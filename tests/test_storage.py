@@ -91,7 +91,7 @@ def test_end_to_end_index_and_search(tmp_path: Path,
     (root / "serving.md").write_text(MD_FILE, encoding="utf-8")
     source = SourceConfig(
         root=str(root), include=[".py", ".md"], code_extensions=[".py"],
-        chunkers={".py": "python_ast", ".md": "markdown_headers"},
+        chunkers={".py": "python_ast", ".md": "markdown_headers_packed"},
     )
     config = RagConfig(
         paths=PathsConfig(processed_dir=str(tmp_path / "processed")),

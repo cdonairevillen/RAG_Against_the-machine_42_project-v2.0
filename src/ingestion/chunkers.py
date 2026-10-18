@@ -7,8 +7,6 @@ OVERLAP_RATIO = 0.20
 DEFAULT_CODE_CHUNK_SIZE = 2000
 DEFAULT_DOC_CHUNK_SIZE = 2000
 
-MIN_SECTION_SIZE = 200
-
 
 def split_by_size(text: str, file_path: str, chunk_type: str,
                   max_chunk_size: int, start_offset: int = 0,
@@ -263,152 +261,6 @@ def chunk_python_file(file_path: str, content: str,
     return chunks
 
 
-def chunk_doc_file(file_path: str, content: str,
-                   max_chunk_size: int = DEFAULT_DOC_CHUNK_SIZE
-                   ) -> list[Chunk]:
-    """Chunk a Markdown or RST file by splitting on header lines.
-
-    Sections smaller than MIN_SECTION_SIZE are accumulated with the
-    next section before flushing, so parent chunks always carry
-    enough context for downstream ranking. Tables are kept as
-    indivisible units and prefixed with the section title.
-
-    Args:
-        file_path: Relative path used for chunk metadata.
-        content: Full text content of the file.
-        max_chunk_size: Maximum characters per chunk.
-
-    Returns:
-        List of Chunk objects.
-    """
-    chunks: list[Chunk] = []
-    lines = content.splitlines(keepends=True)
-
-    section_lines: list[str] = []
-    section_start_offset = 0
-    char_offset = 0
-    section_title: str = ""
-
-    def is_table_line(line: str) -> bool:
-        return line.strip().startswith("|")
-
-    def flush(_end_offset: int) -> None:
-        section_text = "".join(section_lines).strip()
-        if not section_text:
-            return
-
-        blocks: list[tuple[str, bool]] = []
-        current_block: list[str] = []
-        current_is_table = is_table_line(section_lines[0])
-
-        for line in section_lines:
-            line_is_table = is_table_line(line)
-            if line_is_table != current_is_table:
-                if current_block:
-                    blocks.append(
-                        ("".join(current_block), current_is_table)
-                    )
-                current_block = [line]
-                current_is_table = line_is_table
-            else:
-                current_block.append(line)
-        if current_block:
-            blocks.append(("".join(current_block), current_is_table))
-
-        block_offset = section_start_offset
-        for block_text, is_table in blocks:
-            block_stripped = block_text.strip()
-            if not block_stripped:
-                block_offset += len(block_text)
-                continue
-
-            block_end = block_offset + len(block_text)
-
-            if is_table:
-                full_text = (
-                    section_title + "\n" + block_stripped
-                    if section_title else block_stripped
-                )
-                if len(full_text) <= max_chunk_size:
-                    chunks.append(Chunk(
-                        text=full_text,
-                        file_path=file_path,
-                        first_character_index=block_offset,
-                        last_character_index=block_end,
-                        chunk_type="doc",
-                    ))
-                else:
-                    chunks.extend(split_with_header(
-                        block_text,
-                        section_title + "\n" if section_title else "",
-                        file_path, "doc", max_chunk_size, block_offset,
-                    ))
-            else:
-                if len(block_stripped) <= max_chunk_size:
-                    chunks.append(Chunk(
-                        text=block_stripped,
-                        file_path=file_path,
-                        first_character_index=block_offset,
-                        last_character_index=block_end,
-                        chunk_type="doc",
-                    ))
-                else:
-                    chunks.extend(split_by_size(
-                        block_stripped, file_path, "doc",
-                        max_chunk_size, block_offset,
-                    ))
-
-            block_offset += len(block_text)
-
-    pending_lines: list[str] = []
-    pending_start_offset = 0
-    pending_title = ""
-
-    for line in lines:
-        if line.startswith("#") and section_lines:
-            section_text = "".join(section_lines).strip()
-            if len(section_text) < MIN_SECTION_SIZE:
-                if not pending_lines:
-                    pending_start_offset = section_start_offset
-                    pending_title = section_title
-                pending_lines.extend(section_lines)
-            else:
-                if pending_lines:
-                    combined = (
-                        "".join(pending_lines) + "".join(section_lines)
-                    )
-                    if len(combined.strip()) <= max_chunk_size:
-                        section_lines = pending_lines + section_lines
-                        section_start_offset = pending_start_offset
-                        section_title = pending_title
-                    else:
-                        old_lines = section_lines
-                        old_start = section_start_offset
-                        old_title = section_title
-                        section_lines = pending_lines
-                        section_start_offset = pending_start_offset
-                        section_title = pending_title
-                        flush(char_offset)
-                        section_lines = old_lines
-                        section_start_offset = old_start
-                        section_title = old_title
-                    pending_lines = []
-                flush(char_offset)
-                section_lines = []
-                section_start_offset = char_offset
-                section_title = line.strip()
-        section_lines.append(line)
-        char_offset += len(line)
-
-    if pending_lines:
-        section_lines = pending_lines + section_lines
-        section_start_offset = pending_start_offset
-        section_title = pending_title
-
-    flush(char_offset)
-    return chunks
-
-
 def chunk_text_file(file_path: str, content: str,
                     max_chunk_size: int = DEFAULT_DOC_CHUNK_SIZE
                     ) -> list[Chunk]:
@@ -463,7 +315,7 @@ def chunk_markdown_packed(file_path: str, content: str,
                           ) -> list[Chunk]:
     """Chunk Markdown by headers, packing consecutive sections.
 
-    Same header-based boundaries as chunk_doc_file(), but sections are
+    Sections start at header lines (see markdown_sections()) and are
     accumulated until the next one would exceed max_chunk_size, so a
     chunk holds as much related context as fits. Consecutive chunks
     overlap by whole sections: a new chunk repeats the trailing sections
@@ -538,7 +390,6 @@ ChunkerFn = Callable[[str, str, int], list[Chunk]]
 # (file_path, content, max_chunk_size) and returns parent chunks.
 CHUNKERS: dict[str, ChunkerFn] = {
     "python_ast": chunk_python_file,
-    "markdown_headers": chunk_doc_file,
     "markdown_headers_packed": chunk_markdown_packed,
     "size": chunk_text_file,
 }

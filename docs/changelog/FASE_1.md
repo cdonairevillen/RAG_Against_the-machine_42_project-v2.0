@@ -103,11 +103,12 @@ Datasets públicos de 42, `k = 10`, evaluador original. Todas las ejecuciones es
   - Las secciones que superan el máximo se subdividen y cada trozo conserva el título.
 - **LangChain** (`RecursiveCharacterTextSplitter` para Markdown): mejor R@1 en la ruta oficial, pero peor en R@10 y en la ruta de la web. **Descartado para esta versión** por tu decisión, con su código y su dependencia retirados. Queda anotado en *Posibilidades* (`docs/PLANING.md`) para volver a medirlo tras la Fase 2.
 - **Solape por líneas** (afinado para intentar subir R@1): no mejora R@1 en la ruta oficial y empeora R@5, R@10 y R@3 en las dos rutas. **Descartado**, y su código retirado.
-- `markdown_headers` (el original) sigue disponible en `rag.toml` como referencia.
+- **`markdown_headers` (el original) retirado del código** por tu decisión. Su versión sigue en la etiqueta `v1.0-42`, y sus resultados en `bench/results/` (ejecuciones `00`–`11`). Tras retirarlo, el benchmark sale idéntico (`18-sin-markdown-headers` = `17-fase1-final`).
+- **B16 (encontrado al adaptar los tests, pendiente para la Fase 2):** `split_by_size()` ajusta el **final** de cada trozo a un salto de línea, pero **no el inicio**, así que los trozos subdivididos empiezan a mitad de línea (por ejemplo `'value 17 |'`). Afecta a todo lo que se subdivide por tamaño, también al código. Corregirlo cambia el troceado de code y hay que medirlo; no se ha mezclado con esta fase.
 
 | Chunker de docs | Chunks padre | Tamaño mediano | Respuesta GT entera en un chunk |
 |---|---|---|---|
-| `markdown_headers` (original) | 1 275 | 633 | 63 % |
+| `markdown_headers` (original, retirado) | 1 275 | 633 | 63 % |
 | LangChain (descartado) | 797 | 1 419 | 81 % |
 | **`markdown_headers_packed`** | 768 | 1 583 | 72 % |
 
@@ -121,7 +122,7 @@ Datasets públicos de 42, `k = 10`, evaluador original. Todas las ejecuciones es
 | `rag.toml` | **Nuevo**: configuración del pipeline |
 | `src/config.py` | **Nuevo**: carga y validación de la config, overrides por entorno |
 | `src/ingestion/chunk.py` | **Nuevo**: `Chunk` con ID estable, dominio, nivel, modalidad y ordinal |
-| `src/ingestion/chunkers.py` | **Nuevo**: chunkers movidos desde `ingester.py` + registro + `split_with_header` (B7) + `markdown_headers_packed` |
+| `src/ingestion/chunkers.py` | **Nuevo**: chunkers movidos desde `ingester.py` + registro + `split_with_header` (B7) + `markdown_headers_packed`, que sustituye a `markdown_headers` |
 | `src/ingestion/pipeline.py` | **Nuevo**: recorrido de fuentes, padres e hijos, BM25 y manifest |
 | `src/storage/base.py` | **Nuevo**: interfaz `ChunkStore` |
 | `src/storage/qdrant_store.py` | **Nuevo**: implementación con Qdrant |

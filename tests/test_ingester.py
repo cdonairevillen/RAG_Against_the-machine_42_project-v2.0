@@ -1,7 +1,7 @@
 from src.config import ChunkingConfig, SourceConfig
 from src.ingestion.chunk import PARENT, chunk_uuid
 from src.ingestion.chunkers import (
-    chunk_doc_file, chunk_markdown_packed, chunk_python_file,
+    chunk_markdown_packed, chunk_python_file,
     markdown_sections, split_by_size,
 )
 from src.ingestion.pipeline import Ingester, assign_ids
@@ -43,7 +43,7 @@ def test_unsplit_python_chunks_match_file_offsets() -> None:
 
 
 def test_doc_chunks_point_inside_their_section() -> None:
-    chunks = chunk_doc_file("f.md", DOC_SOURCE, max_chunk_size=2000)
+    chunks = chunk_markdown_packed("f.md", DOC_SOURCE, max_chunk_size=2000)
 
     assert chunks
     for chunk in chunks:
@@ -114,10 +114,11 @@ def test_split_table_offsets_match_file() -> None:
         + "| name | value |\n|---|---|\n" + rows
     )
     title = "## Table\n"
-    chunks = chunk_doc_file("f.md", source, max_chunk_size=500)
-    table_parts = [c for c in chunks if c.text.startswith(title + "|")]
+    chunks = chunk_markdown_packed("f.md", source, max_chunk_size=500)
+    table_parts = [c for c in chunks if c.text.startswith(title)]
 
     assert len(table_parts) > 1
+    assert table_parts[0].text.startswith(title + "| name | value |")
     for chunk in table_parts:
         file_slice = source[
             chunk.first_character_index:chunk.last_character_index

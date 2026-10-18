@@ -131,6 +131,7 @@ saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web
   - Hoy `uv sync` instala torch en CPU. Para usar la GPU hay que configurar el índice de PyTorch con CUDA en `pyproject.toml`.
 - **B14**: activar la descomposición de identificadores en `expand_query` **junto con** el tokenizador code-aware y la recalibración de `SKIP_RERANK_SCORE`. En la Fase 0, activarla sola subió code R@10 a 0.75 pero bajó R@3.
 - **Elegir o unificar la ruta de retrieval**: `search_smart` (benchmark) y `search_for_generation` (web y `answer`) dan resultados muy distintos. Tras la Fase 1, la ruta generation tiene docs R@5 0.88, una pregunta por debajo de la Fase 0.
+- **B16**: que `split_by_size()` empiece los trozos en un salto de línea (hoy solo ajusta el final). Cambia el troceado de code, así que se mide con `make bench`.
 - **Búsqueda por vectores contra Qdrant** (vectores con nombre en los mismos puntos de `rag_<dominio>`). Hoy el retriever carga todos los chunks en memoria.
 - **Volver a medir el chunker de LangChain** tras el híbrido (está en *Posibilidades* de `PLANING.md`), por si se busca subir R@1.
 - **Fusión con RRF**, con ablaciones por separado en docs y en code (BM25 / dense / híbrido).
