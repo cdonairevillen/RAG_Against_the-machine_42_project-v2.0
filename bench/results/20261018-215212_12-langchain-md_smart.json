@@ -1,0 +1,44 @@
+{
+  "label": "12-langchain-md",
+  "mode": "smart",
+  "k": 10,
+  "timestamp": "2026-10-18T21:51:19",
+  "commit": "44d137e",
+  "dirty": true,
+  "domain": "vllm",
+  "chunking": {
+    "code_chunk_size": 2000,
+    "doc_chunk_size": 2000,
+    "code_child_size": 600,
+    "doc_child_size": 600
+  },
+  "chunkers": {
+    ".py": "python_ast",
+    ".pyi": "python_ast",
+    ".md": "langchain_markdown",
+    ".rst": "langchain_markdown",
+    ".txt": "langchain_markdown"
+  },
+  "datasets": {
+    "docs": {
+      "recall_at_k": {
+        "1": 0.72,
+        "3": 0.84,
+        "5": 0.87,
+        "10": 0.87
+      },
+      "seconds": 7.36,
+      "questions": 100
+    },
+    "code": {
+      "recall_at_k": {
+        "1": 0.44,
+        "3": 0.63,
+        "5": 0.64,
+        "10": 0.72
+      },
+      "seconds": 44.99,
+      "questions": 100
+    }
+  }
+}

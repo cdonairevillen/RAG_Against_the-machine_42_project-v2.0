@@ -1,0 +1,44 @@
+{
+  "label": "16-packed-lines",
+  "mode": "generation",
+  "k": 10,
+  "timestamp": "2026-10-18T22:13:29",
+  "commit": "44d137e",
+  "dirty": true,
+  "domain": "vllm",
+  "chunking": {
+    "code_chunk_size": 2000,
+    "doc_chunk_size": 2000,
+    "code_child_size": 600,
+    "doc_child_size": 600
+  },
+  "chunkers": {
+    ".py": "python_ast",
+    ".pyi": "python_ast",
+    ".md": "markdown_headers_packed_lines",
+    ".rst": "markdown_headers_packed_lines",
+    ".txt": "markdown_headers_packed_lines"
+  },
+  "datasets": {
+    "docs": {
+      "recall_at_k": {
+        "1": 0.7,
+        "3": 0.8,
+        "5": 0.85,
+        "10": 0.9
+      },
+      "seconds": 95.79,
+      "questions": 100
+    },
+    "code": {
+      "recall_at_k": {
+        "1": 0.24,
+        "3": 0.56,
+        "5": 0.64,
+        "10": 0.7
+      },
+      "seconds": 93.96,
+      "questions": 100
+    }
+  }
+}

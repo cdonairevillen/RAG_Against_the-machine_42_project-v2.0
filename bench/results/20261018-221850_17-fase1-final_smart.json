@@ -1,0 +1,44 @@
+{
+  "label": "17-fase1-final",
+  "mode": "smart",
+  "k": 10,
+  "timestamp": "2026-10-18T22:18:06",
+  "commit": "44d137e",
+  "dirty": true,
+  "domain": "vllm",
+  "chunking": {
+    "code_chunk_size": 2000,
+    "doc_chunk_size": 2000,
+    "code_child_size": 600,
+    "doc_child_size": 600
+  },
+  "chunkers": {
+    ".py": "python_ast",
+    ".pyi": "python_ast",
+    ".md": "markdown_headers_packed",
+    ".rst": "markdown_headers_packed",
+    ".txt": "markdown_headers_packed"
+  },
+  "datasets": {
+    "docs": {
+      "recall_at_k": {
+        "1": 0.68,
+        "3": 0.84,
+        "5": 0.86,
+        "10": 0.88
+      },
+      "seconds": 5.42,
+      "questions": 100
+    },
+    "code": {
+      "recall_at_k": {
+        "1": 0.43,
+        "3": 0.63,
+        "5": 0.64,
+        "10": 0.72
+      },
+      "seconds": 38.92,
+      "questions": 100
+    }
+  }
+}

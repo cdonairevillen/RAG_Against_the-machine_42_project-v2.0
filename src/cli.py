@@ -1,10 +1,13 @@
 import os
+from typing import Optional
+
 from pydantic import BaseModel
 from tqdm import tqdm
 
+from src.config import CONFIG_FILE, RagConfig, load_config
 from src.retriever import Retriever
 from src.generator import Generator
-from src.ingester import Chunk
+from src.ingestion.chunk import Chunk
 from src.models import (
     MinimalAnswer,
     MinimalSearchResults,
@@ -14,8 +17,7 @@ from src.models import (
     MinimalSource,
 )
 
-PROCESSED_DIR = "data/processed"
-REPO_ROOT = "data/raw/vllm-0.10.1"
+DEFAULT_DOMAIN = "vllm"
 
 
 class CLI:
@@ -23,15 +25,17 @@ class CLI:
     point.
 
     Loads Retriever and Generator lazily on first use and reuses
-    them for all subsequent calls within the same process.
+    them for all subsequent calls within the same process. Pipeline
+    settings (Qdrant, chunking, sources) come from rag.toml.
 
     Commands:
-        index           Build the BM25 indices.
+        index           Chunk a source and store it (Qdrant + BM25).
         search          Search for a single query (fast, no reranker).
         search_dataset  Batch retrieval over a full dataset JSON.
         answer          Answer a single question (with reranker).
         answer_dataset  Full pipeline: retrieve + rerank + generate.
         evaluate        Compute Recall@k against ground truth.
+        bench           Run and record both public 42 datasets.
 
     Examples:
         uv run python -m src index
@@ -50,18 +54,16 @@ class CLI:
             data/datasets/AnsweredQuestions/dataset_docs_public.json
     """
 
-    def __init__(self, processed_dir: str = PROCESSED_DIR,
-                 repo_root: str = REPO_ROOT) -> None:
+    def __init__(self, domain: str = DEFAULT_DOMAIN,
+                 config: str = CONFIG_FILE) -> None:
         """Initialise the CLI orchestrator.
 
         Args:
-            processed_dir: Directory containing chunks and BM25
-                indices.
-            repo_root: Root of the vLLM repository (used by
-                Generator).
+            domain: Knowledge source to work on (a source in rag.toml).
+            config: Path to the TOML configuration file.
         """
-        self.processed_dir = processed_dir
-        self.repo_root = repo_root
+        self.domain = domain
+        self.config: RagConfig = load_config(config)
         self.retriever: Retriever | None = None
         self.generator: Generator | None = None
 
@@ -81,10 +83,13 @@ class CLI:
         """
         if self.retriever is None:
             try:
-                self.retriever = Retriever.from_disk(self.processed_dir)
+                self.retriever = Retriever.from_store(
+                    self.domain, config=self.config
+                )
             except Exception as exc:
                 print(f"Error loading index: {exc}")
-                print("Have you run 'uv run python -m src index' yet?")
+                print("Is Qdrant up ('make db-up') and the source "
+                      "indexed ('make index')?")
                 raise
 
         if with_reranker and self.retriever.reranker is None:
@@ -103,47 +108,62 @@ class CLI:
         """
         if self.generator is None:
             try:
-                self.generator = Generator(repo_root=self.repo_root)
+                self.generator = Generator()
             except Exception as exc:
                 print(f"Error loading model: {exc}")
                 raise
         return self.generator
 
-    def index(self, repo_root: str = REPO_ROOT,
-              max_chunk_size: int = 2000,
-              code_chunk_size: int = 2000,
-              doc_chunk_size: int = 2000,
-              output_dir: str = PROCESSED_DIR,
-              use_embeddings: bool = False) -> None:
-        """Ingest the vLLM repository and persist the BM25 indices.
+    def index(self, source: Optional[str] = None,
+              max_chunk_size: Optional[int] = None,
+              code_chunk_size: Optional[int] = None,
+              doc_chunk_size: Optional[int] = None,
+              repo_root: Optional[str] = None) -> None:
+        """Chunk a knowledge source and persist it.
+
+        Chunk records go to Qdrant and the BM25 indices to
+        <processed_dir>/<source>/. Sizes default to rag.toml.
 
         Args:
-            repo_root: Path to the vLLM repository root.
-            max_chunk_size: Overrides both code and doc chunk size
-                when different from the 2000-char default.
-            code_chunk_size: Maximum characters per code chunk.
-            doc_chunk_size: Maximum characters per doc chunk.
-            output_dir: Where chunks and indices are saved.
-            use_embeddings: Reserved for future use; has no effect.
+            source: Source to index (defaults to the CLI domain).
+            max_chunk_size: Overrides both code and doc parent sizes.
+            code_chunk_size: Maximum characters per code parent chunk.
+            doc_chunk_size: Maximum characters per doc parent chunk.
+            repo_root: Overrides the source root directory.
         """
-        from src.ingester import Ingester
+        from src.ingestion.pipeline import Ingester
+        from src.storage.qdrant_store import QdrantChunkStore
 
-        if max_chunk_size != 2000:
-            code_chunk_size = max_chunk_size
-            doc_chunk_size = max_chunk_size
+        domain = source or self.domain
+        try:
+            source_cfg = self.config.source(domain)
+        except KeyError as exc:
+            print(f"Error: {exc.args[0]}")
+            return
+        if repo_root:
+            source_cfg = source_cfg.model_copy(update={"root": repo_root})
+        chunking = self.config.chunking.model_copy(update={
+            k: v for k, v in {
+                "code_chunk_size": code_chunk_size or max_chunk_size,
+                "doc_chunk_size": doc_chunk_size or max_chunk_size,
+            }.items() if v
+        })
 
-        if not os.path.isdir(repo_root):
-            print(f"Error: repository not found at '{repo_root}'")
+        if not os.path.isdir(source_cfg.root):
+            print(f"Error: source root not found at '{source_cfg.root}'")
             return
         try:
-            ingester = Ingester(
-                repo_root=repo_root,
-                code_chunk_size=code_chunk_size,
-                doc_chunk_size=doc_chunk_size,
+            store = QdrantChunkStore.from_config(self.config.qdrant)
+            ingester = Ingester(domain, source_cfg, chunking)
+            ingester.build()
+            ingester.save_bm25(self.config.paths.processed_dir)
+            store.replace(domain, ingester.all_chunks())
+            docs = sum(1 for c in ingester.chunks if c.chunk_type == "doc")
+            print(
+                f"Indexed '{domain}': {len(ingester.parent_chunks)} "
+                f"parents, {len(ingester.chunks)} children "
+                f"({docs} doc, {len(ingester.chunks) - docs} code)"
             )
-            ingester.build(use_embeddings=use_embeddings)
-            ingester.save(output_dir)
-            print("Ingestion complete! Indices saved under", output_dir)
         except Exception as exc:
             print(f"Error during indexing: {exc}")
 
@@ -417,7 +437,7 @@ class CLI:
         try:
             run_bench(
                 label=label, mode=mode, k=k,
-                processed_dir=self.processed_dir,
+                domain=self.domain, config=self.config,
             )
         except Exception as exc:
             print(f"Error during bench: {exc}")

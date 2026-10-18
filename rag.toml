@@ -1,0 +1,38 @@
+# RAG Against the Machine — pipeline configuration.
+# Every value can be overridden with an environment variable named
+# RAG_<SECTION>_<KEY> (e.g. RAG_QDRANT_URL=http://other-host:6333).
+
+[qdrant]
+url = "http://localhost:6333"
+collection_prefix = "rag_"
+batch_size = 512
+
+[paths]
+processed_dir = "data/processed"
+
+[chunking]
+code_chunk_size = 2000
+doc_chunk_size = 2000
+code_child_size = 600
+doc_child_size = 600
+
+# One block per knowledge source. `chunkers` maps a file extension to a
+# chunker name (see src/ingestion/chunkers.py); unknown extensions fall
+# back to `default_chunker`.
+[sources.vllm]
+root = "data/raw/vllm-0.10.1"
+include = [".py", ".pyi", ".md", ".rst", ".txt"]
+exclude_dirs = [
+    "csrc", ".buildkite", ".github", "cmake", "docker", ".gemini",
+    "requirements", "__pycache__", ".git", "node_modules", "tests",
+    "examples",
+]
+code_extensions = [".py", ".pyi"]
+default_chunker = "size"
+
+[sources.vllm.chunkers]
+".py" = "python_ast"
+".pyi" = "python_ast"
+".md" = "markdown_headers_packed"
+".rst" = "markdown_headers_packed"
+".txt" = "markdown_headers_packed"

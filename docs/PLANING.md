@@ -50,6 +50,10 @@ Usar otros modelos. A parte de Qwen3-0.6b podemos buscar otros modelos libres qu
 
 Ingesta de imagenes y videos. Ampliar la ingesta para que el RAG pueda trabajar tambien con contenido multimedia (imagenes, capturas, diagramas, videos) y no solo con texto y codigo. No se como de viable es, pero me gustaria valorarlo. Se valoraria como parte de la ingesta.
 
+------------------------------------
+
+Chunker de LangChain para documentacion (descartado en Fase 1, se puede retomar). Medido en Fase 1: en la ruta oficial mejoraba R@1 (0.72 frente a 0.68 del chunker propio empaquetado), pero quedaba por debajo en R@10 y empeoraba la ruta de la web (R@5 0.85 frente a 0.88). Con la busqueda hibrida y los rerankers de Fase 2 el reparto puede cambiar, asi que merece la pena volver a medirlo si se busca subir R@1. Detalle en changelog/FASE_1.md.
+
 # Limitaciones #
 
 NO QUIERO GASTAR DINERO. Actualmente tenemos solo una aplicacion subida a google cloud y si quisiesemos podriamos subir otra mas, pero si esto entra en conflicto con la funcionalidad de nuestra aplicacion desplegada, se elimina la opcion de subirla por el momento

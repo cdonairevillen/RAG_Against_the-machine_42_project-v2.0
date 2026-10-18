@@ -49,6 +49,7 @@ Dado que vamos a hacer un frontend real, podríamos plantear la **modularizació
 **Regla común a todas las fases:**
 - Al cerrar cada fase se ejecuta `make bench` sobre los datasets públicos de 42.
 - **Los recalls no pueden empeorar** respecto a la mejor marca anterior. Si empeoran, se justifica en el changelog o se revierte.
+- **Prioridad de métricas: R@5 > R@10 > R@3 > R@1.** Un cambio que sube R@1 a costa de las demás no se adopta.
 - Cada fase cierra con su `changelog/FASE_N.md`: qué se ha cambiado, lista de ficheros, por qué, en qué afecta y qué debes saber de la arquitectura.
 
 ```
@@ -110,6 +111,14 @@ saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web
 
 **Cierre:** es un refactor, así que **los recalls deben ser iguales** a los de la Fase 0, salvo la variación por el fix de offsets (B7), que se documenta.
 
+> ✅ **Completada (2026-10-18).** Detalle en `changelog/FASE_1.md`. Cambios respecto al plan:
+> - **Qdrant en servidor (Docker)**, no en modo local: el modo local tardaba ~9 min en escribir los chunks.
+> - **Chunker de docs:** tu versión empaquetada (`markdown_headers_packed`), no LangChain.
+>
+> Línea base oficial (`search_smart`):
+> - **Docs:** 0.68 / 0.84 / 0.86 / 0.88.
+> - **Code:** 0.43 / 0.63 / 0.64 / 0.72.
+
 ## Fase 2 — Retrieval híbrido
 
 **Objetivo:** demostrar con números si el híbrido mejora, ahora que los embeddings se implementan bien (ver `RESPUESTA.md` §3).
@@ -121,7 +130,9 @@ saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web
   - La ingesta pesada se hace en la 3080 Ti. Los valores por defecto deben poder ejecutarse en 42 (D3).
   - Hoy `uv sync` instala torch en CPU. Para usar la GPU hay que configurar el índice de PyTorch con CUDA en `pyproject.toml`.
 - **B14**: activar la descomposición de identificadores en `expand_query` **junto con** el tokenizador code-aware y la recalibración de `SKIP_RERANK_SCORE`. En la Fase 0, activarla sola subió code R@10 a 0.75 pero bajó R@3.
-- **Elegir o unificar la ruta de retrieval**: `search_smart` (benchmark) y `search_for_generation` (web y `answer`) dan resultados muy distintos.
+- **Elegir o unificar la ruta de retrieval**: `search_smart` (benchmark) y `search_for_generation` (web y `answer`) dan resultados muy distintos. Tras la Fase 1, la ruta generation tiene docs R@5 0.88, una pregunta por debajo de la Fase 0.
+- **Búsqueda por vectores contra Qdrant** (vectores con nombre en los mismos puntos de `rag_<dominio>`). Hoy el retriever carga todos los chunks en memoria.
+- **Volver a medir el chunker de LangChain** tras el híbrido (está en *Posibilidades* de `PLANING.md`), por si se busca subir R@1.
 - **Fusión con RRF**, con ablaciones por separado en docs y en code (BM25 / dense / híbrido).
 - **Rerankers**:
   - `ms-marco-MiniLM` (referencia actual).
@@ -189,6 +200,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **Agente intermediario propio**:
   - Router, reescritura de la query y llamada a herramientas, con *fallback* determinista.
   - Bucle de varios pasos solo con los modelos opcionales grandes.
+  - **Memoria** (petición tuya): historial de la conversación más memoria semántica recuperable. Se puede guardar en Qdrant (una colección `memory_*` con vectores) o, si hace falta algo relacional, motivar el paso a Postgres que se dejó abierto en la Fase 1.
 - **Acceso directo al RAG** siempre disponible: se elige con un flag de config o de la petición.
 - **Benchmark agente frente a acceso directo** (recall, calidad, latencia) en `BENCHMARK_REPORT.md`.
 - ⚠️ **D7 se discute antes de empezar esta fase.**
@@ -235,5 +247,10 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-18**: el CDN de 42 devuelve 403 sin sesión. Los datasets públicos se versionan en `data/datasets/` (recuperados del historial) y vLLM 0.10.1 se descarga de la etiqueta oficial de GitHub. Verificado: las 200 fuentes de ground truth coinciden en ruta y offsets.
 - **2026-10-18**: `llm_sdk` se importa de forma estándar (`from llm_sdk import ...`). El arreglo está en la config de mypy (`mypy_path = "llm_sdk"`), sin tocar la carpeta del SDK.
 - **2026-10-18**: Fase 0 completada. Ver `changelog/FASE_0.md`.
+- **2026-10-18**: **base de datos: Qdrant en servidor (Docker)**, decidido tras medir Qdrant local, Qdrant servidor, Postgres + pgvector, SQLite y LanceDB (esta última bloqueada por Windows). Postgres queda como opción si más adelante hace falta una base relacional (por ejemplo, la memoria del agente).
+- **2026-10-18**: prioridad de métricas: R@5 > R@10 > R@3 > R@1.
+- **2026-10-18**: LangChain descartado como chunker en esta versión (anotado en *Posibilidades*); el chunker de docs por defecto es el propio empaquetado.
+- **2026-10-18**: el campo `lang` del payload, previsto en la Fase 1, no se ha añadido todavía: vLLM es solo inglés. Entra con el modo CV multilingüe (Fase 4).
+- **2026-10-18**: Fase 1 completada. Ver `changelog/FASE_1.md`.
 - **2026-10-18**: las cifras del README (docs 0.89 / code 0.75 en R@10) eran de los datasets **públicos**, aunque estuvieran etiquetadas como privadas, y salían de configuraciones anteriores que no se reproducen con `v1.0-42`. Se acepta como línea base oficial `04-fase0-final / smart`. La etiqueta del README se corrige en la reescritura final.
 - **2026-10-18**: finales de línea normalizados a LF con `.gitattributes`, con `llm_sdk/` excluido (P7).

@@ -13,7 +13,8 @@ dependencies = [
     "llm-sdk",
     "streamlit",
     "sentence-transformers",
-
+    "qdrant-client==1.19.1",
+    "tomli>=2.0 ; python_full_version < '3.11'",
 ]
 
 [tool.uv.sources]
@@ -45,3 +46,6 @@ check_untyped_defs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+filterwarnings = [
+    "ignore:Payload indexes have no effect in the local Qdrant:UserWarning",
+]

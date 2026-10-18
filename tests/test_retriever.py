@@ -1,11 +1,11 @@
-from src.ingester import Chunk
+from src.ingestion.chunk import Chunk
 from src.retriever import Retriever, expand_query
 
 
 def make_retriever(chunks: list[Chunk],
                    parents: list[Chunk]) -> Retriever:
     retriever = Retriever(chunks=chunks, bm25=None)  # type: ignore[arg-type]
-    retriever.parent_chunks = parents
+    retriever.set_parents(parents)
     return retriever
 
 
@@ -42,8 +42,8 @@ def test_classifier_ignores_product_name_and_first_word() -> None:
 
 
 def test_child_maps_to_parent_source() -> None:
-    parent = Chunk("parent text", "f.py", 10, 90, "code")
-    child = Chunk("child", "f.py", 20, 40, "code", parent_id=0)
+    parent = Chunk("parent text", "f.py", 10, 90, "code", id="p1")
+    child = Chunk("child", "f.py", 20, 40, "code", parent_id="p1")
     retriever = make_retriever([child], [parent])
 
     source = retriever.child_to_parent_source(child)
@@ -53,7 +53,7 @@ def test_child_maps_to_parent_source() -> None:
 
 
 def test_orphan_child_maps_to_itself() -> None:
-    child = Chunk("child", "f.py", 20, 40, "code", parent_id=-1)
+    child = Chunk("child", "f.py", 20, 40, "code", parent_id="")
     retriever = make_retriever([child], [])
 
     source = retriever.child_to_parent_source(child)

@@ -2,8 +2,11 @@ import re
 from typing import Optional
 import bm25s
 import numpy as np
-from src.ingester import Chunk, Ingester
+from src.config import RagConfig, get_config
+from src.ingestion.chunk import CHILD, PARENT, Chunk
+from src.ingestion.pipeline import load_bm25
 from src.models import MinimalSource
+from src.storage.base import ChunkStore
 
 IDENTIFIER_PATTERN = re.compile(r"_|[a-z0-9][A-Z]|[A-Z]{2,}[a-z]{2,}")
 TOKEN_PUNCTUATION = ".,;:?!()[]{}'\"`"
@@ -98,7 +101,7 @@ class Retriever:
                  bm25: bm25s.BM25) -> None:
         """Initialise with pre-loaded components.
 
-        Prefer Retriever.from_disk() for normal usage.
+        Prefer Retriever.from_store() for normal usage.
 
         Args:
             chunks: All child Chunk objects in corpus order.
@@ -111,6 +114,7 @@ class Retriever:
         self.chunk_map: dict = {}
         self.parent_chunk_map: dict = {}
         self.parent_chunks: list[Chunk] = []
+        self.parent_by_id: dict[str, Chunk] = {}
 
         self.bm25_code: Optional[bm25s.BM25] = None
         self.bm25_doc: Optional[bm25s.BM25] = None
@@ -150,29 +154,78 @@ class Retriever:
             print(f"Warning: reranker unavailable ({exc}).")
             self.reranker = None
 
+    def set_parents(self, parents: list[Chunk]) -> None:
+        """Set the parent chunks and reset the lookups built on them."""
+        self.parent_chunks = parents
+        self.parent_by_id = {p.id: p for p in parents}
+        self.parent_chunk_map = {}
+
+    def set_children(self, children: list[Chunk]) -> None:
+        """Set the child chunks (in BM25 row order) and derive the
+        per-type row mappings used by the code and doc indices."""
+        self.chunks = children
+        self.chunk_map = {}
+        self.code_chunk_indices = [
+            i for i, c in enumerate(children) if c.chunk_type == "code"
+        ]
+        self.doc_chunk_indices = [
+            i for i, c in enumerate(children) if c.chunk_type == "doc"
+        ]
+
     @classmethod
-    def from_disk(cls, processed_dir: str) -> "Retriever":
-        """Load a Retriever from a directory produced by Ingester.save().
+    def from_store(cls, domain: str = "vllm",
+                   config: Optional[RagConfig] = None,
+                   store: Optional[ChunkStore] = None) -> "Retriever":
+        """Load a Retriever for one domain.
+
+        Chunk records come from the ChunkStore (Qdrant) and the BM25
+        indices from disk; the manifest written at indexing time
+        guarantees both belong to the same ingestion run.
 
         Args:
-            processed_dir: Path containing chunks/ and the BM25
-                index directories.
+            domain: Knowledge source to load (a key of rag.toml sources).
+            config: Pipeline configuration (defaults to rag.toml).
+            store: ChunkStore to read from (defaults to Qdrant from the
+                configuration).
 
         Returns:
             A ready-to-use Retriever instance.
 
         Raises:
-            RuntimeError: If the unified BM25 index fails to load.
+            RuntimeError: If the store and the BM25 indices disagree,
+                which means the domain must be re-indexed.
         """
-        ingester = Ingester.load(processed_dir)
-        if ingester.bm25 is None:
-            raise RuntimeError("BM25 index failed to load from disk.")
-        retriever = cls(chunks=ingester.chunks, bm25=ingester.bm25)
-        retriever.parent_chunks = ingester.parent_chunks
-        retriever.bm25_code = ingester.bm25_code
-        retriever.bm25_doc = ingester.bm25_doc
-        retriever.code_chunk_indices = ingester.code_chunk_indices
-        retriever.doc_chunk_indices = ingester.doc_chunk_indices
+        config = config or get_config()
+        if store is None:
+            from src.storage.qdrant_store import QdrantChunkStore
+            store = QdrantChunkStore.from_config(config.qdrant)
+
+        bm25, bm25_code, bm25_doc, manifest = load_bm25(
+            config.paths.processed_dir, domain
+        )
+        chunks = store.load(domain)
+        parents = [c for c in chunks if c.level == PARENT]
+        children = [c for c in chunks if c.level == CHILD]
+        if (len(parents), len(children)) != (
+                manifest["parents"], manifest["children"]):
+            raise RuntimeError(
+                f"Store has {len(parents)} parents / {len(children)} "
+                f"children for '{domain}' but the BM25 index expects "
+                f"{manifest['parents']} / {manifest['children']}. "
+                f"Run 'make index' again."
+            )
+
+        retriever = cls(chunks=children, bm25=bm25)
+        retriever.set_children(children)
+        retriever.set_parents(parents)
+        retriever.bm25_code = bm25_code
+        retriever.bm25_doc = bm25_doc
+        print(
+            f"Loaded {len(children)} chunks for '{domain}' "
+            f"({len(retriever.doc_chunk_indices)} doc, "
+            f"{len(retriever.code_chunk_indices)} code), "
+            f"{len(parents)} parents"
+        )
         return retriever
 
     def search(self, query: str, k: int = 10) -> list[MinimalSource]:
@@ -601,8 +654,8 @@ class Retriever:
             MinimalSource of the parent chunk, or the child's own
             source if it has no parent.
         """
-        if 0 <= child.parent_id < len(self.parent_chunks):
-            parent = self.parent_chunks[child.parent_id]
+        parent = self.parent_by_id.get(child.parent_id)
+        if parent is not None:
             return MinimalSource(
                 file_path=parent.file_path,
                 first_character_index=parent.first_character_index,

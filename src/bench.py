@@ -3,10 +3,11 @@ import os
 import subprocess
 import time
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from tqdm import tqdm
 
+from src.config import RagConfig, get_config
 from src.evaluator import Evaluator
 from src.models import MinimalSearchResults, RagDataset, StudentSearchResults
 from src.retriever import Retriever
@@ -142,7 +143,7 @@ def print_table(runs: list[dict[str, Any]]) -> None:
 
 
 def run_bench(label: str, mode: str = "smart", k: int = 10,
-              processed_dir: str = "data/processed",
+              domain: str = "vllm", config: Optional[RagConfig] = None,
               save: bool = True) -> dict[str, Any]:
     """Run the public 42 datasets end to end and record the result.
 
@@ -150,7 +151,8 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
         label: Short name for this run (e.g. 'baseline', 'fix-b1').
         mode: 'smart' or 'generation'.
         k: Number of sources retrieved per question.
-        processed_dir: Directory with the built indices.
+        domain: Indexed source the datasets are about.
+        config: Pipeline configuration (defaults to rag.toml).
         save: When True, writes the run to bench/results/.
 
     Returns:
@@ -162,7 +164,8 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}, got '{mode}'")
 
-    retriever = Retriever.from_disk(processed_dir)
+    config = config or get_config()
+    retriever = Retriever.from_store(domain, config=config)
     retriever.load_reranker()
 
     run: dict[str, Any] = {
@@ -171,6 +174,9 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
         "k": k,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         **git_revision(),
+        "domain": domain,
+        "chunking": config.chunking.model_dump(),
+        "chunkers": config.source(domain).chunkers,
         "datasets": {},
     }
     output_dir = os.path.join(OUTPUT_DIR, f"{label}_{mode}")

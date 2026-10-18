@@ -7,8 +7,7 @@ sys.path.insert(
     0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
 
-PROCESSED_DIR = "data/processed"
-REPO_ROOT = "data/raw/vllm-0.10.1"
+DOMAIN = "vllm"
 EVAL_DOCS = "data/output/search_results/dataset_docs_public.json"
 EVAL_CODE = "data/output/search_results/dataset_code_public.json"
 GT_DOCS = "data/datasets/AnsweredQuestions/dataset_docs_public.json"
@@ -260,7 +259,7 @@ def load_retriever() -> object:
         Loaded Retriever instance cached in session state.
     """
     from src.retriever import Retriever
-    retriever = Retriever.from_disk(PROCESSED_DIR)
+    retriever = Retriever.from_store(DOMAIN)
     retriever.load_reranker()
     return retriever
 
@@ -272,7 +271,7 @@ def load_generator() -> object:
         Loaded Generator instance cached in session state.
     """
     from src.generator import Generator
-    return Generator(repo_root=REPO_ROOT)
+    return Generator()
 
 
 def load_recall_metrics() -> dict:

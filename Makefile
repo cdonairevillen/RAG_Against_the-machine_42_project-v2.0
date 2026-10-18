@@ -68,10 +68,21 @@ data-42:
 	@mv datasets_public/public/UnansweredQuestions $(DATASETS)
 	@rm -rf datasets_public datasets_public.zip vllm-0.10.1.zip
 
+# Qdrant server (docker-compose.yml). Data lives in a named Docker volume.
+db-up:
+	@docker compose up -d --quiet-pull qdrant >/dev/null 2>&1
+	@sh -c 'for i in $$(seq 1 30); do curl -sf localhost:6333/readyz >/dev/null && exit 0; sleep 1; done; echo "Qdrant did not start"; exit 1'
+
+db-down:
+	docker compose down
+
+db-reset:
+	docker compose down -v
+
 run:
 	$(RUN) $(ARGS)
 
-web:
+web: db-up
 	$(ENV) $(UV) run streamlit run src/web.py &
 	@echo "Web running at http://localhost:8501"
 
@@ -79,15 +90,15 @@ web-stop:
 	@echo "Closing web."
 	@pkill -f "streamlit run" || true
 
-index:
+index: db-up
 	$(RUN) index --max_chunk_size 2000
 
-search-docs:
+search-docs: db-up
 	$(RUN) search_dataset \
 		--dataset_path $(DATASETS)/UnansweredQuestions/dataset_docs_public.json \
 		--save_directory $(SEARCH)
 
-search-code:
+search-code: db-up
 	$(RUN) search_dataset \
 		--dataset_path $(DATASETS)/UnansweredQuestions/dataset_code_public.json \
 		--save_directory $(SEARCH)
@@ -104,10 +115,10 @@ eval-code:
 		--dataset_path $(DATASETS)/AnsweredQuestions/dataset_code_public.json \
 		--k 10
 
-bench:
+bench: db-up
 	$(RUN) bench --label $(LABEL) --mode smart
 
-bench-gen:
+bench-gen: db-up
 	$(RUN) bench --label $(LABEL) --mode generation
 
 test:
@@ -140,5 +151,5 @@ meme:
 	$(ENV) $(UV) run streamlit run src/web.py &
 	@echo "Web running at http://localhost:8501"
 
-.PHONY: install data data-42 run web web-stop index search-docs search-code \
+.PHONY: install data data-42 db-up db-down db-reset run web web-stop index search-docs search-code \
         eval-docs eval-code bench bench-gen test lint clean meme
