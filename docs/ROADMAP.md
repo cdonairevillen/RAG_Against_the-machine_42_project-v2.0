@@ -129,10 +129,10 @@ saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web
   - Candidatos **multilingües** (D6): `multilingual-e5-small`, `bge-m3`, `Qwen3-Embedding-0.6B`.
   - Referencia: `bge-small-en-v1.5`.
   - La ingesta pesada se hace en la 3080 Ti. Los valores por defecto deben poder ejecutarse en 42 (D3).
-  - Hoy `uv sync` instala torch en CPU. Para usar la GPU hay que configurar el índice de PyTorch con CUDA en `pyproject.toml`.
+  - ✅ torch con CUDA 12.6 configurado; `device = "auto"` cae a CPU sin GPU (probado).
 - **B14**: activar la descomposición de identificadores en `expand_query` **junto con** el tokenizador code-aware y la recalibración de `SKIP_RERANK_SCORE`. En la Fase 0, activarla sola subió code R@10 a 0.75 pero bajó R@3.
-- **Elegir o unificar la ruta de retrieval**: `search_smart` (benchmark) y `search_for_generation` (web y `answer`) dan resultados muy distintos. Tras la Fase 1, la ruta generation tiene docs R@5 0.88, una pregunta por debajo de la Fase 0.
-- **Recuperar code en la ruta oficial**: tras B16/B17 (cierre de la Fase 1), code R@3 bajó de 0.63 a 0.59 y R@10 de 0.72 a 0.71. El original daba, sin querer, doble peso en BM25 al final de las funciones. Revisar con la recalibración de umbrales y el híbrido, incluida la pregunta de Molmo (`multimodal_embeddings`) que dejó de encontrarse.
+- ✅ **Rutas unificadas**: `search_for_generation` = filtro de relevancia + `search_smart`.
+- ✅ **Code recuperado** con la fusión RRF por listas y el reranker siempre activo: code 0.45 / 0.63 / 0.67 / 0.72 (supera la Fase 0) y docs 0.72 / 0.90 / 0.93 / 0.95.
 - **Búsqueda por vectores contra Qdrant** (vectores con nombre en los mismos puntos de `rag_<dominio>`). Hoy el retriever carga todos los chunks en memoria.
 - **Volver a medir el chunker de LangChain** tras el híbrido (está en *Posibilidades* de `PLANING.md`), por si se busca subir R@1.
 - **Fusión con RRF**, con ablaciones por separado en docs y en code (BM25 / dense / híbrido).
@@ -140,7 +140,7 @@ saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web
   - `ms-marco-MiniLM` (referencia actual).
   - `bge-reranker-v2-m3` (multilingüe).
   - `Qwen3-Reranker-0.6B`.
-- **Revisar las reglas manuales** (`SKIP_RERANK_SCORE`, mínimo de 2 docs, umbral 5.5): se mantienen solo si siguen aportando.
+- **Reglas manuales**: ✅ `skip_rerank_score` (ahora `inf`) y ✅ mínimo de 2 docs (eliminado al unificar). El umbral 5.5 está medido como mala señal; pasa a la Fase 3 (B15). Pendiente: revisar el clasificador doc/code.
 - **Métricas complementarias**: MRR y nDCG@10. El evaluador de 42 queda intacto.
 
 **Entregable:** `docs/BENCHMARK_REPORT.md`, sección *Retrieval* (tabla de configuraciones × recall docs/code × latencia).
@@ -254,5 +254,6 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-18**: LangChain descartado como chunker en esta versión (anotado en *Posibilidades*); el chunker de docs por defecto es el propio empaquetado.
 - **2026-10-18**: el campo `lang` del payload, previsto en la Fase 1, no se ha añadido todavía: vLLM es solo inglés. Entra con el modo CV multilingüe (Fase 4).
 - **2026-10-18**: Fase 1 completada. Ver `changelog/FASE_1.md`.
+- **2026-10-18**: Fase 2 iniciada: CUDA 12.6 (con CPU como alternativa), fusión RRF del reranker y rutas unificadas. Ver `changelog/FASE_2.md`.
 - **2026-10-18**: las cifras del README (docs 0.89 / code 0.75 en R@10) eran de los datasets **públicos**, aunque estuvieran etiquetadas como privadas, y salían de configuraciones anteriores que no se reproducen con `v1.0-42`. Se acepta como línea base oficial `04-fase0-final / smart`. La etiqueta del README se corrige en la reescritura final.
 - **2026-10-18**: finales de línea normalizados a LF con `.gitattributes`, con `llm_sdk/` excluido (P7).

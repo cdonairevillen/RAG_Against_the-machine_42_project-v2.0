@@ -15,10 +15,23 @@ dependencies = [
     "sentence-transformers",
     "qdrant-client==1.19.1",
     "tomli>=2.0 ; python_full_version < '3.11'",
+    # Declared here (llm_sdk already needs it) only to pick the CUDA build.
+    "torch>=2.0.0",
+    "accelerate>=1.15.0",
 ]
 
 [tool.uv.sources]
 llm-sdk = { path = "./llm_sdk", editable = true }
+# CUDA 12.6 build: runs on old drivers (42 machines) and falls back to CPU
+# when there is no GPU. macOS keeps the default PyPI wheel.
+torch = [
+    { index = "pytorch-cu126", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]

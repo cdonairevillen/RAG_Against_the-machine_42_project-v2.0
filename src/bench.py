@@ -177,6 +177,8 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
         "domain": domain,
         "chunking": config.chunking.model_dump(),
         "chunkers": config.source(domain).chunkers,
+        "retrieval": config.retrieval.model_dump(),
+        "device": config.models.resolved_device(),
         "datasets": {},
     }
     output_dir = os.path.join(OUTPUT_DIR, f"{label}_{mode}")

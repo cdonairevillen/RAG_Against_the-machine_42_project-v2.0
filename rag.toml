@@ -16,6 +16,27 @@ doc_chunk_size = 2000
 code_child_size = 600
 doc_child_size = 600
 
+[models]
+# "auto" = CUDA if a GPU is available, CPU otherwise (e.g. 42 machines
+# without GPU). Force with "cpu" / "cuda" or RAG_MODELS_DEVICE=cpu.
+device = "auto"
+
+[retrieval]
+# Tuned with `make bench` (see docs/changelog/FASE_2.md).
+classifier_margin = 0.5
+code_signal_weight = 0.5
+doc_signal_weight = 0.5
+# Code-mode queries are always reranked (v1 skipped it above 9.0).
+skip_rerank_score = inf
+# Out-of-domain filter used before generation only. Known to be a weak
+# signal; to be replaced in Phase 3 (B15).
+bm25_score_floor = 5.5
+reranker_model = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+# "rrf": fuse the reranker order with the BM25 order(s); "replace": the
+# reranker order wins (v1 behaviour).
+rerank_fusion = "rrf"
+rrf_k = 60
+
 # One block per knowledge source. `chunkers` maps a file extension to a
 # chunker name (see src/ingestion/chunkers.py); unknown extensions fall
 # back to `default_chunker`.

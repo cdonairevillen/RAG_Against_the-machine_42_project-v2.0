@@ -41,6 +41,38 @@ class ChunkingConfig(BaseModel):
     doc_child_size: int = 600
 
 
+class RetrievalConfig(BaseModel):
+    """Retrieval knobs, tuned with `make bench`."""
+
+    classifier_margin: float = 0.5
+    code_signal_weight: float = 0.5
+    doc_signal_weight: float = 0.5
+    skip_rerank_score: float = float("inf")
+    bm25_score_floor: float = 5.5
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    # "replace": reranker order wins; "rrf": fuse it with the BM25 order.
+    rerank_fusion: str = "rrf"
+    rrf_k: int = 60
+
+
+class ModelsConfig(BaseModel):
+    """Where neural models run.
+
+    `device = "auto"` uses CUDA when a GPU is available and the CPU
+    otherwise, so the same configuration works on machines without GPU.
+    """
+
+    device: str = "auto"
+
+    def resolved_device(self) -> str:
+        """Return the concrete torch device for `device`."""
+        if self.device != "auto":
+            return self.device
+        import torch
+
+        return "cuda" if torch.cuda.is_available() else "cpu"
+
+
 class SourceConfig(BaseModel):
     """A knowledge source (domain) and how its files are chunked."""
 
@@ -66,6 +98,8 @@ class RagConfig(BaseModel):
     qdrant: QdrantConfig = Field(default_factory=QdrantConfig)
     paths: PathsConfig = Field(default_factory=PathsConfig)
     chunking: ChunkingConfig = Field(default_factory=ChunkingConfig)
+    retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
+    models: ModelsConfig = Field(default_factory=ModelsConfig)
     sources: dict[str, SourceConfig] = Field(default_factory=dict)
 
     def source(self, domain: str) -> SourceConfig:
@@ -101,6 +135,8 @@ def apply_env_overrides(data: dict[str, Any],
         "qdrant": QdrantConfig,
         "paths": PathsConfig,
         "chunking": ChunkingConfig,
+        "retrieval": RetrievalConfig,
+        "models": ModelsConfig,
     }
     for section, model in sections.items():
         for key in model.model_fields:

@@ -2,7 +2,7 @@ import re
 from typing import Optional
 import bm25s
 import numpy as np
-from src.config import RagConfig, get_config
+from src.config import ModelsConfig, RagConfig, RetrievalConfig, get_config
 from src.ingestion.chunk import CHILD, PARENT, Chunk
 from src.ingestion.pipeline import load_bm25
 from src.models import MinimalSource
@@ -27,12 +27,6 @@ DOC_SIGNAL_TERMS = {
     "capability", "compute", "status", "feature",
 }
 
-CLASSIFIER_MARGIN = 0.5
-CODE_SIGNAL_WEIGHT = 0.5
-DOC_SIGNAL_WEIGHT = 0.5
-SKIP_RERANK_SCORE = 9.0
-BM25_SCORE_FLOOR = 5.5
-
 
 def expand_query(query: str) -> str:
     """Expand a query with snake_case variants of CamelCase names.
@@ -42,7 +36,7 @@ def expand_query(query: str) -> str:
 
     Splitting identifiers into their parts (`Paged`, `Attention`,
     `max`, `model`...) is deliberately not done yet: it inflates BM25
-    scores past the hand-tuned SKIP_RERANK_SCORE and was measured to
+    scores past the hand-tuned skip_rerank_score and was measured to
     lower Recall@3. It is revisited together with the code-aware
     tokenizer in Phase 2 (see docs/changelog/FASE_0.md, B14).
 
@@ -95,10 +89,10 @@ class Retriever:
         reranker: Loaded CrossEncoder, or None until load_reranker().
     """
 
-    RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-
     def __init__(self, chunks: list[Chunk],
-                 bm25: bm25s.BM25) -> None:
+                 bm25: bm25s.BM25,
+                 settings: Optional[RetrievalConfig] = None,
+                 models: Optional[ModelsConfig] = None) -> None:
         """Initialise with pre-loaded components.
 
         Prefer Retriever.from_store() for normal usage.
@@ -106,9 +100,13 @@ class Retriever:
         Args:
             chunks: All child Chunk objects in corpus order.
             bm25: Fitted unified BM25 instance.
+            settings: Retrieval knobs (defaults to the v1 values).
+            models: Device settings for the neural models.
         """
         self.chunks = chunks
         self.bm25 = bm25
+        self.settings = settings or RetrievalConfig()
+        self.models = models or ModelsConfig()
         self.reranker = None
 
         self.chunk_map: dict = {}
@@ -148,7 +146,10 @@ class Retriever:
         """
         try:
             from sentence_transformers import CrossEncoder
-            self.reranker = CrossEncoder(self.RERANKER_MODEL)
+            self.reranker = CrossEncoder(
+                self.settings.reranker_model,
+                device=self.models.resolved_device(),
+            )
             print("Reranker loaded — precision reranking active.")
         except Exception as exc:
             print(f"Warning: reranker unavailable ({exc}).")
@@ -215,7 +216,8 @@ class Retriever:
                 f"Run 'make index' again."
             )
 
-        retriever = cls(chunks=children, bm25=bm25)
+        retriever = cls(chunks=children, bm25=bm25,
+                        settings=config.retrieval, models=config.models)
         retriever.set_children(children)
         retriever.set_parents(parents)
         retriever.bm25_code = bm25_code
@@ -332,8 +334,9 @@ class Retriever:
             1 for t in query_terms if t in DOC_SIGNAL_TERMS
         )
 
-        combined_code = code_top_score + code_signals * CODE_SIGNAL_WEIGHT
-        combined_doc = doc_top_score + doc_signals * DOC_SIGNAL_WEIGHT
+        w = self.settings
+        combined_code = code_top_score + code_signals * w.code_signal_weight
+        combined_doc = doc_top_score + doc_signals * w.doc_signal_weight
         return combined_code, combined_doc
 
     def search_smart(self, query: str, k: int = 10) -> list[MinimalSource]:
@@ -362,7 +365,7 @@ class Retriever:
         expanded = expand_query(query)
         combined_code, combined_doc = self.classify_query(expanded)
 
-        if combined_code > combined_doc + CLASSIFIER_MARGIN:
+        if combined_code > combined_doc + self.settings.classifier_margin:
             return self._search_smart_code(expanded, k, combined_code)
         return self._search_smart_docs(expanded, k)
 
@@ -414,9 +417,16 @@ class Retriever:
             except Exception:
                 pass
 
-        if code_top_score > SKIP_RERANK_SCORE:
+        if code_top_score > self.settings.skip_rerank_score:
             return code_sources[:k]
-        return self.rerank_parents(expanded, code_sources + doc_backup, k)
+        # Code and doc candidates come from two separate BM25 rankings:
+        # each keeps its own rank for the fusion with the reranker.
+        input_ranks = list(range(len(code_sources))) + list(
+            range(len(doc_backup))
+        )
+        return self.rerank_parents(
+            expanded, code_sources + doc_backup, k, input_ranks
+        )
 
     def _search_smart_docs(self, expanded: str,
                            k: int) -> list[MinimalSource]:
@@ -481,13 +491,24 @@ class Retriever:
 
     def rerank_parents(self, query: str,
                        sources: list[MinimalSource],
-                       k: int) -> list[MinimalSource]:
+                       k: int,
+                       input_ranks: Optional[list[int]] = None
+                       ) -> list[MinimalSource]:
         """Rerank parent sources using parent chunk text.
+
+        With `rerank_fusion = "replace"` the cross-encoder order replaces
+        the incoming (BM25) order. With "rrf" both orders are fused with
+        Reciprocal Rank Fusion, so a source either ranking puts high
+        stays competitive.
 
         Args:
             query: The original search string.
-            sources: Parent MinimalSource objects to rerank.
+            sources: Parent MinimalSource objects to rerank, in their
+                incoming (BM25) order.
             k: Number of top results to return.
+            input_ranks: Rank of each source in the list it came from,
+                for RRF when sources merge several rankings (defaults to
+                its position in `sources`).
 
         Returns:
             Reranked and truncated MinimalSource list.
@@ -509,6 +530,16 @@ class Retriever:
         except Exception:
             return sources[:k]
 
+        if self.settings.rerank_fusion == "rrf":
+            rrf_k = self.settings.rrf_k
+            by_score = sorted(range(len(sources)),
+                              key=lambda i: scores[i], reverse=True)
+            ranks = input_ranks or list(range(len(sources)))
+            fused = [0.0] * len(sources)
+            for rank, i in enumerate(by_score):
+                fused[i] = 1 / (rrf_k + rank) + 1 / (rrf_k + ranks[i])
+            scores = fused
+
         ranked = sorted(
             zip(scores, sources), key=lambda x: x[0], reverse=True
         )
@@ -516,87 +547,29 @@ class Retriever:
 
     def search_for_generation(self, query: str,
                               k: int = 10) -> list[MinimalSource]:
-        """Precise retrieval for LLM generation — BM25 + reranker.
+        """Retrieval for LLM generation: relevance filter + search_smart().
 
-        Searches the unified index, splits candidates into doc and
-        code parents, reranks them together, and guarantees at least
-        two doc results survive into the final list when docs were
-        present in the candidate pool.
+        Same ranking as the benchmarked path (search_smart), plus a
+        relevance filter: when no chunk reaches bm25_score_floor the
+        question is considered out of domain and nothing is returned,
+        so the LLM answers "not found" instead of guessing.
 
         Args:
             query: Natural-language search string.
-            k: Number of results to return after reranking.
+            k: Number of results to return.
 
         Returns:
-            Reranked list of parent MinimalSource objects.
+            Ranked list of parent MinimalSource objects, or [] when the
+            query is out of domain.
         """
         if not query or not query.strip() or k <= 0:
             return []
 
-        if self.get_top_bm25_score(query) < BM25_SCORE_FLOOR:
+        floor = self.settings.bm25_score_floor
+        if self.get_top_bm25_score(query) < floor:
             return []
 
-        if self.reranker is None:
-            return self.search_no_rerank(query, k)
-
-        expanded = expand_query(query)
-        fetch_k = min(k * 5, len(self.chunks))
-        child_candidates = self.search_bm25(
-            expanded, fetch_k, min_score=0.0
-        )
-
-        parent_map = self.get_chunk_map()
-        seen: set = set()
-        doc_sources: list[MinimalSource] = []
-        code_sources: list[MinimalSource] = []
-
-        for source in child_candidates:
-            child = parent_map.get(
-                (source.file_path, source.first_character_index)
-            )
-            if child is None:
-                continue
-            parent_source = self.child_to_parent_source(child)
-            key = (
-                parent_source.file_path,
-                parent_source.first_character_index,
-            )
-            if key not in seen:
-                seen.add(key)
-                if child.chunk_type == "doc":
-                    doc_sources.append(parent_source)
-                else:
-                    code_sources.append(parent_source)
-
-        all_sources = doc_sources + code_sources
-        reranked = self.rerank_parents(
-            query, all_sources, k + min(2, len(doc_sources))
-        )
-
-        result: list[MinimalSource] = []
-        seen_result: set = set()
-        min_docs = min(2, len(doc_sources))
-        doc_keys = {
-            (d.file_path, d.first_character_index) for d in doc_sources
-        }
-
-        for src in reranked:
-            key = (src.file_path, src.first_character_index)
-            if key not in seen_result and key in doc_keys:
-                result.append(src)
-                seen_result.add(key)
-                if len(result) >= min_docs:
-                    break
-
-        for src in reranked:
-            key = (src.file_path, src.first_character_index)
-            if key not in seen_result:
-                result.append(src)
-                seen_result.add(key)
-            if len(result) >= k:
-                break
-
-        return result[:k]
+        return self.search_smart(query, k)
 
     def search_bm25(self, query: str, k: int,
                     min_score: float = 0.0) -> list[MinimalSource]:

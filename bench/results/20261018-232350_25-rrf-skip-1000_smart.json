@@ -1,0 +1,55 @@
+{
+  "label": "25-rrf-skip-1000",
+  "mode": "smart",
+  "k": 10,
+  "timestamp": "2026-10-18T23:23:43",
+  "commit": "12f9280",
+  "dirty": true,
+  "domain": "vllm",
+  "chunking": {
+    "code_chunk_size": 2000,
+    "doc_chunk_size": 2000,
+    "code_child_size": 600,
+    "doc_child_size": 600
+  },
+  "chunkers": {
+    ".py": "python_ast",
+    ".pyi": "python_ast",
+    ".md": "markdown_headers_packed",
+    ".rst": "markdown_headers_packed",
+    ".txt": "markdown_headers_packed"
+  },
+  "retrieval": {
+    "classifier_margin": 0.5,
+    "code_signal_weight": 0.5,
+    "doc_signal_weight": 0.5,
+    "skip_rerank_score": 1000.0,
+    "bm25_score_floor": 5.5,
+    "reranker_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "rerank_fusion": "rrf",
+    "rrf_k": 60
+  },
+  "device": "cuda",
+  "datasets": {
+    "docs": {
+      "recall_at_k": {
+        "1": 0.64,
+        "3": 0.79,
+        "5": 0.83,
+        "10": 0.9
+      },
+      "seconds": 1.03,
+      "questions": 100
+    },
+    "code": {
+      "recall_at_k": {
+        "1": 0.46,
+        "3": 0.64,
+        "5": 0.68,
+        "10": 0.72
+      },
+      "seconds": 5.62,
+      "questions": 100
+    }
+  }
+}
