@@ -11,6 +11,7 @@ from tqdm import tqdm
 from src.config import ChunkingConfig, SourceConfig
 from src.ingestion.chunk import CHILD, PARENT, Chunk, chunk_uuid
 from src.ingestion.chunkers import get_chunker, split_by_size
+from src.ingestion.tokens import tokenize, with_identifier_parts
 
 INDEX_DIR = "bm25_index"
 INDEX_CODE_DIR = "bm25_code_index"
@@ -71,7 +72,8 @@ def normalise_for_bm25(text: str) -> str:
     return " ".join(text.split())
 
 
-def build_bm25(chunks: list[Chunk], label: str = "corpus") -> bm25s.BM25:
+def build_bm25(chunks: list[Chunk], label: str = "corpus",
+               part_types: Optional[list[str]] = None) -> bm25s.BM25:
     """Tokenize chunks and fit a BM25 model.
 
     Each chunk's text is prefixed with its normalised file path (without
@@ -80,6 +82,8 @@ def build_bm25(chunks: list[Chunk], label: str = "corpus") -> bm25s.BM25:
     Args:
         chunks: Chunks to index, in BM25 row order.
         label: Human-readable label for progress output.
+        part_types: Chunk types whose text gets identifier parts
+            (see tokens.py); none by default.
 
     Returns:
         A fitted bm25s.BM25 instance.
@@ -90,7 +94,12 @@ def build_bm25(chunks: list[Chunk], label: str = "corpus") -> bm25s.BM25:
         for c in chunks
     ]
     print(f"Tokenizing {label} ({len(corpus)} chunks)...")
-    tokenized = bm25s.tokenize(corpus, stopwords="en", show_progress=True)
+    part_types = part_types or []
+    corpus = [
+        with_identifier_parts(text) if c.chunk_type in part_types else text
+        for text, c in zip(corpus, chunks)
+    ]
+    tokenized = tokenize(corpus, code_aware=False, show_progress=True)
     retriever = bm25s.BM25()
     retriever.index(tokenized, show_progress=True)
     return retriever
@@ -112,10 +121,12 @@ class Ingester:
     """
 
     def __init__(self, domain: str, source: SourceConfig,
-                 chunking: ChunkingConfig) -> None:
+                 chunking: ChunkingConfig,
+                 part_types: Optional[list[str]] = None) -> None:
         self.domain = domain
         self.source = source
         self.chunking = chunking
+        self.part_types = part_types or []
 
         self.parent_chunks: list[Chunk] = []
         self.chunks: list[Chunk] = []
@@ -131,13 +142,17 @@ class Ingester:
         self.chunks = self.collect_child_chunks()
         assign_ids(self.chunks, self.domain, CHILD)
 
-        self.bm25 = build_bm25(self.chunks)
+        self.bm25 = build_bm25(self.chunks, part_types=self.part_types)
         code = [c for c in self.chunks if c.chunk_type == "code"]
         doc = [c for c in self.chunks if c.chunk_type == "doc"]
         # A source may have no code (e.g. a CV) or no docs: skip the
         # per-type index instead of fitting BM25 on an empty corpus.
-        self.bm25_code = build_bm25(code, "code corpus") if code else None
-        self.bm25_doc = build_bm25(doc, "doc corpus") if doc else None
+        self.bm25_code = build_bm25(
+            code, "code corpus", self.part_types
+        ) if code else None
+        self.bm25_doc = build_bm25(
+            doc, "doc corpus", self.part_types
+        ) if doc else None
 
     def all_chunks(self) -> list[Chunk]:
         """Return parents followed by children, ready for the store."""
@@ -270,6 +285,7 @@ class Ingester:
             "domain": self.domain,
             "parents": len(self.parent_chunks),
             "children": len(self.chunks),
+            "identifier_parts": sorted(self.part_types),
         }
         with open(os.path.join(domain_dir, MANIFEST_FILE), "w",
                   encoding="utf-8", newline="\n") as fh:

@@ -124,13 +124,12 @@ saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web
 
 **Objetivo:** demostrar con números si el híbrido mejora, ahora que los embeddings se implementan bien (ver `RESPUESTA.md` §3).
 
-- **Tokenizador code-aware** (B8): partir snake_case y CamelCase en el corpus **y** en la query.
+- ✅ **Tokenizador code-aware** (B8 + B14): modo `code` (partes de identificadores solo en chunks e índices de code). Code 0.49 / 0.70 / 0.75 / 0.83; docs 0.72 / 0.91 / 0.93 / 0.94.
 - **Embeddings de chunks y de query** con el mismo modelo y el prefijo de instrucción correcto.
   - Candidatos **multilingües** (D6): `multilingual-e5-small`, `bge-m3`, `Qwen3-Embedding-0.6B`.
   - Referencia: `bge-small-en-v1.5`.
   - La ingesta pesada se hace en la 3080 Ti. Los valores por defecto deben poder ejecutarse en 42 (D3).
   - ✅ torch con CUDA 12.6 configurado; `device = "auto"` cae a CPU sin GPU (probado).
-- **B14**: activar la descomposición de identificadores en `expand_query` **junto con** el tokenizador code-aware y la recalibración de `SKIP_RERANK_SCORE`. En la Fase 0, activarla sola subió code R@10 a 0.75 pero bajó R@3.
 - ✅ **Rutas unificadas**: `search_for_generation` = filtro de relevancia + `search_smart`.
 - ✅ **Code recuperado** con la fusión RRF por listas y el reranker siempre activo: code 0.45 / 0.63 / 0.67 / 0.72 (supera la Fase 0) y docs 0.72 / 0.90 / 0.93 / 0.95.
 - **Búsqueda por vectores contra Qdrant** (vectores con nombre en los mismos puntos de `rag_<dominio>`). Hoy el retriever carga todos los chunks en memoria.

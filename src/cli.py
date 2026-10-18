@@ -132,6 +132,7 @@ class CLI:
             repo_root: Overrides the source root directory.
         """
         from src.ingestion.pipeline import Ingester
+        from src.ingestion.tokens import corpus_part_types
         from src.storage.qdrant_store import QdrantChunkStore
 
         domain = source or self.domain
@@ -154,7 +155,12 @@ class CLI:
             return
         try:
             store = QdrantChunkStore.from_config(self.config.qdrant)
-            ingester = Ingester(domain, source_cfg, chunking)
+            ingester = Ingester(
+                domain, source_cfg, chunking,
+                part_types=corpus_part_types(
+                    self.config.retrieval.code_aware_tokens
+                ),
+            )
             ingester.build()
             ingester.save_bm25(self.config.paths.processed_dir)
             store.replace(domain, ingester.all_chunks())

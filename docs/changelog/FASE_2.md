@@ -1,7 +1,9 @@
 # CHANGELOG — Fase 2: Retrieval híbrido
 
 **Fecha de inicio:** 2026-10-18
-**Estado:** 🟡 en curso. **Paso 1 completado:** recuperar code y unificar las rutas. Sin commit.
+**Estado:** 🟡 en curso.
+- **Paso 1** (recuperar code y unificar rutas): completado, commit `acab947`.
+- **Paso 2** (tokenizador code-aware, B8 + B14): completado, sin commit (ver §6).
 
 **Prioridad de métricas: R@5 > R@10 > R@3 > R@1.**
 
@@ -122,8 +124,60 @@ Mejora **en todos los cortes de los dos datasets**, y code supera también a la 
 
 ## 5. Pendiente en la Fase 2
 
-1. **Tokenizador code-aware (B8) + descomposición de identificadores (B14)**, medidos juntos.
+1. ~~**Tokenizador code-aware (B8) + descomposición de identificadores (B14)**~~ → hecho (§6).
 2. **Embeddings** multilingües de chunks y consulta en Qdrant, fusionados con BM25: `multilingual-e5-small`, `bge-m3`, `Qwen3-Embedding-0.6B`. Se medirán en CPU y en GPU.
 3. **Rerankers:** `ms-marco` (actual), `bge-reranker-v2-m3` y `Qwen3-Reranker-0.6B`.
 4. Revisar el clasificador doc/code (`classifier_margin` y pesos), que sigue enviando preguntas de docs a la rama de code.
 5. `docs/BENCHMARK_REPORT.md` con la comparativa de modelos.
+
+---
+
+## 6. Paso 2: tokenizador code-aware (B8 + B14)
+
+### Resultado
+
+| Ejecución | Modo | Docs R@1/@3/@5/@10 | Code R@1/@3/@5/@10 |
+|---|---|---|---|
+| `29-rrf-default` | sin descomposición (antes) | 0.72 / 0.90 / 0.93 / 0.95 | 0.45 / 0.63 / 0.67 / 0.72 |
+| `30-tokens-none` | `none` (refactor, **idéntico** a `29`) | 0.72 / 0.90 / 0.93 / 0.95 | 0.45 / 0.63 / 0.67 / 0.72 |
+| `31-tokens-query` | `query`: solo la consulta (el B14 original) | 0.71 / 0.89 / 0.93 / 0.96 | 0.45 / 0.62 / 0.67 / 0.75 |
+| `33-tokens-both` | `both`: corpus y consulta (B8 + B14) | 0.74 / 0.89 / 0.92 / 0.93 | 0.48 / 0.69 / 0.74 / 0.81 |
+| `33-tokens-code` | `code`: solo chunks e índices de code | 0.72 / 0.90 / 0.92 / 0.94 | 0.50 / 0.71 / 0.76 / 0.84 |
+| **`35-tokens-code-default`** | **`code` + clasificador sin descomponer** (por defecto) | **0.72 / 0.91 / 0.93 / 0.94** | **0.49 / 0.70 / 0.75 / 0.83** |
+
+**Neto frente a `29`:**
+- **Docs:** R@5 igual, R@3 +0.01, R@10 −0.01 (una pregunta).
+- **Code:** **+0.04 / +0.07 / +0.08 / +0.11**.
+- **La ruta de la web da ahora exactamente lo mismo que la oficial:** las dos preguntas legítimas que bloqueaba el filtro de relevancia (§2.6) lo superan, porque con las partes de los identificadores puntúan más alto.
+
+### Qué se ha cambiado
+
+- **`src/ingestion/tokens.py` (nuevo):** un único punto de tokenización para el corpus y la consulta, de modo que no puedan desincronizarse.
+  - `split_identifier()`: `max_model_len` → max, model, len; `PagedAttention` → paged, attention; `RMSNorm` → rms, norm.
+  - Se **conservan los identificadores originales**, así que las coincidencias exactas siguen contando.
+  - `vLLM` se excluye: partirlo añadía "llm" a casi todo el corpus. Es la misma trampa que vimos en la Fase 0 con el clasificador.
+- **`code_aware_tokens`** en `[retrieval]`, con cuatro modos medidos (`none`, `query`, `both`, `code`). Por defecto, **`code`**:
+  - Las partes se añaden **solo a los chunks de código**; en la documentación eran sobre todo ruido (`both` bajaba docs R@10 −0.02).
+  - La consulta se descompone al buscar en el índice de code y en el general, **nunca en el de docs**.
+- **El clasificador doc/code usa la consulta sin descomponer** en los dos índices. Con las partes, el índice de code puntuaba más alto en general y enviaba preguntas de docs a la rama de code (`33-tokens-code`: docs R@5 0.92). Con la consulta sin descomponer, docs R@5 vuelve a 0.93.
+- **Seguridad:** el manifest registra a qué chunks se añadieron partes (`identifier_parts`), y el retriever **se niega a arrancar** si no coincide con `code_aware_tokens` ("Run 'make index' again"). El test de integración lo detectó al cambiar el valor por defecto, que es justo para lo que está.
+
+### Pregunta a pregunta (`29` → `35`)
+
+- **Code:** mejoran 24 y empeoran 16. Se pierden 4 que estaban entre el 3.º y el 10.º puesto; el resto se mueve unos pocos puestos.
+- **Docs:** cambian 3. La que se pierde (*"Where can I find information about using generative models in vLLM?"*, antes 6.ª) es un **fallo del clasificador**, no de la tokenización: se envía a la rama de code (code 7.41 frente a doc 6.09), donde solo entran 4 documentos de respaldo. Se revisa en el paso 4 (clasificador).
+- **Decisión:** adoptado, justificado según la regla (R@5 no empeora en ningún dataset). Se revierte con `code_aware_tokens = "none"` y `make index`.
+
+### Ficheros
+
+| Fichero | Cambio |
+|---|---|
+| `src/ingestion/tokens.py` | **Nuevo**: descomposición de identificadores y tokenización común |
+| `src/ingestion/pipeline.py` | El corpus BM25 añade partes según el tipo de chunk; manifest con `identifier_parts` |
+| `src/retriever.py` | Tokenización por índice; clasificador con la consulta sin descomponer; comprobación del manifest |
+| `src/cli.py` | `index` aplica el modo configurado |
+| `src/config.py`, `rag.toml` | `code_aware_tokens = "code"` |
+| `tests/test_tokens.py` | **Nuevo** (4 tests) |
+| `tests/test_storage.py` | La integración indexa según la configuración |
+
+**Tests:** 42. Lint limpio.

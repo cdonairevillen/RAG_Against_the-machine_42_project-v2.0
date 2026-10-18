@@ -53,6 +53,9 @@ class RetrievalConfig(BaseModel):
     # "replace": reranker order wins; "rrf": fuse it with the BM25 order.
     rerank_fusion: str = "rrf"
     rrf_k: int = 60
+    # Identifier splitting for BM25: "none", "query", "both" or "code".
+    # Changing it needs a re-index (see src/ingestion/tokens.py).
+    code_aware_tokens: str = "code"
 
 
 class ModelsConfig(BaseModel):

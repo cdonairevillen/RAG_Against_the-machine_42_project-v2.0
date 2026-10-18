@@ -1,10 +1,13 @@
 import re
-from typing import Optional
+from typing import Any, Optional
 import bm25s
 import numpy as np
 from src.config import ModelsConfig, RagConfig, RetrievalConfig, get_config
 from src.ingestion.chunk import CHILD, PARENT, Chunk
 from src.ingestion.pipeline import load_bm25
+from src.ingestion.tokens import (
+    corpus_part_types, query_uses_parts, tokenize,
+)
 from src.models import MinimalSource
 from src.storage.base import ChunkStore
 
@@ -155,6 +158,16 @@ class Retriever:
             print(f"Warning: reranker unavailable ({exc}).")
             self.reranker = None
 
+    def tokenize(self, query: str, index: str = "all") -> Any:
+        """Tokenize a query the way a BM25 index expects it.
+
+        Args:
+            query: Query text.
+            index: 'all' (general), 'code' or 'doc' index.
+        """
+        mode = self.settings.code_aware_tokens
+        return tokenize([query], code_aware=query_uses_parts(mode, index))
+
     def set_parents(self, parents: list[Chunk]) -> None:
         """Set the parent chunks and reset the lookups built on them."""
         self.parent_chunks = parents
@@ -204,6 +217,15 @@ class Retriever:
         bm25, bm25_code, bm25_doc, manifest = load_bm25(
             config.paths.processed_dir, domain
         )
+        mode = config.retrieval.code_aware_tokens
+        indexed = manifest.get("identifier_parts", [])
+        if indexed != corpus_part_types(mode):
+            raise RuntimeError(
+                f"The BM25 index of '{domain}' has identifier parts for "
+                f"{indexed or 'no'} chunks, but code_aware_tokens='{mode}' "
+                f"expects {corpus_part_types(mode) or 'none'}. "
+                f"Run 'make index' again."
+            )
         chunks = store.load(domain)
         parents = [c for c in chunks if c.level == PARENT]
         children = [c for c in chunks if c.level == CHILD]
@@ -301,17 +323,16 @@ class Retriever:
         doc_top_score = 0.0
         code_top_score = 0.0
         try:
-            tokenized = bm25s.tokenize(
-                [query], stopwords="en", show_progress=False
-            )
             if self.bm25_doc is not None:
                 _, ds = self.bm25_doc.retrieve(
-                    tokenized, k=3, show_progress=False
+                    self.tokenize(query, "doc"), k=3, show_progress=False
                 )
                 doc_top_score = float(np.mean(ds[0]))
             if self.bm25_code is not None:
+                # Plain query on both indices: identifier parts inflate
+                # code scores and would route doc questions to code.
                 _, cs = self.bm25_code.retrieve(
-                    tokenized, k=3, show_progress=False
+                    self.tokenize(query, "doc"), k=3, show_progress=False
                 )
                 code_top_score = float(np.mean(cs[0]))
         except Exception:
@@ -398,9 +419,7 @@ class Retriever:
         doc_backup: list[MinimalSource] = []
         if self.bm25_doc is not None and self.doc_chunk_indices:
             try:
-                tokenized = bm25s.tokenize(
-                    [expanded], stopwords="en", show_progress=False
-                )
+                tokenized = self.tokenize(expanded, "doc")
                 results, _ = self.bm25_doc.retrieve(
                     tokenized, k=10, show_progress=False
                 )
@@ -436,9 +455,7 @@ class Retriever:
 
         if self.bm25_doc is not None and self.doc_chunk_indices:
             try:
-                tokenized = bm25s.tokenize(
-                    [expanded], stopwords="en", show_progress=False
-                )
+                tokenized = self.tokenize(expanded, "doc")
                 results, _ = self.bm25_doc.retrieve(
                     tokenized, k=fetch_k, show_progress=False
                 )
@@ -479,9 +496,7 @@ class Retriever:
             Highest score, or 0.0 on error.
         """
         try:
-            tokenized = bm25s.tokenize(
-                [query], stopwords="en", show_progress=False
-            )
+            tokenized = self.tokenize(query)
             _, scores = self.bm25.retrieve(
                 tokenized, k=1, show_progress=False
             )
@@ -584,9 +599,7 @@ class Retriever:
             Ranked MinimalSource list.
         """
         try:
-            tokenized = bm25s.tokenize(
-                [query], stopwords="en", show_progress=False
-            )
+            tokenized = self.tokenize(query)
             effective_k = min(k, len(self.chunks))
             results, scores = self.bm25.retrieve(
                 tokenized, k=effective_k, show_progress=False

@@ -7,6 +7,7 @@ from src.config import ChunkingConfig, PathsConfig, QdrantConfig, \
     RagConfig, SourceConfig
 from src.ingestion.chunk import CHILD, PARENT, Chunk
 from src.ingestion.pipeline import Ingester
+from src.ingestion.tokens import corpus_part_types
 from src.retriever import Retriever
 from src.storage.qdrant_store import QdrantChunkStore
 
@@ -99,7 +100,10 @@ def test_end_to_end_index_and_search(tmp_path: Path,
         sources={"demo": source},
     )
 
-    ingester = Ingester("demo", source, config.chunking)
+    ingester = Ingester(
+        "demo", source, config.chunking,
+        part_types=corpus_part_types(config.retrieval.code_aware_tokens),
+    )
     ingester.build()
     ingester.save_bm25(config.paths.processed_dir)
     store.replace("demo", ingester.all_chunks())
@@ -125,7 +129,10 @@ def test_store_and_index_mismatch_is_detected(
         paths=PathsConfig(processed_dir=str(tmp_path / "processed")),
         sources={"demo": source},
     )
-    ingester = Ingester("demo", source, config.chunking)
+    ingester = Ingester(
+        "demo", source, config.chunking,
+        part_types=corpus_part_types(config.retrieval.code_aware_tokens),
+    )
     ingester.build()
     ingester.save_bm25(config.paths.processed_dir)
     store.replace("demo", ingester.all_chunks()[:-1])
