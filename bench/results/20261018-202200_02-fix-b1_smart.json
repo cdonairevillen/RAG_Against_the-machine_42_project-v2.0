@@ -1,0 +1,30 @@
+{
+  "label": "02-fix-b1",
+  "mode": "smart",
+  "k": 10,
+  "timestamp": "2026-10-18T20:21:18",
+  "commit": "d73e66a",
+  "dirty": true,
+  "datasets": {
+    "docs": {
+      "recall_at_k": {
+        "1": 0.66,
+        "3": 0.82,
+        "5": 0.84,
+        "10": 0.84
+      },
+      "seconds": 8.07,
+      "questions": 100
+    },
+    "code": {
+      "recall_at_k": {
+        "1": 0.46,
+        "3": 0.63,
+        "5": 0.65,
+        "10": 0.71
+      },
+      "seconds": 33.46,
+      "questions": 100
+    }
+  }
+}

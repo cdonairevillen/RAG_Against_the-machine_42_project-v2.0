@@ -1,0 +1,30 @@
+{
+  "label": "03-fix-b14",
+  "mode": "smart",
+  "k": 10,
+  "timestamp": "2026-10-18T20:26:05",
+  "commit": "d73e66a",
+  "dirty": true,
+  "datasets": {
+    "docs": {
+      "recall_at_k": {
+        "1": 0.65,
+        "3": 0.82,
+        "5": 0.84,
+        "10": 0.85
+      },
+      "seconds": 5.96,
+      "questions": 100
+    },
+    "code": {
+      "recall_at_k": {
+        "1": 0.43,
+        "3": 0.58,
+        "5": 0.63,
+        "10": 0.75
+      },
+      "seconds": 18.62,
+      "questions": 100
+    }
+  }
+}

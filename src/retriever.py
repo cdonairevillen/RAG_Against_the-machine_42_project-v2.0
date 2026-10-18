@@ -5,7 +5,9 @@ import numpy as np
 from src.ingester import Chunk, Ingester
 from src.models import MinimalSource
 
-RRF_K = 60
+IDENTIFIER_PATTERN = re.compile(r"_|[a-z0-9][A-Z]|[A-Z]{2,}[a-z]{2,}")
+TOKEN_PUNCTUATION = ".,;:?!()[]{}'\"`"
+NON_IDENTIFIER_TERMS = {"vllm"}
 
 CODE_SIGNAL_TERMS = {
     "def", "return", "attribute", "instance",
@@ -29,53 +31,39 @@ SKIP_RERANK_SCORE = 9.0
 BM25_SCORE_FLOOR = 5.5
 
 
-def expand_query(query: str, chunks: Optional[list] = None) -> str:
-    """Expand a query with identifier variants to improve BM25 recall.
+def expand_query(query: str) -> str:
+    """Expand a query with snake_case variants of CamelCase names.
 
-    Detects CamelCase class names and snake_case identifiers in the
-    query and adds decomposed variants. When chunks are provided,
-    also boosts terms found in Chunk.symbols that match query tokens.
+    `PagedAttention` adds `paged_attention`, so BM25 can match code
+    that uses the snake_case spelling of the same concept.
+
+    Splitting identifiers into their parts (`Paged`, `Attention`,
+    `max`, `model`...) is deliberately not done yet: it inflates BM25
+    scores past the hand-tuned SKIP_RERANK_SCORE and was measured to
+    lower Recall@3. It is revisited together with the code-aware
+    tokenizer in Phase 2 (see docs/changelog/FASE_0.md, B14).
 
     Args:
         query: The original natural-language search string.
-        chunks: Optional list of Chunk objects. When provided, symbol
-            names matching query tokens are appended to the query.
 
     Returns:
-        Expanded query string with additional identifier variants.
+        Expanded query string with the snake_case variants appended.
     """
-    extras: list[str] = []
-
     camel_pattern = re.compile(
         r"\b([A-Z][a-zA-Z0-9]*(?:[A-Z][a-z0-9]+)+)\b"
     )
+    extras: list[str] = []
     for match in camel_pattern.finditer(query):
-        term = match.group(1)
-        parts = re.sub(r"([A-Z])", r" \1", term).strip().split()
+        parts = re.sub(r"([A-Z])", r" \1", match.group(1)).split()
         if len(parts) > 1:
-            extras.extend(parts)
             extras.append("_".join(p.lower() for p in parts))
 
-    snake_pattern = re.compile(r"\b([a-z][a-z0-9]*(?:_[a-z0-9]+){2,})\b")
-    for match in snake_pattern.finditer(query):
-        term = match.group(1)
-        extras.extend(term.split("_"))
-
-    if chunks:
-        query_tokens = set(query.lower().split())
-        for chunk in chunks:
-            if not chunk.symbols:
-                continue
-            for sym in chunk.symbols.split():
-                if sym.lower() in query_tokens and sym not in extras:
-                    extras.append(sym)
-
-    if not extras:
-        return query
-
+    query_tokens = set(re.findall(r"\w+", query.lower()))
     unique_extras = list(dict.fromkeys(
-        e for e in extras if e.lower() not in query.lower()
+        e for e in extras if e not in query_tokens
     ))
+    if not unique_extras:
+        return query
     return query + " " + " ".join(unique_extras)
 
 
@@ -213,7 +201,7 @@ class Retriever:
         if not query or not query.strip() or k <= 0:
             return []
 
-        expanded = expand_query(query, self.chunks)
+        expanded = expand_query(query)
         fetch_k = min(k * 5, len(self.chunks))
         child_candidates = self.search_bm25(
             expanded, fetch_k, min_score=0.0
@@ -275,11 +263,17 @@ class Retriever:
             pass
 
         query_terms = set(query.lower().split())
+        raw_terms = {
+            t.strip(TOKEN_PUNCTUATION).removesuffix("'s")
+            for t in query.split()
+        }
         code_signals = sum(
-            1 for t in query_terms
-            if "_" in t
-            or (t[0].isupper() if t else False)
-            or t in CODE_SIGNAL_TERMS
+            1 for t in raw_terms
+            if t.lower() not in NON_IDENTIFIER_TERMS
+            and (
+                IDENTIFIER_PATTERN.search(t)
+                or t.lower() in CODE_SIGNAL_TERMS
+            )
         )
         doc_signals = sum(
             1 for t in query_terms if t in DOC_SIGNAL_TERMS
@@ -312,7 +306,7 @@ class Retriever:
         if not query or not query.strip() or k <= 0:
             return []
 
-        expanded = expand_query(query, self.chunks)
+        expanded = expand_query(query)
         combined_code, combined_doc = self.classify_query(expanded)
 
         if combined_code > combined_doc + CLASSIFIER_MARGIN:
@@ -492,7 +486,7 @@ class Retriever:
         if self.reranker is None:
             return self.search_no_rerank(query, k)
 
-        expanded = expand_query(query, self.chunks)
+        expanded = expand_query(query)
         fetch_k = min(k * 5, len(self.chunks))
         child_candidates = self.search_bm25(
             expanded, fetch_k, min_score=0.0

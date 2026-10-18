@@ -399,6 +399,29 @@ class CLI:
         except Exception as exc:
             print(f"Error during evaluation: {exc}")
 
+    def bench(self, label: str = "run", mode: str = "smart",
+              k: int = 10) -> None:
+        """Run both public datasets, evaluate and record the result.
+
+        Results are appended to bench/results/ and compared against
+        every previous run.
+
+        Args:
+            label: Short name for this run (e.g. 'baseline').
+            mode: 'smart' (search_dataset path) or 'generation'
+                (search_for_generation path).
+            k: Number of sources retrieved per question.
+        """
+        from src.bench import run_bench
+
+        try:
+            run_bench(
+                label=label, mode=mode, k=k,
+                processed_dir=self.processed_dir,
+            )
+        except Exception as exc:
+            print(f"Error during bench: {exc}")
+
     @staticmethod
     def build_context_blocks(sources: list[MinimalSource],
                              parent_map: dict) -> list[str]:
@@ -433,14 +456,9 @@ class CLI:
         Returns:
             True if the response indicates no answer was found.
         """
-        phrases = (
-            "not found in the provided sources",
-            "provided sources do not contain",
-            "no relevant information",
-            "i've not found",
-        )
-        response_lower = response.lower()
-        return any(p in response_lower for p in phrases)
+        from src.generator import is_not_found
+
+        return is_not_found(response)
 
     @staticmethod
     def find_chunk(retriever: Retriever,

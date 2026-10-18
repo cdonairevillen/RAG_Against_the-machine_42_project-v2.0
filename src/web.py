@@ -19,13 +19,6 @@ NOT_FOUND_MESSAGE = (
     "in my files."
 )
 
-NOT_FOUND_PHRASES = (
-    "not found in the provided sources",
-    "provided sources do not contain",
-    "no relevant information",
-    "i've not found",
-)
-
 st.set_page_config(
     page_title="RAG against the Machine",
     page_icon="🎸",
@@ -378,8 +371,9 @@ def is_not_found(answer: str) -> bool:
     Returns:
         True if the answer indicates no answer was found.
     """
-    answer_lower = answer.lower()
-    return any(p in answer_lower for p in NOT_FOUND_PHRASES)
+    from src.generator import is_not_found as generator_is_not_found
+
+    return generator_is_not_found(answer)
 
 
 def main() -> None:

@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Data: only the public 42 datasets are versioned
+data/*
+!data/datasets/
+data/datasets/private/
+
+# Bench outputs (results/ is versioned on purpose)
+data/output/
+
+# Local config / secrets
+.streamlit/
+.env
+.cache/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

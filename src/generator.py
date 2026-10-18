@@ -1,17 +1,35 @@
 import re
+from typing import Any
+
 import torch
-from llm_sdk.__init__ import Small_LLM_Model
+from llm_sdk import Small_LLM_Model
 
 NOT_FOUND_PATTERNS = (
     r"not found in the provided sources",
     r"i've not found",
     r"i have not found",
-    r"the provided sources do not contain",
+    r"provided sources do not contain",
     r"there is no information",
     r"no relevant information",
 )
 
 NOT_FOUND_MESSAGE = "Not found in the provided sources."
+
+
+def is_not_found(text: str) -> bool:
+    """Check whether an answer means "no answer in the sources".
+
+    Single source of truth for the CLI, the web interface and the
+    Generator's own normalisation.
+
+    Args:
+        text: Generated answer text.
+
+    Returns:
+        True if the text matches any NOT_FOUND_PATTERNS entry.
+    """
+    text_lower = text.lower()
+    return any(re.search(p, text_lower) for p in NOT_FOUND_PATTERNS)
 
 
 def build_prompt(question: str, context_blocks: list[str]) -> str:
@@ -164,8 +182,11 @@ class Generator:
 
         eos_token = self.model._tokenizer.encode("<|im_end|>")[0]
 
+        # The SDK types the model as PreTrainedModel, which does not
+        # expose generate() to type checkers; every causal LM has it.
+        causal_lm: Any = self.model._model
         with torch.no_grad():
-            output_ids = self.model._model.generate(
+            output_ids = causal_lm.generate(
                 **inputs,
                 max_new_tokens=self.max_new_tokens,
                 do_sample=False,
@@ -179,9 +200,7 @@ class Generator:
         text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
         text = text.strip()
 
-        text_lower = text.lower()
-        for pattern in NOT_FOUND_PATTERNS:
-            if re.search(pattern, text_lower):
-                return NOT_FOUND_MESSAGE
+        if is_not_found(text):
+            return NOT_FOUND_MESSAGE
 
         return text

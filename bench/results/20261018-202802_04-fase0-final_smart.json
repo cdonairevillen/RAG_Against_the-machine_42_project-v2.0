@@ -1,0 +1,30 @@
+{
+  "label": "04-fase0-final",
+  "mode": "smart",
+  "k": 10,
+  "timestamp": "2026-10-18T20:27:16",
+  "commit": "d73e66a",
+  "dirty": true,
+  "datasets": {
+    "docs": {
+      "recall_at_k": {
+        "1": 0.64,
+        "3": 0.83,
+        "5": 0.85,
+        "10": 0.85
+      },
+      "seconds": 5.95,
+      "questions": 100
+    },
+    "code": {
+      "recall_at_k": {
+        "1": 0.45,
+        "3": 0.62,
+        "5": 0.64,
+        "10": 0.72
+      },
+      "seconds": 40.09,
+      "questions": 100
+    }
+  }
+}

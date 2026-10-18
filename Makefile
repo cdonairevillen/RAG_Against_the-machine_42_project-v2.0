@@ -1,9 +1,21 @@
-PY        := python3
+PY        := python
 UV        := uv
-USER_NAME := $(shell whoami)
-BASE      := /goinfre/$(USER_NAME)/rag_cache
 ARGS      ?=
 VENV      := .venv
+LABEL     ?= run
+
+VLLM_DIR  := data/raw/vllm-0.10.1
+VLLM_URL  := https://github.com/vllm-project/vllm/archive/refs/tags/v0.10.1.zip
+URL_42    := https://cdn.intra.42.fr/document/document
+DATASETS  := data/datasets
+SEARCH    := data/output/search_results
+
+# On 42 clusters the home quota is tiny: redirect every cache to goinfre.
+# Elsewhere the default user caches are kept (no re-download of models).
+# Detected by the shell that runs the recipes; force with ON_42=yes|no.
+ON_42     ?= $(shell sh -c 'test -d /goinfre && echo yes')
+ifeq ($(ON_42),yes)
+BASE      := /goinfre/$(shell whoami)/rag_cache
 CACHE     := $(BASE)/uv_cache
 TMP       := $(BASE)/tmp
 HF        := $(BASE)/hf_cache
@@ -11,43 +23,53 @@ ENV       := HF_HOME=$(HF) \
 			 TRANSFORMERS_CACHE=$(HF) \
 			 HF_DATASETS_CACHE=$(HF) \
 			 UV_CACHE_DIR=$(CACHE) \
-			 TMPDIR=$(TMP) \
+			 TMPDIR=$(TMP)
+else
+BASE      :=
+ENV       :=
+endif
 
-install:
-	@echo "Generating folder structure..."
-	@rm -rf data/
-	@mkdir -p $(BASE) $(CACHE) $(TMP) $(HF)
-	@mkdir -p data/raw \
-			 data/processed \
-			 data/output \
-			 data/datasets
-	@mkdir -p .streamlit
+RUN       := $(ENV) $(UV) run --project . $(PY) -m src
 
-	@echo "Downloading physical dependencies from web..."
-	@wget https://cdn.intra.42.fr/document/document/49030/datasets_public.zip
-	@wget https://cdn.intra.42.fr/document/document/49032/vllm-0.10.1.zip
-
-	@echo "Placing archieves in their locations..."
-	@unzip datasets_public.zip
-	@unzip vllm-0.10.1.zip
-	@touch .streamlit/config.toml
-	@printf '[server]\nfileWatcherType = "none"\n\n[browser]\ngatherUsageStats = false\n' > .streamlit/config.toml
-
-	@mv vllm-0.10.1 ./data/raw
-	@mv datasets_public/public/AnsweredQuestions ./data/datasets
-	@mv datasets_public/public/UnansweredQuestions ./data/datasets
-
-	@echo "Cleaning downloaded archives..."
-	@rm -rf datasets_public
-	@rm -rf datasets_public.zip
-	@rm -rf vllm-0.10.1.zip
-
+install: data
 	@echo "Creating Virtual Environment and installing dependencies"
+ifneq ($(BASE),)
+	@mkdir -p $(BASE) $(CACHE) $(TMP) $(HF)
+endif
+	@mkdir -p .streamlit
+	@printf '[server]\nfileWatcherType = "none"\n\n[browser]\ngatherUsageStats = false\n' > .streamlit/config.toml
 	$(ENV) $(UV) venv $(VENV)
 	$(ENV) $(UV) sync
 
+# vLLM 0.10.1 from the official GitHub tag (same files and offsets as the
+# 42 attachment). The public datasets are versioned in data/datasets.
+data:
+	@mkdir -p data/raw data/processed data/output
+	@if [ ! -d "$(VLLM_DIR)" ]; then \
+		echo "Downloading vLLM 0.10.1 from GitHub..."; \
+		curl -fL -o vllm-0.10.1.zip $(VLLM_URL) && \
+		unzip -q vllm-0.10.1.zip -d data/raw && \
+		rm -f vllm-0.10.1.zip; \
+	else \
+		echo "vLLM already present at $(VLLM_DIR)"; \
+	fi
+
+# Original 42 download. Needs access to the intra CDN and replaces the
+# versioned datasets with the ones from the attachment.
+data-42:
+	@mkdir -p data/raw data/processed data/output $(DATASETS)
+	curl -fL -o datasets_public.zip $(URL_42)/54681/datasets_public.zip
+	curl -fL -o vllm-0.10.1.zip $(URL_42)/54683/vllm-0.10.1.zip
+	@unzip -q -o datasets_public.zip
+	@rm -rf $(VLLM_DIR)
+	@unzip -q vllm-0.10.1.zip -d data/raw
+	@rm -rf $(DATASETS)/AnsweredQuestions $(DATASETS)/UnansweredQuestions
+	@mv datasets_public/public/AnsweredQuestions $(DATASETS)
+	@mv datasets_public/public/UnansweredQuestions $(DATASETS)
+	@rm -rf datasets_public datasets_public.zip vllm-0.10.1.zip
+
 run:
-	$(ENV) $(UV) run --project . $(PY) -m src $(ARGS)
+	$(RUN) $(ARGS)
 
 web:
 	$(ENV) $(UV) run streamlit run src/web.py &
@@ -58,39 +80,41 @@ web-stop:
 	@pkill -f "streamlit run" || true
 
 index:
-	$(ENV) $(UV) run --project . $(PY) -m src index \
-		--max_chunk_size 2000 --use_embeddings False
-
-index-embed:
-	$(ENV) $(UV) run --project . $(PY) -m src index \
-		--max_chunk_size 2000 --use_embeddings True
+	$(RUN) index --max_chunk_size 2000
 
 search-docs:
-	$(ENV) $(UV) run --project . $(PY) -m src answer_dataset \
-		--dataset_path data/datasets/UnansweredQuestions/dataset_docs_public.json \
-		--skip_generation True \
-		--save_directory data/output/search_results
+	$(RUN) search_dataset \
+		--dataset_path $(DATASETS)/UnansweredQuestions/dataset_docs_public.json \
+		--save_directory $(SEARCH)
 
 search-code:
-	$(ENV) $(UV) run --project . $(PY) -m src answer_dataset \
-		--dataset_path data/datasets/UnansweredQuestions/dataset_code_public.json \
-		--skip_generation True \
-		--save_directory data/output/search_results
+	$(RUN) search_dataset \
+		--dataset_path $(DATASETS)/UnansweredQuestions/dataset_code_public.json \
+		--save_directory $(SEARCH)
 
 eval-docs:
-	$(ENV) $(UV) run --project . $(PY) -m src evaluate \
-		--student_answer_path data/output/search_results/dataset_docs_public.json \
-		--dataset_path data/datasets/AnsweredQuestions/dataset_docs_public.json \
+	$(RUN) evaluate \
+		--student_answer_path $(SEARCH)/dataset_docs_public.json \
+		--dataset_path $(DATASETS)/AnsweredQuestions/dataset_docs_public.json \
 		--k 10
 
 eval-code:
-	$(ENV) $(UV) run --project . $(PY) -m src evaluate \
-		--student_answer_path data/output/search_results/dataset_code_public.json \
-		--dataset_path data/datasets/AnsweredQuestions/dataset_code_public.json \
+	$(RUN) evaluate \
+		--student_answer_path $(SEARCH)/dataset_code_public.json \
+		--dataset_path $(DATASETS)/AnsweredQuestions/dataset_code_public.json \
 		--k 10
 
+bench:
+	$(RUN) bench --label $(LABEL) --mode smart
+
+bench-gen:
+	$(RUN) bench --label $(LABEL) --mode generation
+
+test:
+	$(ENV) $(UV) run --project . pytest
+
 lint:
-	$(ENV) $(UV) run --project . flake8 src
+	$(ENV) $(UV) run --project . flake8 src tests
 	$(ENV) $(UV) run --project . mypy src \
 		--warn-return-any \
 		--warn-unused-ignores \
@@ -99,11 +123,13 @@ lint:
 		--check-untyped-defs
 
 clean:
-	@echo "Cleaning venv and donwloaded data."
+	@echo "Cleaning venv, caches and generated data."
+ifneq ($(BASE),)
 	@rm -rf $(BASE)
+endif
 	@rm -rf $(VENV)
-	@rm -rf .mypy_cache
-	@rm -rf data
+	@rm -rf .mypy_cache .pytest_cache
+	@rm -rf data/raw data/processed data/output
 	@rm -rf .streamlit
 	@find . -type d -name "__pycache__" -exec rm -rf {} +
 
@@ -114,28 +140,5 @@ meme:
 	$(ENV) $(UV) run streamlit run src/web.py &
 	@echo "Web running at http://localhost:8501"
 
-
-test-docs:
-	$(ENV) uv run --project . python3 -m src search_dataset \
-		--dataset_path data/datasets/private/UnansweredQuestions/dataset_docs_private.json \
-		--save_directory data/output/search_results
-
-test-eval-docs:
-	$(ENV) uv run --project . python3 -m src evaluate \
-		--student_answer_path data/output/search_results/dataset_docs_private.json \
-		--dataset_path data/datasets/private/AnsweredQuestions/dataset_docs_private.json \
-		--k 10
-
-test-code:
-	$(ENV) uv run --project . python3 -m src search_dataset \
-		--dataset_path data/datasets/private/UnansweredQuestions/dataset_code_private.json \
-		--save_directory data/output/search_results
-
-test-eval-code:
-	$(ENV) uv run --project . python3 -m src evaluate \
-		--student_answer_path data/output/search_results/dataset_code_private.json \
-		--dataset_path data/datasets/private/AnsweredQuestions/dataset_code_private.json \
-		--k 10
-
-.PHONY: install run web web-stop index index-fast search-docs search-code \
-        eval-docs eval-code lint clean meme
+.PHONY: install data data-42 run web web-stop index search-docs search-code \
+        eval-docs eval-code bench bench-gen test lint clean meme
