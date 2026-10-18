@@ -1,0 +1,6 @@
+# Commits que solo cambian formato; git blame los ignora.
+# Uso local: git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub lo aplica automaticamente.
+
+# Normalizacion de finales de linea a LF (.gitattributes)
+5a1cc4b0a1e0d7525e9232ef2e5fd52dd87872ea

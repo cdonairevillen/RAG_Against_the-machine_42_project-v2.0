@@ -218,7 +218,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 |---|---|---|
 | P1 | D7: agente frente a acceso directo, y qué es lo por defecto | Antes de la Fase 5 |
 | P2 | ~~D9: alcance de la ingesta multimedia~~ → resuelto: todo lo posible, prioridad vídeo y audio. **Queda por concretar qué material y cuánto** | Antes de la Fase 4 |
-| P7 | `.gitattributes` para normalizar los finales de línea (CRLF/LF mezclados; un solo commit con un diff grande) | Cuando quieras |
+| P7 | ~~`.gitattributes` para normalizar los finales de línea~~ → resuelto: todo LF y `llm_sdk/` intacto (commit `5a1cc4b`) | Hecho |
 | P3 | Qué datasets o dominios nuevos se añaden (D6) | Antes de la Fase 4 |
 | P4 | Modularización: qué opciones se exponen en la web y cómo se navega | Antes de la Fase 6 |
 | P5 | GPU de los ordenadores de 42 (para fijar los valores por defecto) | Durante la Fase 2 |
@@ -235,3 +235,5 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-18**: el CDN de 42 devuelve 403 sin sesión. Los datasets públicos se versionan en `data/datasets/` (recuperados del historial) y vLLM 0.10.1 se descarga de la etiqueta oficial de GitHub. Verificado: las 200 fuentes de ground truth coinciden en ruta y offsets.
 - **2026-10-18**: `llm_sdk` se importa de forma estándar (`from llm_sdk import ...`). El arreglo está en la config de mypy (`mypy_path = "llm_sdk"`), sin tocar la carpeta del SDK.
 - **2026-10-18**: Fase 0 completada. Ver `changelog/FASE_0.md`.
+- **2026-10-18**: las cifras del README (docs 0.89 / code 0.75 en R@10) eran de los datasets **públicos**, aunque estuvieran etiquetadas como privadas, y salían de configuraciones anteriores que no se reproducen con `v1.0-42`. Se acepta como línea base oficial `04-fase0-final / smart`. La etiqueta del README se corrige en la reescritura final.
+- **2026-10-18**: finales de línea normalizados a LF con `.gitattributes`, con `llm_sdk/` excluido (P7).

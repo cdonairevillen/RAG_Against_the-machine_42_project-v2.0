@@ -26,7 +26,11 @@ Datasets públicos de 42 (100 preguntas docs + 100 code), `k = 10`, evaluador or
   - 4 preguntas que antes fallaban ahora aciertan.
   - 1 pregunta sube de puesto.
 
-> **Ojo con el README:** sus cifras (docs 0.89, code 0.75 en R@10) son de los datasets **privados**. Ahora usamos los públicos (D1), así que no son comparables. La línea base oficial es la fila `04-fase0-final / smart`.
+> **Sobre las cifras del README** (corregido tras tu aclaración):
+> - Las cifras del README (docs 0.89, code 0.75 en R@10) **son de los datasets públicos**, aunque su tabla diga *"private evaluation datasets"*: el README está mal etiquetado.
+> - Salieron de configuraciones anteriores. Llegaste a 0.93 en R@10, pero a costa de desplomar otros cortes.
+> - **No se reproducen con el código de `v1.0-42`**: medido aquí, da docs 0.85 / code 0.68 en R@10 (ruta smart).
+> - **Decisión:** se acepta. La línea base oficial es la fila `04-fase0-final / smart`, que sí es reproducible con `make bench`. La etiqueta errónea del README se corrige en la reescritura final (Fase 6).
 
 ---
 
@@ -121,7 +125,11 @@ Datasets públicos de 42 (100 preguntas docs + 100 code), `k = 10`, evaluador or
   - **Efecto secundario:** mypy ya comprueba los tipos de la interacción con el SDK. Por eso `generate()` lleva un `Any` explícito y comentado: las anotaciones de transformers no lo exponen en `PreTrainedModel`.
 - **`search_smart` es la ruta oficial de benchmark**, porque es la que usa `search_dataset` (moulinette). `search_for_generation` es la que usan la web y `answer`: da más recall en docs pero mucho menos en code R@1, y tarda 5 veces más (reranker sobre 50 candidatos). **Unificar o elegir ruta es una decisión para la Fase 2.**
 - **La regla de "no empeorar" se aplica por pregunta, no solo a la media.** `src/bench.py` guarda las salidas en `data/output/bench/<label>_<modo>/`, que permiten diferenciar pregunta a pregunta (así se detectó el falso positivo de `vLLM` en B1).
-- **Finales de línea:** el repo guarda los `.py` en **CRLF** (se mantienen así, y `src/` y `tests/` están normalizados), pero `uv` reescribe `uv.lock` y `pyproject.toml` en LF. **Propuesta para cuando quieras:** un `.gitattributes` (`* text=auto`, `Makefile eol=lf`) que normalice el repo una vez. Genera un diff grande en un solo commit, así que no lo he hecho sin tu permiso.
+- **Finales de línea:** ✅ **resuelto en el cierre de la fase (P7).**
+  - **`.gitattributes`:** `* text=auto eol=lf` en todo el repo, y `llm_sdk/** -text` para que el SDK no se toque ni en sus finales de línea.
+  - **Commit `5a1cc4b`:** es solo de normalización. Con `git diff --ignore-cr-at-eol` el único cambio es el propio `.gitattributes`.
+  - **`.git-blame-ignore-revs`:** hace que `git blame` y GitHub se salten ese commit. En local hay que activarlo con `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
+  - **Medición de control** (`05-eol-lf`): idéntica a `04-fase0-final`.
 - **Torch en CPU:** `uv sync` instala `torch 2.12.1+cpu` (en Windows, PyPI no trae CUDA). Basta para el retrieval y para Qwen3-0.6B. Para usar la 3080 Ti en las fases 2 y 3 habrá que configurar el índice de PyTorch con CUDA en `pyproject.toml`; se decidirá entonces.
 
 ---
