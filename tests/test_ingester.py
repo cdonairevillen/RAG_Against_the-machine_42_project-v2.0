@@ -63,6 +63,49 @@ def test_split_by_size_respects_limit_and_overlaps() -> None:
         assert nxt.first_character_index < prev.last_character_index
 
 
+def test_split_by_size_starts_at_line_breaks() -> None:
+    """B16: pieces start right after a line break, not mid-line."""
+    text = "".join(f"value = compute({i}, k={i * 3})\n" for i in range(200))
+    chunks = split_by_size(text, "f.py", "code", max_chunk_size=300)
+
+    assert len(chunks) > 1
+    for chunk in chunks[1:]:
+        assert text[chunk.first_character_index - 1] == "\n"
+
+
+def test_split_by_size_covers_every_character() -> None:
+    """B17: no text falls between two consecutive pieces, even when a
+    piece ends early at a line break."""
+    lines = [("x" * (i % 7 * 20 + 5)) for i in range(150)]
+    text = "\n".join(lines) + "\n"
+    chunks = split_by_size(text, "f.txt", "doc", max_chunk_size=300)
+
+    covered = [False] * len(text)
+    for chunk in chunks:
+        for i in range(chunk.first_character_index,
+                       chunk.last_character_index):
+            covered[i] = True
+    assert all(covered[i] for i, ch in enumerate(text) if not ch.isspace())
+
+
+def test_split_by_size_always_moves_past_previous_piece() -> None:
+    """Short lines followed by a line longer than the limit must not
+    produce pieces contained in the previous one."""
+    text = "".join(f"short line {i}\n" for i in range(40)) + "y" * 900 + "\n"
+    chunks = split_by_size(text, "f.txt", "doc", max_chunk_size=300)
+
+    for prev, nxt in zip(chunks, chunks[1:]):
+        assert nxt.last_character_index > prev.last_character_index
+
+
+def test_split_by_size_cuts_lines_longer_than_limit() -> None:
+    text = "a" * 1000
+    chunks = split_by_size(text, "f.txt", "doc", max_chunk_size=300)
+
+    assert all(len(c.text) <= 300 for c in chunks)
+    assert chunks[-1].last_character_index == 1000
+
+
 def test_children_reference_valid_parents() -> None:
     source = SourceConfig(root="", include=[".py"], code_extensions=[".py"])
     chunking = ChunkingConfig(code_child_size=50, doc_child_size=50)

@@ -13,8 +13,11 @@ def split_by_size(text: str, file_path: str, chunk_type: str,
                   symbols: str = "") -> list[Chunk]:
     """Split text into overlapping chunks of at most max_chunk_size.
 
-    Each chunk overlaps the previous by OVERLAP_RATIO * max_chunk_size
-    characters so that context at chunk boundaries is not lost.
+    Chunks end at a line break and the next one starts at a line break
+    inside the last OVERLAP_RATIO * max_chunk_size characters of the
+    previous chunk, so pieces never begin mid-line and every character
+    is covered (the next start is derived from where the previous chunk
+    actually ended). A line longer than the limit is cut by characters.
 
     Args:
         text: The text to split.
@@ -29,15 +32,19 @@ def split_by_size(text: str, file_path: str, chunk_type: str,
     """
     chunks: list[Chunk] = []
     overlap = int(max_chunk_size * OVERLAP_RATIO)
-    step = max_chunk_size - overlap
     pos = 0
+    prev_end = 0
 
     while pos < len(text):
         end = min(pos + max_chunk_size, len(text))
         if end < len(text):
-            newline = text.rfind("\n", pos, end)
+            # Only snap back to a line break that still ends past the
+            # previous piece; otherwise a long line ahead would make the
+            # loop crawl line by line producing redundant pieces.
+            newline = text.rfind("\n", max(pos, prev_end), end)
             if newline > pos:
                 end = newline + 1
+        prev_end = end
         slice_text = text[pos:end].strip()
         if slice_text:
             chunks.append(Chunk(
@@ -48,7 +55,11 @@ def split_by_size(text: str, file_path: str, chunk_type: str,
                 chunk_type=chunk_type,
                 symbols=symbols,
             ))
-        pos += step
+        if end >= len(text):
+            break
+        next_pos = max(end - overlap, pos + 1)
+        newline = text.find("\n", next_pos - 1, end - 1)
+        pos = newline + 1 if newline != -1 else next_pos
 
     return chunks
 

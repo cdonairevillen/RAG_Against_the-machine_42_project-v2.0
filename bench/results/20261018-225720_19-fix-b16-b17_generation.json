@@ -1,0 +1,44 @@
+{
+  "label": "19-fix-b16-b17",
+  "mode": "generation",
+  "k": 10,
+  "timestamp": "2026-10-18T22:54:19",
+  "commit": "a823a23",
+  "dirty": true,
+  "domain": "vllm",
+  "chunking": {
+    "code_chunk_size": 2000,
+    "doc_chunk_size": 2000,
+    "code_child_size": 600,
+    "doc_child_size": 600
+  },
+  "chunkers": {
+    ".py": "python_ast",
+    ".pyi": "python_ast",
+    ".md": "markdown_headers_packed",
+    ".rst": "markdown_headers_packed",
+    ".txt": "markdown_headers_packed"
+  },
+  "datasets": {
+    "docs": {
+      "recall_at_k": {
+        "1": 0.68,
+        "3": 0.83,
+        "5": 0.87,
+        "10": 0.92
+      },
+      "seconds": 91.34,
+      "questions": 100
+    },
+    "code": {
+      "recall_at_k": {
+        "1": 0.24,
+        "3": 0.53,
+        "5": 0.65,
+        "10": 0.7
+      },
+      "seconds": 89.71,
+      "questions": 100
+    }
+  }
+}
