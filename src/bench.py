@@ -76,7 +76,7 @@ def run_dataset(retriever: Retriever, name: str, mode: str, k: int,
 
     os.makedirs(output_dir, exist_ok=True)
     student_path = os.path.join(output_dir, filename)
-    with open(student_path, "w", encoding="utf-8") as fh:
+    with open(student_path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(StudentSearchResults(
             search_results=results, k=k
         ).model_dump_json(indent=2))
@@ -183,7 +183,7 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
         os.makedirs(RESULTS_DIR, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         path = os.path.join(RESULTS_DIR, f"{stamp}_{label}_{mode}.json")
-        with open(path, "w", encoding="utf-8") as fh:
+        with open(path, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(run, fh, indent=2)
         print(f"Saved bench run to {path}")
 
