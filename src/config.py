@@ -129,6 +129,10 @@ class RagConfig(BaseModel):
     models: ModelsConfig = Field(default_factory=ModelsConfig)
     embeddings: EmbeddingsConfig = Field(default_factory=EmbeddingsConfig)
     sources: dict[str, SourceConfig] = Field(default_factory=dict)
+    # Active profile ("default" = the stable base configuration) and the
+    # profiles rag.toml offers, e.g. for a model selector in the web.
+    profile: str = "default"
+    available_profiles: list[str] = Field(default_factory=list)
 
     def source(self, domain: str) -> SourceConfig:
         """Return a source by name.
@@ -175,22 +179,55 @@ def apply_env_overrides(data: dict[str, Any],
     return merged
 
 
+def deep_merge(base: dict[str, Any],
+               override: dict[str, Any]) -> dict[str, Any]:
+    """Return base with override applied recursively (dicts merged,
+    everything else replaced)."""
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def load_config(path: str = CONFIG_FILE,
-                environ: dict[str, str] | None = None) -> RagConfig:
+                environ: dict[str, str] | None = None,
+                profile: str | None = None) -> RagConfig:
     """Load and validate the configuration file.
+
+    Precedence: environment variables > selected profile > rag.toml base
+    > code defaults. Without a profile the stable base configuration is
+    used, so results do not depend on the machine.
 
     Args:
         path: TOML file to read. A missing file yields the defaults.
         environ: Environment used for overrides (defaults to os.environ).
+        profile: Profile from `[profiles.<name>]` to apply on top of the
+            base (defaults to RAG_PROFILE, then "default").
 
     Returns:
         The validated RagConfig.
+
+    Raises:
+        KeyError: If the requested profile does not exist.
     """
     data: dict[str, Any] = {}
     if os.path.isfile(path):
         with open(path, "rb") as fh:
             data = tomllib.load(fh)
     env = dict(os.environ) if environ is None else environ
+
+    profiles: dict[str, Any] = data.pop("profiles", {})
+    name = profile or env.get(f"{ENV_PREFIX}PROFILE") or "default"
+    if name != "default":
+        if name not in profiles:
+            known = ", ".join(sorted(profiles)) or "none"
+            raise KeyError(f"Unknown profile '{name}' (available: {known})")
+        data = deep_merge(data, profiles[name])
+    data["profile"] = name
+    data["available_profiles"] = ["default", *sorted(profiles)]
     return RagConfig.model_validate(apply_env_overrides(data, env))
 
 

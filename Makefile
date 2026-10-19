@@ -29,7 +29,9 @@ BASE      :=
 ENV       :=
 endif
 
-RUN       := $(ENV) $(UV) run --project . $(PY) -m src
+# Optional profile from rag.toml (extra models), e.g. PROFILE=gpu-quality.
+PROFILE   ?=
+RUN       := $(ENV) $(if $(PROFILE),RAG_PROFILE=$(PROFILE)) $(UV) run --project . $(PY) -m src
 
 install: data
 	@echo "Creating Virtual Environment and installing dependencies"

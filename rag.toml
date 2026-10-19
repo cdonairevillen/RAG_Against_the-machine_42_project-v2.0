@@ -73,3 +73,19 @@ default_chunker = "size"
 ".md" = "markdown_headers_packed"
 ".rst" = "markdown_headers_packed"
 ".txt" = "markdown_headers_packed"
+
+# Optional profiles: extra models as explicit options on top of the
+# stable base above (which is what the official benchmark uses and gives
+# the same results on any machine). Select with --profile <name>,
+# RAG_PROFILE=<name> or `make <target> PROFILE=<name>`. A profile that
+# changes embeddings needs `make index PROFILE=<name>` first.
+
+[profiles.gpu-quality.retrieval]
+# Best measured reranker (code R@5 0.86 vs 0.80), but ~4.4 s per question
+# on GPU and ~23 s on CPU: only for machines with a GPU.
+reranker_model = "BAAI/bge-reranker-v2-m3"
+
+[profiles.cpu-light.embeddings]
+# Index in ~13 min on CPU instead of ~2 h with bge-m3 (lower recall,
+# see docs/BENCHMARK_REPORT.md).
+model = "intfloat/multilingual-e5-small"

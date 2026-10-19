@@ -249,7 +249,11 @@ Todas las tablas están en `docs/BENCHMARK_REPORT.md` §2.
 - **Descartados sin medir el recall:**
   - `jina-reranker-v2-base-multilingual`, por su licencia **CC-BY-NC-4.0** (no comercial).
   - `Qwen3-Reranker-0.6B`, según tu criterio: necesita un adaptador propio y es pesado; solo compensaría con un beneficio muy alto. Queda en *Posibilidades*.
-- **⚠️ `bge-reranker-v2-m3`: recall sin medir.** La ejecución se detuvo porque **el sistema se quedaba sin memoria** (Claude Code paró el proceso mientras la sesión estaba inactiva) y no la he relanzado. Con 23 s por consulta en CPU, solo podría ser una opción "solo GPU".
+- **`bge-reranker-v2-m3`:** la primera ejecución se detuvo por falta de memoria del sistema. **Relanzada después (`46`), en primer plano:**
+  - **Resultado:** code **0.52 / 0.83 / 0.86 / 0.87** (R@5 +0.06 y R@3 +0.11 frente a `mmarco`; R@10 −0.01); docs 0.78 / 0.92 / 0.92 / 0.94.
+  - **Coste:** 439 s el dataset de code (~4,4 s por pregunta en GPU) y ~23 s por consulta en CPU.
+  - **Memoria:** pico de memoria comprometida de 39,1 GB sobre 67,9 GB; la causa de la primera parada no se ha podido determinar.
+  - **Decisión (tuya):** perfil opcional `gpu-quality`; `mmarco` sigue en la base (§12).
 - **Rerank en la rama de docs** (`rerank_doc_branch`): sigue perjudicando con los dos rerankers medidos; se queda desactivado.
 - **Decisión: `mmarco-mMiniLMv2-L12` por defecto.** En el benchmark oficial empata en R@5 y gana en R@10 de code (+0.02); en español, docs R@5 pasa de 0.70 a 0.90. Cuesta el doble que `ms-marco`, pero sigue siendo viable en CPU (1,8 s por consulta).
 
@@ -312,6 +316,22 @@ Tablas en `docs/BENCHMARK_REPORT.md` §3.
 
 ### Pendiente para revisar contigo
 
-1. **`bge-reranker-v2-m3`:** recall sin medir (parada por memoria). ¿Merece la pena medirlo como opción "solo GPU"?
-2. **¿`bge-m3` como modelo por defecto aunque indexar en CPU lleve ~2 h?** La alternativa es `e5-small` por defecto en entornos sin GPU, o llevar un índice ya construido (ver *Posibilidades*).
+1. ~~`bge-reranker-v2-m3`~~ → resuelto: perfil opcional `gpu-quality`, con `mmarco` en la base (§12).
+2. ~~¿`bge-m3` aunque indexar en CPU lleve ~2 h?~~ → resuelto: `bge-m3` en la base (resultados estables) y perfil `cpu-light` con `e5-small` (§12). El índice preconstruido sigue en *Posibilidades*.
 3. **La pregunta de docs en español** que empeora con el clasificador nuevo (§10).
+
+---
+
+## 12. Perfiles: base estable y modelos extra como opciones
+
+**Tu criterio:** el sistema debe comportarse igual en cualquier ordenador; los modelos extra son opciones y en la web podrían ofrecerse con selectores (ingesta, reranker, embeddings). Eso se planteará en su fase.
+
+- **Base estable:** lo que hay en `rag.toml` fuera de `[profiles.*]` (`bge-m3` + `mmarco`). Es lo que usa el benchmark oficial y **no cambia según la máquina** (no hay selección automática por GPU), así que los números son reproducibles y comparables con otros RAG de 42.
+- **Perfiles** (`[profiles.<nombre>]` en `rag.toml`): solo sobrescriben lo que declaran.
+  - **Cómo se elige:** `--profile <nombre>`, `RAG_PROFILE=<nombre>` o `make <target> PROFILE=<nombre>`.
+  - **Precedencia:** variables de entorno > perfil > base de `rag.toml` > valores por defecto del código.
+  - **`gpu-quality`:** reranker `bge-reranker-v2-m3` (code R@5 0.86 frente a 0.80, pero ~4,4 s por pregunta en GPU y ~23 s en CPU).
+  - **`cpu-light`:** embeddings `e5-small`, para indexar sin GPU en ~13 min en lugar de ~2 h. Necesita `make index PROFILE=cpu-light`; el manifest impide mezclar índices.
+- **`bench` registra el perfil** de cada ejecución, y la configuración expone `available_profiles`, que es lo que necesitaría un selector en la web (Fase 6).
+- **Verificación:** la base da resultados idénticos a `49-fase2-final` (`50-base-check`). Tests: 51 (+4 de perfiles).
+- **Ficheros:** `src/config.py` (`deep_merge`, perfiles en `load_config`), `src/cli.py` (`--profile`), `src/bench.py`, `Makefile` (`PROFILE=`), `rag.toml`, `tests/test_config.py`.

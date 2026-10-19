@@ -151,7 +151,6 @@ saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web
 > - **No hecho, pasa a pendientes:**
 >   - Métricas MRR/nDCG.
 >   - Volver a medir LangChain.
->   - Recall de `bge-reranker-v2-m3` (la medición se paró por falta de memoria del sistema).
 >   - Clasificador semántico.
 
 ## Fase 3 — Mejoras en la generación de respuesta
@@ -227,6 +226,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
   - Tipografías JetBrains Mono + Inter.
   - Tarjetas de fuentes y barras de recall.
 - **Navegación y selectores** (modelo, agente sí/no), según lo que se decida de la modularización.
+  - **Base ya preparada (Fase 2):** los perfiles de `rag.toml` (`available_profiles`) son las opciones que podría ofrecer un selector de ingesta, reranker o embeddings. La base estable sigue siendo la del benchmark. *A plantear en esta fase.*
 - **Despliegue sin coste**:
   - Backend en un Hugging Face Space (Docker, CPU gratuito).
   - Frontend estático en GitHub Pages.
@@ -243,8 +243,8 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 | P1 | D7: agente frente a acceso directo, y qué es lo por defecto | Antes de la Fase 5 |
 | P2 | ~~D9: alcance de la ingesta multimedia~~ → resuelto: todo lo posible, prioridad vídeo y audio. **Queda por concretar qué material y cuánto** | Antes de la Fase 4 |
 | P7 | ~~`.gitattributes` para normalizar los finales de línea~~ → resuelto: todo LF y `llm_sdk/` intacto (commit `5a1cc4b`) | Hecho |
-| P8 | ¿`bge-m3` por defecto aunque indexar en CPU lleve ~2 h? Alternativas: `e5-small` sin GPU o llevar un índice ya construido | Antes de probar en 42 |
-| P9 | ¿Medir `bge-reranker-v2-m3` como opción "solo GPU"? (la medición se paró por memoria) | Cuando quieras |
+| P8 | ~~¿`bge-m3` por defecto aunque indexar en CPU lleve ~2 h?~~ → resuelto: `bge-m3` en la base y perfil `cpu-light` (`e5-small`) | Hecho |
+| P9 | ~~`bge-reranker-v2-m3`~~ → resuelto: perfil opcional `gpu-quality` | Hecho |
 | P3 | Qué datasets o dominios nuevos se añaden (D6) | Antes de la Fase 4 |
 | P4 | Modularización: qué opciones se exponen en la web y cómo se navega | Antes de la Fase 6 |
 | P5 | GPU de los ordenadores de 42 (para fijar los valores por defecto) | Durante la Fase 2 |

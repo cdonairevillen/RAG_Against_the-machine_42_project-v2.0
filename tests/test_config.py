@@ -63,6 +63,54 @@ def test_unknown_source_is_reported(tmp_path: Path) -> None:
         config.source("missing")
 
 
+PROFILES = CONFIG + """
+[profiles.big.retrieval]
+reranker_model = "big-reranker"
+
+[profiles.light.embeddings]
+model = "small-embedder"
+"""
+
+
+def write_profiles(tmp_path: Path) -> str:
+    path = tmp_path / "rag.toml"
+    path.write_text(PROFILES, encoding="utf-8")
+    return str(path)
+
+
+def test_without_profile_the_base_is_used(tmp_path: Path) -> None:
+    config = load_config(write_profiles(tmp_path), environ={})
+
+    assert config.profile == "default"
+    assert config.available_profiles == ["default", "big", "light"]
+    assert config.retrieval.reranker_model != "big-reranker"
+
+
+def test_profile_overrides_only_what_it_declares(tmp_path: Path) -> None:
+    config = load_config(write_profiles(tmp_path), environ={},
+                         profile="big")
+
+    assert config.profile == "big"
+    assert config.retrieval.reranker_model == "big-reranker"
+    assert config.qdrant.url == "http://qdrant:6333"
+    assert config.chunking.code_chunk_size == 1500
+
+
+def test_profile_from_environment_and_env_wins(tmp_path: Path) -> None:
+    config = load_config(write_profiles(tmp_path), environ={
+        "RAG_PROFILE": "light",
+        "RAG_EMBEDDINGS_MODEL": "from-env",
+    })
+
+    assert config.profile == "light"
+    assert config.embeddings.model == "from-env"
+
+
+def test_unknown_profile_is_reported(tmp_path: Path) -> None:
+    with pytest.raises(KeyError, match="big"):
+        load_config(write_profiles(tmp_path), environ={}, profile="nope")
+
+
 def test_missing_file_gives_defaults(tmp_path: Path) -> None:
     config = load_config(str(tmp_path / "nope.toml"), environ={})
 

@@ -61,7 +61,7 @@ Configuración común:
 - Es el mejor en el benchmark oficial con tu prioridad: code R@5 empata con los demás (0.79) y gana en R@10 (0.86 frente a 0.84 y 0.83), y docs tiene el mejor R@3.
 - Es multilingüe, con docs en español a 0.90 en R@10.
 - En CPU responde rápido (141 ms por consulta).
-- **Su coste:** indexar sin GPU lleva unas 2 h. Para máquinas sin GPU (42), la alternativa documentada es `e5-small` (`RAG_EMBEDDINGS_MODEL=intfloat/multilingual-e5-small`, ~13 min en CPU), o bien indexar en una máquina con GPU y llevar el índice ya hecho (ver *Posibilidades*).
+- **Su coste:** indexar sin GPU lleva unas 2 h. Para máquinas sin GPU (42) existe el perfil opcional **`cpu-light`** (`e5-small`, ~13 min en CPU: `make index PROFILE=cpu-light`), o se puede indexar en una máquina con GPU y llevar el índice ya hecho (ver *Posibilidades*).
 - **Qwen3-Embedding-0.6B descartado:** no mejora a `bge-m3` en el benchmark oficial, empata en español y en CPU es inviable (19 h de indexado y 0,8 s por consulta).
 
 ---
@@ -87,10 +87,14 @@ Configuración común:
 | `ms-marco-MiniLM-L-6-v2` | sí | 0.71 / 0.89 / 0.91 / 0.92 | 0.52 / 0.71 / 0.79 / 0.86 |
 | **`mmarco-mMiniLMv2-L12`** | no | 0.75 / 0.90 / 0.91 / 0.94 | 0.51 / **0.72 / 0.80 / 0.88** |
 | `mmarco-mMiniLMv2-L12` | sí | 0.70 / 0.88 / 0.90 / 0.93 | 0.51 / 0.72 / 0.80 / 0.88 |
-| `bge-reranker-v2-m3` | no | *no medido (ver nota)* | *no medido* |
+| `bge-reranker-v2-m3` (`46`, medido después) | no | **0.78 / 0.92** / 0.92 / 0.94 | 0.52 / **0.83 / 0.86** / 0.87 |
 
 - **Reranquear la rama de docs sigue perjudicando** con los dos rerankers (−0.01 a −0.02 en R@5), así que se queda desactivado (`rerank_doc_branch = false`), como en la v1.
-- **Nota:** la medición de `bge-reranker-v2-m3` se detuvo porque **el sistema se quedaba sin memoria**; Claude Code la paró mientras la sesión estaba inactiva, y no se ha relanzado. Con 23 s por consulta en CPU no es viable para máquinas sin GPU, así que solo sería una opción "solo GPU". Queda pendiente.
+- **`bge-reranker-v2-m3`:** la primera medición se detuvo por falta de memoria del sistema (Claude Code paró el proceso con la sesión inactiva). **Relanzada a petición tuya, en primer plano:**
+  - **Resultado:** code R@5 +0.06 (0.80 → 0.86) y R@3 +0.11, con R@10 −0.01; docs R@1 +0.02 y R@3 +0.01.
+  - **Coste:** 439 s el dataset de code (~4,4 s por pregunta en GPU), frente a 15 s con `mmarco`; ~23 s por consulta en CPU.
+  - **Memoria:** pico de memoria comprometida de 39,1 GB sobre 67,9 GB; no estuvo cerca del límite. El proceso añade unos 16 GB a la carga del sistema.
+  - **Decisión:** disponible como perfil opcional `gpu-quality` (`make bench PROFILE=gpu-quality`); la base sigue con `mmarco`.
 
 ### 2.3 Multilingüe (20 preguntas, con `bge-m3`)
 

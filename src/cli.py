@@ -59,15 +59,18 @@ class CLI:
     """
 
     def __init__(self, domain: str = DEFAULT_DOMAIN,
-                 config: str = CONFIG_FILE) -> None:
+                 config: str = CONFIG_FILE,
+                 profile: Optional[str] = None) -> None:
         """Initialise the CLI orchestrator.
 
         Args:
             domain: Knowledge source to work on (a source in rag.toml).
             config: Path to the TOML configuration file.
+            profile: Optional profile from rag.toml (extra models on top
+                of the stable base); defaults to RAG_PROFILE or none.
         """
         self.domain = domain
-        self.config: RagConfig = load_config(config)
+        self.config: RagConfig = load_config(config, profile=profile)
         self.retriever: Retriever | None = None
         self.generator: Generator | None = None
 
