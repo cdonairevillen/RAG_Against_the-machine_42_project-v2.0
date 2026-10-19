@@ -254,11 +254,14 @@ class Ingester:
 
         return children
 
-    def save_bm25(self, processed_dir: str) -> str:
+    def save_bm25(self, processed_dir: str,
+                  embedding_model: Optional[str] = None) -> str:
         """Persist the BM25 indices and a manifest for this domain.
 
         Args:
             processed_dir: Root directory for processed artefacts.
+            embedding_model: Model whose vectors are stored in Qdrant
+                for this run, recorded so the retriever can check it.
 
         Returns:
             The domain directory that was written.
@@ -286,6 +289,7 @@ class Ingester:
             "parents": len(self.parent_chunks),
             "children": len(self.chunks),
             "identifier_parts": sorted(self.part_types),
+            "embedding_model": embedding_model,
         }
         with open(os.path.join(domain_dir, MANIFEST_FILE), "w",
                   encoding="utf-8", newline="\n") as fh:

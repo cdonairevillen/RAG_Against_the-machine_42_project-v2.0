@@ -1,0 +1,144 @@
+{
+  "rag_questions": [
+    {
+      "question_id": "189c8b8a-e59c-4fca-92ad-c02df42cbe40",
+      "question": "¿Qué formatos de activación devuelve la capa MoE batched fusionada en vLLM?",
+      "answer": "The fused batched MoE layer returns a tuple of two `mk.FusedMoEActivationFormat.BatchedExperts` values from its `activation_formats` property.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/vllm/model_executor/layers/fused_moe/fused_batched_moe.py",
+          "first_character_index": 28416,
+          "last_character_index": 28975
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "d39bfccf-9478-4c98-978d-574c596049b2",
+      "question": "¿Qué devuelve el método get_num_new_matched_tokens de NIXLConnector?",
+      "answer": "The get_num_new_matched_tokens method in NIXLConnector returns a tuple containing two values: an integer representing the number of tokens that can be loaded from the external KV cache beyond what is already computed, and a boolean indicating whether the external KV cache tokens will be loaded asynchronously (between scheduler steps).",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/vllm/distributed/kv_transfer/kv_connector/v1/nixl_connector.py",
+          "first_character_index": 9604,
+          "last_character_index": 10551
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "706af2a5-9d60-42db-be84-211f217e03f3",
+      "question": "¿Cuál es el valor por defecto del parámetro min_dynamic_patch al inicializar el modelo NemotronVL?",
+      "answer": "The default value for min_dynamic_patch is 1 when it is None.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/vllm/model_executor/models/nemotron_vl.py",
+          "first_character_index": 6516,
+          "last_character_index": 7527
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "9f1db215-19ff-4475-bdd5-dd7caf6bf807",
+      "question": "¿Cuáles son los percentiles por defecto que se calculan para las métricas ITL y E2EL en el benchmark de serve de vLLM?",
+      "answer": "The code references `selected_percentiles` to calculate percentiles for both inter-token latency (ITL) and end-to-end latency (E2EL) metrics, but the specific default values are not visible in this code snippet as `selected_percentiles` is defined elsewhere in the function.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/vllm/benchmarks/serve.py",
+          "first_character_index": 12209,
+          "last_character_index": 12657
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "b0fa5524-77d7-4288-8967-f606f32d9066",
+      "question": "¿Qué aserción se hace sobre vocab_size y tp_size al cargar los pesos de embedding de fairseq2 LLaMA?",
+      "answer": "The code asserts that `loaded_weight.shape[dim] * self.tp_size == self.config.vocab_size` with the message \"vocab_size should be divisible by tp_size.\" This ensures that the vocabulary size is evenly divisible by the tensor parallel size when embedding weights are being loaded.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/vllm/model_executor/models/fairseq2_llama.py",
+          "first_character_index": 5507,
+          "last_character_index": 6527
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "12f7ab0a-fce8-4891-a6ed-9b402171b591",
+      "question": "¿Qué devuelve el método extract_tool_calls de MistralToolParser cuando el bot_token no está en la salida del modelo?",
+      "answer": "It returns an ExtractedToolCallInformation object with tools_called=False, tool_calls=[] (empty list), and content=model_output (the original model output).",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/vllm/entrypoints/openai/tool_parsers/mistral_tool_parser.py",
+          "first_character_index": 4039,
+          "last_character_index": 4873
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "79ef0eef-b8b3-49d1-a8d9-30b99ce0c4d7",
+      "question": "¿Cuál es el valor por defecto del atributo use_bitsandbytes_4bit cuando no está presente en un objeto parámetro en la capa lineal de vLLM?",
+      "answer": "The default value is False, as specified by the getattr call: `getattr(param, \"use_bitsandbytes_4bit\", False)`.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/vllm/model_executor/layers/linear.py",
+          "first_character_index": 46123,
+          "last_character_index": 47089
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "df39833c-7c8c-4e82-b6fd-a66f3b8ce929",
+      "question": "¿Cuál es el valor por defecto de engine_id al crear conectores en MultiKVConnector?",
+      "answer": "The default value for engine_id is `vllm_config.kv_transfer_config.engine_id`, retrieved using `ktc.get(\"engine_id\", vllm_config.kv_transfer_config.engine_id)` in the MultiKVConnector.__init__ method.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/vllm/distributed/kv_transfer/kv_connector/v1/multi_connector.py",
+          "first_character_index": 1385,
+          "last_character_index": 2495
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "30622359-490d-493a-8f1c-6f05f80bc91b",
+      "question": "¿Qué pasa con input_ids cuando inputs_embeds es None en el forward de LlaVA-NeXT-Video?",
+      "answer": "When inputs_embeds is None, the input_ids is set to None after vision embeddings are generated and input embeddings are obtained, so that only inputs_embeds is passed to the language model.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/vllm/model_executor/models/llava_next_video.py",
+          "first_character_index": 16530,
+          "last_character_index": 17564
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "83396129-7585-435e-9683-271ddfa46475",
+      "question": "¿Cuáles son las dimensiones esperadas del tensor w13_weight_scale en la capa de cuantización MXFP4 de vLLM?",
+      "answer": "The w13_weight_scale tensor must have 3 dimensions with shape [num_experts, intermediate_size * 2, hidden_size // sf_block_size].",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/vllm/model_executor/layers/quantization/mxfp4.py",
+          "first_character_index": 11210,
+          "last_character_index": 12073
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    }
+  ]
+}

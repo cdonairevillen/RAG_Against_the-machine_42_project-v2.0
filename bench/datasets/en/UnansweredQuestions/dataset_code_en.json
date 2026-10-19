@@ -1,0 +1,44 @@
+{
+  "rag_questions": [
+    {
+      "question_id": "189c8b8a-e59c-4fca-92ad-c02df42cbe40",
+      "question": "What activation formats does the fused batched MoE layer return in vLLM?"
+    },
+    {
+      "question_id": "d39bfccf-9478-4c98-978d-574c596049b2",
+      "question": "What does the get_num_new_matched_tokens method in NIXLConnector return?"
+    },
+    {
+      "question_id": "706af2a5-9d60-42db-be84-211f217e03f3",
+      "question": "What is the default value for min_dynamic_patch parameter in NemotronVL model initialization?"
+    },
+    {
+      "question_id": "9f1db215-19ff-4475-bdd5-dd7caf6bf807",
+      "question": "What are the default percentiles calculated for ITL and E2EL metrics in vLLM's serve benchmark?"
+    },
+    {
+      "question_id": "b0fa5524-77d7-4288-8967-f606f32d9066",
+      "question": "What assertion is made about vocab_size and tp_size when loading fairseq2 LLaMA embedding weights?"
+    },
+    {
+      "question_id": "12f7ab0a-fce8-4891-a6ed-9b402171b591",
+      "question": "What does the extract_tool_calls method in MistralToolParser return when the bot_token is not present in the model output?"
+    },
+    {
+      "question_id": "79ef0eef-b8b3-49d1-a8d9-30b99ce0c4d7",
+      "question": "What is the default value for the use_bitsandbytes_4bit attribute when it's not present on a parameter object in vLLM's linear layer?"
+    },
+    {
+      "question_id": "df39833c-7c8c-4e82-b6fd-a66f3b8ce929",
+      "question": "What is the default value for engine_id when creating connectors in MultiKVConnector?"
+    },
+    {
+      "question_id": "30622359-490d-493a-8f1c-6f05f80bc91b",
+      "question": "What happens to input_ids when inputs_embeds is None in LlaVA-NeXT-Video's forward pass?"
+    },
+    {
+      "question_id": "83396129-7585-435e-9683-271ddfa46475",
+      "question": "What are the expected tensor dimensions for w13_weight_scale in vLLM's MXFP4 quantization layer?"
+    }
+  ]
+}

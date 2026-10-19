@@ -49,13 +49,37 @@ class RetrievalConfig(BaseModel):
     doc_signal_weight: float = 0.5
     skip_rerank_score: float = float("inf")
     bm25_score_floor: float = 5.5
-    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    reranker_model: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
     # "replace": reranker order wins; "rrf": fuse it with the BM25 order.
     rerank_fusion: str = "rrf"
     rrf_k: int = 60
+    # Languages whose doc-question markers the classifier counts.
+    doc_signal_languages: list[str] = Field(
+        default_factory=lambda: ["en", "es"]
+    )
+    # Rerank the doc branch too (v1 removed it: ms-marco hurt docs).
+    rerank_doc_branch: bool = False
     # Identifier splitting for BM25: "none", "query", "both" or "code".
     # Changing it needs a re-index (see src/ingestion/tokens.py).
     code_aware_tokens: str = "code"
+
+
+class EmbeddingsConfig(BaseModel):
+    """Dense retrieval: child chunks and queries embedded with one model.
+
+    Vectors live in Qdrant as a named vector on the child points, fused
+    with BM25 through RRF. Changing the model needs `make index`. Off by
+    default in code (tests, light setups); rag.toml turns it on.
+    """
+
+    enabled: bool = False
+    model: str = "BAAI/bge-m3"
+    batch_size: int = 64
+    # Dense candidates fetched per list (code / doc), before fusion.
+    dense_k: int = 50
+    # Also fuse dense candidates in the doc branch of search_smart (the
+    # code branch, including its doc safety net, always uses them).
+    dense_in_doc_branch: bool = True
 
 
 class ModelsConfig(BaseModel):
@@ -103,6 +127,7 @@ class RagConfig(BaseModel):
     chunking: ChunkingConfig = Field(default_factory=ChunkingConfig)
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     models: ModelsConfig = Field(default_factory=ModelsConfig)
+    embeddings: EmbeddingsConfig = Field(default_factory=EmbeddingsConfig)
     sources: dict[str, SourceConfig] = Field(default_factory=dict)
 
     def source(self, domain: str) -> SourceConfig:
@@ -140,6 +165,7 @@ def apply_env_overrides(data: dict[str, Any],
         "chunking": ChunkingConfig,
         "retrieval": RetrievalConfig,
         "models": ModelsConfig,
+        "embeddings": EmbeddingsConfig,
     }
     for section, model in sections.items():
         for key in model.model_fields:

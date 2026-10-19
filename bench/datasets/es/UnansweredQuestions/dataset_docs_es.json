@@ -1,0 +1,44 @@
+{
+  "rag_questions": [
+    {
+      "question_id": "17526382-7764-4120-b5e8-2d3726b8a4da",
+      "question": "¿Qué endpoint HTTP se usa para cargar dinámicamente un adaptador LoRA en vLLM?"
+    },
+    {
+      "question_id": "b336583e-9dcd-44cc-aa87-a2337f0f2d7d",
+      "question": "¿Qué parámetro ajusta vLLM según los distintos esquemas de cuantización para soportar la cuantización de pesos en las capas lineales?"
+    },
+    {
+      "question_id": "a4aa0cc8-ab95-4c66-af21-77bb9774e4b7",
+      "question": "¿Cómo se pueden ver los perfiles de Nsight Systems en vLLM?"
+    },
+    {
+      "question_id": "87790ff0-09f3-4aa6-8f8e-83180ded4c40",
+      "question": "¿Cuál es la versión mínima de bitsandbytes necesaria para la cuantización en vLLM?"
+    },
+    {
+      "question_id": "e3f2374c-9598-469e-bdae-a2f0962044e2",
+      "question": "¿Cuáles son las tres abstracciones clave que se usan para el prefilling desagregado en vLLM?"
+    },
+    {
+      "question_id": "5e2555d2-a1a6-4402-ac72-4e7f46378439",
+      "question": "¿Cuáles son los tres principales patrones de uso que soporta vLLM?"
+    },
+    {
+      "question_id": "b4fb8f6b-b613-46fa-a0aa-aebcf9ed2b14",
+      "question": "¿Con cuántas muestras se recomienda empezar los datos de calibración en la cuantización INT4?"
+    },
+    {
+      "question_id": "99f0b809-1905-4f24-82e6-fa7c7866418d",
+      "question": "¿Qué modelos cubre actualmente la validación de rendimiento de extremo a extremo de vLLM antes de cada versión?"
+    },
+    {
+      "question_id": "50a943ce-91e1-47d4-8d8d-ddb218f7d730",
+      "question": "¿Qué tipos de datos soporta el backend de CPU ARM de vLLM?"
+    },
+    {
+      "question_id": "9dc7f06a-bff9-403c-91d3-10c07b370096",
+      "question": "¿Dónde puedo encontrar un ejemplo completo de salidas estructuradas en el serving online de vLLM?"
+    }
+  ]
+}

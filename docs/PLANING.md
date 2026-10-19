@@ -54,6 +54,18 @@ Ingesta de imagenes y videos. Ampliar la ingesta para que el RAG pueda trabajar 
 
 Chunker de LangChain para documentacion (descartado en Fase 1, se puede retomar). Medido en Fase 1: en la ruta oficial mejoraba R@1 (0.72 frente a 0.68 del chunker propio empaquetado), pero quedaba por debajo en R@10 y empeoraba la ruta de la web (R@5 0.85 frente a 0.88). Con la busqueda hibrida y los rerankers de Fase 2 el reparto puede cambiar, asi que merece la pena volver a medirlo si se busca subir R@1. Detalle en changelog/FASE_1.md.
 
+------------------------------------
+
+Reranker Qwen3-Reranker-0.6B (no medido en Fase 2). Necesita un adaptador propio (se usa como LM causal, no como CrossEncoder) y es pesado en CPU. Solo compensaria con un beneficio muy alto en resultados o en tiempos. Mismo caso para bge-reranker-v2-m3 como opcion "solo GPU" (23 s por consulta en CPU; su recall quedo sin medir por falta de memoria).
+
+------------------------------------
+
+Indice preconstruido. Indexar con bge-m3 en CPU lleva ~2 h. Se podria construir el indice en una maquina con GPU y llevarlo hecho (snapshot de Qdrant + ficheros BM25) a los ordenadores de 42 o al despliegue.
+
+------------------------------------
+
+Clasificador doc/code semantico. El clasificador lexico esta en su limite (23/100 preguntas de docs van a la rama de code). Se podria decidir la rama con los embeddings ya calculados.
+
 # Limitaciones #
 
 NO QUIERO GASTAR DINERO. Actualmente tenemos solo una aplicacion subida a google cloud y si quisiesemos podriamos subir otra mas, pero si esto entra en conflicto con la funcionalidad de nuestra aplicacion desplegada, se elimina la opcion de subirla por el momento

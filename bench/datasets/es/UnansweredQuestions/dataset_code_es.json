@@ -1,0 +1,44 @@
+{
+  "rag_questions": [
+    {
+      "question_id": "189c8b8a-e59c-4fca-92ad-c02df42cbe40",
+      "question": "¿Qué formatos de activación devuelve la capa MoE batched fusionada en vLLM?"
+    },
+    {
+      "question_id": "d39bfccf-9478-4c98-978d-574c596049b2",
+      "question": "¿Qué devuelve el método get_num_new_matched_tokens de NIXLConnector?"
+    },
+    {
+      "question_id": "706af2a5-9d60-42db-be84-211f217e03f3",
+      "question": "¿Cuál es el valor por defecto del parámetro min_dynamic_patch al inicializar el modelo NemotronVL?"
+    },
+    {
+      "question_id": "9f1db215-19ff-4475-bdd5-dd7caf6bf807",
+      "question": "¿Cuáles son los percentiles por defecto que se calculan para las métricas ITL y E2EL en el benchmark de serve de vLLM?"
+    },
+    {
+      "question_id": "b0fa5524-77d7-4288-8967-f606f32d9066",
+      "question": "¿Qué aserción se hace sobre vocab_size y tp_size al cargar los pesos de embedding de fairseq2 LLaMA?"
+    },
+    {
+      "question_id": "12f7ab0a-fce8-4891-a6ed-9b402171b591",
+      "question": "¿Qué devuelve el método extract_tool_calls de MistralToolParser cuando el bot_token no está en la salida del modelo?"
+    },
+    {
+      "question_id": "79ef0eef-b8b3-49d1-a8d9-30b99ce0c4d7",
+      "question": "¿Cuál es el valor por defecto del atributo use_bitsandbytes_4bit cuando no está presente en un objeto parámetro en la capa lineal de vLLM?"
+    },
+    {
+      "question_id": "df39833c-7c8c-4e82-b6fd-a66f3b8ce929",
+      "question": "¿Cuál es el valor por defecto de engine_id al crear conectores en MultiKVConnector?"
+    },
+    {
+      "question_id": "30622359-490d-493a-8f1c-6f05f80bc91b",
+      "question": "¿Qué pasa con input_ids cuando inputs_embeds es None en el forward de LlaVA-NeXT-Video?"
+    },
+    {
+      "question_id": "83396129-7585-435e-9683-271ddfa46475",
+      "question": "¿Cuáles son las dimensiones esperadas del tensor w13_weight_scale en la capa de cuantización MXFP4 de vLLM?"
+    }
+  ]
+}

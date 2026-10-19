@@ -2,7 +2,9 @@ import re
 from typing import Any, Optional
 import bm25s
 import numpy as np
-from src.config import ModelsConfig, RagConfig, RetrievalConfig, get_config
+from src.config import (
+    EmbeddingsConfig, ModelsConfig, RagConfig, RetrievalConfig, get_config,
+)
 from src.ingestion.chunk import CHILD, PARENT, Chunk
 from src.ingestion.pipeline import load_bm25
 from src.ingestion.tokens import (
@@ -12,7 +14,7 @@ from src.models import MinimalSource
 from src.storage.base import ChunkStore
 
 IDENTIFIER_PATTERN = re.compile(r"_|[a-z0-9][A-Z]|[A-Z]{2,}[a-z]{2,}")
-TOKEN_PUNCTUATION = ".,;:?!()[]{}'\"`"
+TOKEN_PUNCTUATION = ".,;:?!¿¡()[]{}'\"`"
 NON_IDENTIFIER_TERMS = {"vllm"}
 
 CODE_SIGNAL_TERMS = {
@@ -28,6 +30,20 @@ DOC_SIGNAL_TERMS = {
     "platform", "gpu", "rocm", "amd", "cli", "command",
     "api", "endpoint", "port", "package",
     "capability", "compute", "status", "feature",
+}
+
+# Spanish doc-question markers (the web is multilingual, D6). Without
+# them every Spanish doc question was routed to the code branch.
+DOC_SIGNAL_TERMS_ES = {
+    "cómo", "como", "qué", "que", "cuál", "cuáles", "cuándo", "dónde",
+    "configurar", "configuro", "instalar", "instalo", "guía", "ejemplo",
+    "documentación", "tutorial", "ejecutar", "servir", "desplegar",
+    "soporta", "soportan", "compatible", "versión", "requisito",
+    "plataforma", "comando", "puerto", "paquete", "característica",
+    "encontrar", "información", "recomienda", "recomendado",
+}
+DOC_SIGNAL_TERMS_BY_LANGUAGE = {
+    "en": DOC_SIGNAL_TERMS, "es": DOC_SIGNAL_TERMS_ES,
 }
 
 
@@ -65,6 +81,30 @@ def expand_query(query: str) -> str:
     if not unique_extras:
         return query
     return query + " " + " ".join(unique_extras)
+
+
+def rrf_merge(lists: list[list[MinimalSource]],
+              rrf_k: int = 60) -> list[MinimalSource]:
+    """Fuse several rankings of sources with Reciprocal Rank Fusion.
+
+    Args:
+        lists: Rankings to fuse, best first. A source may appear in
+            several of them (matched by file and start offset).
+        rrf_k: RRF constant.
+
+    Returns:
+        One ranking with every distinct source, best fused score first
+        (ties keep the order of first appearance).
+    """
+    scores: dict[tuple[str, int], float] = {}
+    first: dict[tuple[str, int], MinimalSource] = {}
+    for ranking in lists:
+        for rank, source in enumerate(ranking):
+            key = (source.file_path, source.first_character_index)
+            scores[key] = scores.get(key, 0.0) + 1 / (rrf_k + rank)
+            first.setdefault(key, source)
+    order = sorted(first, key=lambda key: -scores[key])
+    return [first[key] for key in order]
 
 
 class Retriever:
@@ -111,6 +151,14 @@ class Retriever:
         self.settings = settings or RetrievalConfig()
         self.models = models or ModelsConfig()
         self.reranker = None
+
+        # Dense retrieval (set by from_store when embeddings are on).
+        self.store: Optional[ChunkStore] = None
+        self.domain = ""
+        self.embeddings = EmbeddingsConfig()
+        self.embedder: Optional[Any] = None
+        self.dense_name = ""
+        self._query_cache: tuple[str, list[float]] = ("", [])
 
         self.chunk_map: dict = {}
         self.parent_chunk_map: dict = {}
@@ -186,6 +234,28 @@ class Retriever:
             i for i, c in enumerate(children) if c.chunk_type == "doc"
         ]
 
+    def load_embedder(self, indexed_model: Optional[str]) -> None:
+        """Load the query embedder, checking it matches the index.
+
+        Args:
+            indexed_model: Embedding model recorded in the manifest.
+
+        Raises:
+            RuntimeError: If the index was built with another model (or
+                without embeddings).
+        """
+        from src.embeddings import Embedder, vector_name
+
+        model = self.embeddings.model
+        if indexed_model != model:
+            raise RuntimeError(
+                f"Embeddings are enabled with '{model}' but the index of "
+                f"'{self.domain}' was built with {indexed_model!r}. "
+                f"Run 'make index' again."
+            )
+        self.embedder = Embedder(model, device=self.models.resolved_device())
+        self.dense_name = vector_name(model)
+
     @classmethod
     def from_store(cls, domain: str = "vllm",
                    config: Optional[RagConfig] = None,
@@ -244,6 +314,11 @@ class Retriever:
         retriever.set_parents(parents)
         retriever.bm25_code = bm25_code
         retriever.bm25_doc = bm25_doc
+        retriever.store = store
+        retriever.domain = domain
+        retriever.embeddings = config.embeddings
+        if config.embeddings.enabled:
+            retriever.load_embedder(manifest.get("embedding_model"))
         print(
             f"Loaded {len(children)} chunks for '{domain}' "
             f"({len(retriever.doc_chunk_indices)} doc, "
@@ -323,22 +398,26 @@ class Retriever:
         doc_top_score = 0.0
         code_top_score = 0.0
         try:
+            # Always the plain query, whatever code_aware_tokens says:
+            # identifier parts inflate the scores of whichever index has
+            # them and would bias the routing towards it.
+            plain = tokenize([query], code_aware=False)
             if self.bm25_doc is not None:
                 _, ds = self.bm25_doc.retrieve(
-                    self.tokenize(query, "doc"), k=3, show_progress=False
+                    plain, k=3, show_progress=False
                 )
                 doc_top_score = float(np.mean(ds[0]))
             if self.bm25_code is not None:
-                # Plain query on both indices: identifier parts inflate
-                # code scores and would route doc questions to code.
                 _, cs = self.bm25_code.retrieve(
-                    self.tokenize(query, "doc"), k=3, show_progress=False
+                    plain, k=3, show_progress=False
                 )
                 code_top_score = float(np.mean(cs[0]))
         except Exception:
             pass
 
-        query_terms = set(query.lower().split())
+        query_terms = {
+            t.strip(TOKEN_PUNCTUATION).lower() for t in query.split()
+        }
         raw_terms = {
             t.strip(TOKEN_PUNCTUATION).removesuffix("'s")
             for t in query.split()
@@ -351,9 +430,11 @@ class Retriever:
                 or t.lower() in CODE_SIGNAL_TERMS
             )
         )
-        doc_signals = sum(
-            1 for t in query_terms if t in DOC_SIGNAL_TERMS
-        )
+        doc_terms = set().union(*(
+            DOC_SIGNAL_TERMS_BY_LANGUAGE[lang]
+            for lang in self.settings.doc_signal_languages
+        ))
+        doc_signals = sum(1 for t in query_terms if t in doc_terms)
 
         w = self.settings
         combined_code = code_top_score + code_signals * w.code_signal_weight
@@ -365,13 +446,12 @@ class Retriever:
         for code.
 
         Routes each query to whichever per-type index it best
-        matches. Doc queries are served by BM25 alone over the doc
-        index (the reranker hurts doc ranking on this corpus). Code
-        queries are served by the unified index filtered to code
-        chunks, reranked unless the BM25 signal is already
-        unambiguous — in which case the reranker is skipped to save
-        time. A handful of doc results are always mixed into the
-        code-mode pool as a safety net for borderline queries.
+        matches. Doc queries are served by the doc index without the
+        reranker (it hurts doc ranking on this corpus). Code queries are
+        served by the unified index filtered to code chunks, plus a few
+        doc results as a safety net for borderline queries, fused with
+        the cross-encoder through RRF. When embeddings are enabled, each
+        list (code, doc) first fuses its BM25 and dense candidates.
 
         Args:
             query: Natural-language search string.
@@ -387,10 +467,12 @@ class Retriever:
         combined_code, combined_doc = self.classify_query(expanded)
 
         if combined_code > combined_doc + self.settings.classifier_margin:
-            return self._search_smart_code(expanded, k, combined_code)
-        return self._search_smart_docs(expanded, k)
+            return self._search_smart_code(
+                query, expanded, k, combined_code
+            )
+        return self._search_smart_docs(query, expanded, k)
 
-    def _search_smart_code(self, expanded: str, k: int,
+    def _search_smart_code(self, query: str, expanded: str, k: int,
                            code_top_score: float) -> list[MinimalSource]:
         """Code-mode branch of search_smart(). See that method."""
         fetch_k = min(k * 10, len(self.chunks))
@@ -415,6 +497,13 @@ class Retriever:
                 code_sources.append(parent_source)
             if len(code_sources) >= k * 3:
                 break
+        dense_code = self.dense_parents(query, "code")
+        if dense_code:
+            code_sources = rrf_merge(
+                [code_sources, dense_code], self.settings.rrf_k
+            )[:k * 3]
+            seen = {(s.file_path, s.first_character_index)
+                    for s in code_sources}
 
         doc_backup: list[MinimalSource] = []
         if self.bm25_doc is not None and self.doc_chunk_indices:
@@ -435,6 +524,14 @@ class Retriever:
                         break
             except Exception:
                 pass
+        dense_doc = [
+            s for s in self.dense_parents(query, "doc")
+            if (s.file_path, s.first_character_index) not in seen
+        ]
+        if dense_doc:
+            doc_backup = rrf_merge(
+                [doc_backup, dense_doc], self.settings.rrf_k
+            )[:4]
 
         if code_top_score > self.settings.skip_rerank_score:
             return code_sources[:k]
@@ -447,7 +544,7 @@ class Retriever:
             expanded, code_sources + doc_backup, k, input_ranks
         )
 
-    def _search_smart_docs(self, expanded: str,
+    def _search_smart_docs(self, query: str, expanded: str,
                            k: int) -> list[MinimalSource]:
         """Doc-mode branch of search_smart(). See that method."""
         fetch_k = min(k * 5, len(self.doc_chunk_indices))
@@ -469,6 +566,14 @@ class Retriever:
                         doc_sources.append(ps)
             except Exception:
                 pass
+        dense_doc = (
+            self.dense_parents(query, "doc")
+            if self.embeddings.dense_in_doc_branch else []
+        )
+        if dense_doc:
+            doc_sources = rrf_merge(
+                [doc_sources, dense_doc], self.settings.rrf_k
+            )
 
         if len(doc_sources) < k:
             unified = self.search_no_rerank(expanded, k * 2)
@@ -484,7 +589,46 @@ class Retriever:
                     seen_unified.add(key)
                     doc_sources.append(src)
 
+        if self.settings.rerank_doc_branch and self.reranker is not None:
+            pool = doc_sources[:k * 3]
+            return self.rerank_parents(expanded, pool, k)
         return doc_sources[:k]
+
+    def query_vector(self, query: str) -> list[float]:
+        """Embed a query, reusing the last result for repeated calls."""
+        if self.embedder is None:
+            return []
+        if self._query_cache[0] != query:
+            self._query_cache = (query, self.embedder.encode_query(query))
+        return self._query_cache[1]
+
+    def dense_parents(self, query: str,
+                      chunk_type: str) -> list[MinimalSource]:
+        """Parents of the nearest children to the query (dense search).
+
+        Args:
+            query: Original (non-expanded) query.
+            chunk_type: 'code' or 'doc'.
+
+        Returns:
+            Distinct parent sources, best first; [] when embeddings are
+            disabled.
+        """
+        if self.embedder is None or self.store is None:
+            return []
+        ordinals = self.store.search_dense(
+            self.domain, self.dense_name, self.query_vector(query),
+            self.embeddings.dense_k, chunk_type,
+        )
+        parents: list[MinimalSource] = []
+        seen: set = set()
+        for ordinal in ordinals:
+            source = self.child_to_parent_source(self.chunks[ordinal])
+            key = (source.file_path, source.first_character_index)
+            if key not in seen:
+                seen.add(key)
+                parents.append(source)
+        return parents
 
     def get_top_bm25_score(self, query: str) -> float:
         """Return the highest BM25 score for a query over the corpus.

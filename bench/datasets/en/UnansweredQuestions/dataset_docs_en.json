@@ -1,0 +1,44 @@
+{
+  "rag_questions": [
+    {
+      "question_id": "17526382-7764-4120-b5e8-2d3726b8a4da",
+      "question": "What HTTP endpoint is used to dynamically load a LoRA adapter in vLLM?"
+    },
+    {
+      "question_id": "b336583e-9dcd-44cc-aa87-a2337f0f2d7d",
+      "question": "What parameter does vLLM set according to different quantization schemes to support weight quantization in linear layers?"
+    },
+    {
+      "question_id": "a4aa0cc8-ab95-4c66-af21-77bb9774e4b7",
+      "question": "How can you view Nsight Systems profiles in vLLM?"
+    },
+    {
+      "question_id": "87790ff0-09f3-4aa6-8f8e-83180ded4c40",
+      "question": "What is the minimum version of bitsandbytes required for vLLM quantization?"
+    },
+    {
+      "question_id": "e3f2374c-9598-469e-bdae-a2f0962044e2",
+      "question": "What are the three key abstractions used for disaggregated prefilling in vLLM?"
+    },
+    {
+      "question_id": "5e2555d2-a1a6-4402-ac72-4e7f46378439",
+      "question": "What are the three main usage patterns supported by vLLM?"
+    },
+    {
+      "question_id": "b4fb8f6b-b613-46fa-a0aa-aebcf9ed2b14",
+      "question": "What is the recommended starting number of samples for calibration data in INT4 quantization?"
+    },
+    {
+      "question_id": "99f0b809-1905-4f24-82e6-fa7c7866418d",
+      "question": "What models are currently covered in vLLM's end-to-end performance validation before each release?"
+    },
+    {
+      "question_id": "50a943ce-91e1-47d4-8d8d-ddb218f7d730",
+      "question": "What datatypes are supported by vLLM's ARM CPU backend?"
+    },
+    {
+      "question_id": "9dc7f06a-bff9-403c-91d3-10c07b370096",
+      "question": "Where can I find a complete example of structured outputs in vLLM online serving?"
+    }
+  ]
+}

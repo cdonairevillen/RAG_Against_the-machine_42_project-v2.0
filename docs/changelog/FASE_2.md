@@ -1,9 +1,17 @@
 # CHANGELOG — Fase 2: Retrieval híbrido
 
 **Fecha de inicio:** 2026-10-18
-**Estado:** 🟡 en curso.
-- **Paso 1** (recuperar code y unificar rutas): completado, commit `acab947`.
-- **Paso 2** (tokenizador code-aware, B8 + B14): completado, sin commit (ver §6).
+**Estado:** ✅ completada (2026-10-19).
+- **Paso 1** (recuperar code y unificar rutas): commit `acab947`.
+- **Paso 2** (tokenizador code-aware, B8 + B14): commit `1a91f74` (§6).
+- **Pasos 3–5** (embeddings, rerankers, clasificador) y cierre: commit "Autosave" (§7–§11). Hechos de forma autónoma con tu autorización, para que los revises.
+
+> **Resumen de la fase (ruta oficial):**
+> - **Docs R@5:** 0.87 → **0.92**.
+> - **Code R@5:** 0.64 → **0.80**.
+> - **Code R@10:** 0.71 → **0.88**.
+>
+> Todas las comparativas de modelos están en `docs/BENCHMARK_REPORT.md`.
 
 **Prioridad de métricas: R@5 > R@10 > R@3 > R@1.**
 
@@ -122,13 +130,13 @@ Mejora **en todos los cortes de los dos datasets**, y code supera también a la 
 
 ---
 
-## 5. Pendiente en la Fase 2
+## 5. Plan de la fase tras el paso 1 (todo resuelto)
 
-1. ~~**Tokenizador code-aware (B8) + descomposición de identificadores (B14)**~~ → hecho (§6).
-2. **Embeddings** multilingües de chunks y consulta en Qdrant, fusionados con BM25: `multilingual-e5-small`, `bge-m3`, `Qwen3-Embedding-0.6B`. Se medirán en CPU y en GPU.
-3. **Rerankers:** `ms-marco` (actual), `bge-reranker-v2-m3` y `Qwen3-Reranker-0.6B`.
-4. Revisar el clasificador doc/code (`classifier_margin` y pesos), que sigue enviando preguntas de docs a la rama de code.
-5. `docs/BENCHMARK_REPORT.md` con la comparativa de modelos.
+1. ~~Tokenizador code-aware (B8 + B14)~~ → §6 y §7.
+2. ~~Embeddings multilingües en Qdrant, medidos en CPU y en GPU~~ → §8 (`bge-m3`).
+3. ~~Rerankers~~ → §9 (`mmarco`; `Qwen3-Reranker` descartado y `bge-reranker-v2-m3` pendiente de medir el recall).
+4. ~~Clasificador doc/code~~ → §10.
+5. ~~`docs/BENCHMARK_REPORT.md`~~ → creado.
 
 ---
 
@@ -181,3 +189,129 @@ Mejora **en todos los cortes de los dos datasets**, y code supera también a la 
 | `tests/test_storage.py` | La integración indexa según la configuración |
 
 **Tests:** 42. Lint limpio.
+
+---
+
+## 7. Paso 2 (revisión): modos de tokenización con clasificador neutral
+
+A raíz de tu pregunta ("¿por qué no hay un modo solo para docs?"):
+
+- **Error mío corregido:** el clasificador usaba la tokenización "de docs" pensando que siempre sería la consulta sin descomponer, y eso solo es cierto en el modo `code`. Ahora usa **siempre** la consulta sin descomponer, sea cual sea el modo. En el modo `code` (el de por defecto), el resultado es idéntico (`39-tokens-code-plain-classifier` = `36`).
+- **Modo `doc` añadido** (partes de identificadores solo en chunks e índice de docs) y medido. Comparación justa, sin embeddings:
+
+| Modo | Docs R@1/@3/@5/@10 | Code R@1/@3/@5/@10 |
+|---|---|---|
+| **`code`** (por defecto) | 0.72 / **0.91 / 0.93** / 0.94 | 0.49 / 0.70 / 0.75 / **0.83** |
+| `both` | **0.73** / 0.88 / 0.92 / 0.94 | 0.49 / 0.70 / 0.75 / 0.82 |
+| `doc` | 0.72 / 0.87 / 0.92 / 0.94 | 0.42 / 0.61 / 0.65 / 0.69 |
+
+- **Conclusión:** añadir partes de identificadores a la documentación empeora docs (R@3 −0.03/−0.04, R@5 −0.01). Se mantiene `code`.
+
+---
+
+## 8. Paso 3: embeddings (búsqueda híbrida)
+
+### Qué se ha implementado
+
+- **`src/embeddings.py` (nuevo):** `Embedder` con los prompts correctos de cada familia, verificados en Hugging Face:
+  - E5: `query: ` y `passage: `.
+  - Qwen3: el prompt `query` declarado por el modelo.
+  - bge-m3: sin instrucciones.
+  - El mismo modelo y la misma normalización para documentos y consultas, que era lo que fallaba en la v1 (allí se cruzaban índices de dos listas distintas).
+- **Qué se embebe:** los **chunks hijo** (la misma unidad que BM25), como "ruta + texto". La consulta se embebe **sin expandir**.
+- **Qdrant:** los vectores van como **vector con nombre** en los mismos puntos de `rag_vllm` (un nombre por modelo, distancia coseno). Búsqueda filtrada por nivel (`child`) y tipo (`code`/`doc`).
+- **Fusión:** dentro de cada lista (candidatos de code y documentos de respaldo, o lista de docs), BM25 y vectores se fusionan con **RRF** (`rrf_merge`) antes del reranker.
+- **Seguridad:** el manifest registra `embedding_model`, y el retriever se niega a arrancar si la configuración usa otro modelo.
+- **`[embeddings]`** en `rag.toml`: `enabled`, `model`, `batch_size`, `dense_k` y `dense_in_doc_branch`. En el código está **desactivado por defecto**, para que los tests y los entornos ligeros no descarguen 2 GB; `rag.toml` lo activa.
+
+### Resultados y decisión
+
+Todas las tablas están en `docs/BENCHMARK_REPORT.md` §1. En resumen:
+- **`bge-m3`** es el mejor en el benchmark oficial: code R@10 0.86, frente a 0.84 de e5-small y 0.83 de Qwen3, con R@5 empatado a 0.79.
+- **Docs en español sin embeddings cae a R@10 0.50**; con `bge-m3`, 0.90.
+- **Velocidad en CPU:** `bge-m3` tarda unas 2 h en indexar el corpus (estimado) y 141 ms por consulta. `Qwen3-Embedding` es inviable sin GPU (~19 h de indexado y 0,8 s por consulta). `e5-small` es la **alternativa para máquinas sin GPU** (~13 min).
+- **Embeddings en las dos ramas** (tu decisión): en docs cambian −0.01 de R@5 por +0.03 de R@1 y +0.01 de R@3, y aportan la capacidad multilingüe.
+
+### Set complementario multilingüe (nuevo)
+
+- **`bench/datasets/es/`:** 20 preguntas de los datasets públicos (una de cada diez: 10 docs y 10 code), traducidas por mí al español con el **mismo ground truth** y el mismo `question_id`. Los nombres de código se dejan tal cual.
+- **`bench/datasets/en/`:** las mismas 20 en inglés, para comparar sobre el mismo subconjunto.
+- `make bench` admite `--suite public|en|es`, y cada ejecución registra su `suite`.
+- **Cada pregunta vale 0.10**: las diferencias de 0.10 son una sola pregunta. Es un set complementario (D4); los recalls oficiales siguen siendo solo los de 42.
+
+---
+
+## 9. Paso 4: rerankers
+
+Todas las tablas están en `docs/BENCHMARK_REPORT.md` §2.
+
+- **Medidos:** `ms-marco-MiniLM-L-6-v2` (v1, solo inglés), `mmarco-mMiniLMv2-L12-H384-v1` (multilingüe, 118M) y la latencia de `bge-reranker-v2-m3` (multilingüe, 568M).
+- **Descartados sin medir el recall:**
+  - `jina-reranker-v2-base-multilingual`, por su licencia **CC-BY-NC-4.0** (no comercial).
+  - `Qwen3-Reranker-0.6B`, según tu criterio: necesita un adaptador propio y es pesado; solo compensaría con un beneficio muy alto. Queda en *Posibilidades*.
+- **⚠️ `bge-reranker-v2-m3`: recall sin medir.** La ejecución se detuvo porque **el sistema se quedaba sin memoria** (Claude Code paró el proceso mientras la sesión estaba inactiva) y no la he relanzado. Con 23 s por consulta en CPU, solo podría ser una opción "solo GPU".
+- **Rerank en la rama de docs** (`rerank_doc_branch`): sigue perjudicando con los dos rerankers medidos; se queda desactivado.
+- **Decisión: `mmarco-mMiniLMv2-L12` por defecto.** En el benchmark oficial empata en R@5 y gana en R@10 de code (+0.02); en español, docs R@5 pasa de 0.70 a 0.90. Cuesta el doble que `ms-marco`, pero sigue siendo viable en CPU (1,8 s por consulta).
+
+---
+
+## 10. Paso 5: clasificador doc/code
+
+Tablas en `docs/BENCHMARK_REPORT.md` §3.
+
+- **Diagnóstico medido:** el clasificador enviaba a la rama de code **25 de 100** preguntas de docs oficiales y **10 de 10** de docs en español. Las señales de "pregunta de documentación" estaban solo en inglés y se comparaban sin quitar la puntuación (`¿cómo` nunca coincidía).
+- **Cambios:**
+  - Señales en español (`DOC_SIGNAL_TERMS_ES`), seleccionables con `doc_signal_languages = ["en", "es"]`.
+  - Limpieza de puntuación, incluidos `¿` y `¡`.
+- **Resultado:** docs oficial **+0.01 en R@1, R@3 y R@5, con code idéntico** (mejora estricta). Enrutado: docs oficial 23/100 y docs ES 8/10 mal enrutadas.
+- **Pesos y margen sin cambios:** cada pregunta de docs que se deja de mandar a code se paga con preguntas de code mal enrutadas (code R@5 hasta 0.66).
+- ⚠️ **En el set español**, docs pierde una pregunta en R@3 y R@5 (0.90 → 0.80): dos preguntas pasan a la rama de docs, que no tiene reranker, y una sale peor. Se acepta porque el benchmark de referencia es el oficial.
+- **Límite:** el clasificador léxico no da más de sí. Un clasificador semántico, aprovechando los embeddings, queda como mejora futura.
+
+---
+
+## 11. Cierre de la fase
+
+### Resultado final (`49-fase2-final`)
+
+| Set | Docs R@1/@3/@5/@10 | Code R@1/@3/@5/@10 |
+|---|---|---|
+| **Oficial (42)** (smart y generation, idénticos) | **0.76 / 0.91 / 0.92 / 0.94** | **0.51 / 0.72 / 0.80 / 0.88** |
+| Español (20) | 0.60 / 0.80 / 0.80 / 0.90 | 0.50 / 0.70 / 0.80 / 0.90 |
+
+### Ficheros (pasos 3–5)
+
+| Fichero | Cambio |
+|---|---|
+| `src/embeddings.py` | **Nuevo**: `Embedder`, prompts por modelo, nombre del vector |
+| `src/storage/base.py`, `src/storage/qdrant_store.py` | Vectores con nombre y `search_dense` filtrado |
+| `src/retriever.py` | `rrf_merge`, búsqueda densa en las dos ramas, `load_embedder` (comprueba el manifest), rerank opcional en la rama de docs, clasificador siempre neutral y con señales en inglés y español |
+| `src/ingestion/pipeline.py` | Manifest con `embedding_model` |
+| `src/ingestion/tokens.py` | Modo `doc` |
+| `src/cli.py` | `index` embebe los hijos si los embeddings están activos; `bench --suite` |
+| `src/bench.py` | Sets `public` / `en` / `es` |
+| `src/config.py`, `rag.toml` | `[embeddings]`; reranker `mmarco`; `rerank_doc_branch`; `doc_signal_languages` |
+| `bench/datasets/en/`, `bench/datasets/es/` | **Nuevos**: set complementario de 20 preguntas |
+| `tests/test_dense.py` | **Nuevo**: `rrf_merge`, prompts y búsqueda densa con Qdrant en memoria |
+| `tests/test_retriever.py`, `tests/test_tokens.py` | Clasificador en español; modo `doc` |
+| `docs/BENCHMARK_REPORT.md` | **Nuevo** |
+| `bench/results/*.json` | Ejecuciones 36–49 |
+| `llm_sdk/**` | **Sin tocar** |
+
+**Tests:** 47. Lint limpio.
+
+### Qué debes saber de la arquitectura
+
+- **Indexar ahora embebe 37 381 hijos con `bge-m3`:** ~6 min en la 3080 Ti y **~2 h en CPU** (estimado). En máquinas sin GPU, la alternativa es `RAG_EMBEDDINGS_MODEL=intfloat/multilingual-e5-small make index` (~13 min).
+- **Cambiar de modelo de embeddings obliga a reindexar**; el retriever lo exige mediante el manifest.
+- **RAM:** con `bge-m3` y el reranker cargados, el proceso usa varios GB. Una medición pesada (`bge-reranker-v2-m3`) se paró por falta de memoria del sistema.
+- **Lo que la fase no ha resuelto:**
+  - El clasificador sigue enviando 23 de 100 preguntas de docs a code (léxico en su límite).
+  - El filtro de relevancia BM25 (B15) pasa a la Fase 3.
+- **Prueba de punta a punta:** `answer "¿Qué endpoint HTTP se usa para cargar dinámicamente un adaptador LoRA en vLLM?"` encuentra `lora.md` y responde bien, **pero en inglés**: el prompt no pide contestar en el idioma de la pregunta. Pasa a la Fase 3.
+
+### Pendiente para revisar contigo
+
+1. **`bge-reranker-v2-m3`:** recall sin medir (parada por memoria). ¿Merece la pena medirlo como opción "solo GPU"?
+2. **¿`bge-m3` como modelo por defecto aunque indexar en CPU lleve ~2 h?** La alternativa es `e5-small` por defecto en entornos sin GPU, o llevar un índice ya construido (ver *Posibilidades*).
+3. **La pregunta de docs en español** que empeora con el clasificador nuevo (§10).

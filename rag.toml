@@ -31,7 +31,9 @@ skip_rerank_score = inf
 # Out-of-domain filter used before generation only. Known to be a weak
 # signal; to be replaced in Phase 3 (B15).
 bm25_score_floor = 5.5
-reranker_model = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+# Multilingual (ms-marco-MiniLM-L-6-v2 is English only); see
+# docs/BENCHMARK_REPORT.md.
+reranker_model = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
 # "rrf": fuse the reranker order with the BM25 order(s); "replace": the
 # reranker order wins (v1 behaviour).
 rerank_fusion = "rrf"
@@ -40,6 +42,16 @@ rrf_k = 60
 # "none" | "query" | "both" | "code" (code chunks and code/general-index
 # queries only). Changing it requires `make index`.
 code_aware_tokens = "code"
+
+[embeddings]
+# Dense retrieval fused with BM25 (RRF), in both branches. Changing the
+# model needs `make index`. Without a GPU, indexing with bge-m3 takes
+# ~2 h; use intfloat/multilingual-e5-small (~13 min on CPU) instead.
+enabled = true
+model = "BAAI/bge-m3"
+batch_size = 64
+dense_k = 50
+dense_in_doc_branch = true
 
 # One block per knowledge source. `chunkers` maps a file extension to a
 # chunker name (see src/ingestion/chunkers.py); unknown extensions fall

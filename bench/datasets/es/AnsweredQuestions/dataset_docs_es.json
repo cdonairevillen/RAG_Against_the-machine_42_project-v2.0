@@ -1,0 +1,144 @@
+{
+  "rag_questions": [
+    {
+      "question_id": "17526382-7764-4120-b5e8-2d3726b8a4da",
+      "question": "¿Qué endpoint HTTP se usa para cargar dinámicamente un adaptador LoRA en vLLM?",
+      "answer": "The `/v1/load_lora_adapter` endpoint is used to dynamically load a LoRA adapter in vLLM. You send a POST request to this endpoint with the adapter's name and path in the JSON payload.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/docs/features/lora.md",
+          "first_character_index": 4695,
+          "last_character_index": 6098
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "b336583e-9dcd-44cc-aa87-a2337f0f2d7d",
+      "question": "¿Qué parámetro ajusta vLLM según los distintos esquemas de cuantización para soportar la cuantización de pesos en las capas lineales?",
+      "answer": "vLLM sets the `linear_method` parameter according to different quantization schemes to support weight quantization in linear layers.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/docs/contributing/model/basic.md",
+          "first_character_index": 5934,
+          "last_character_index": 6110
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "a4aa0cc8-ab95-4c66-af21-77bb9774e4b7",
+      "question": "¿Cómo se pueden ver los perfiles de Nsight Systems en vLLM?",
+      "answer": "You can view Nsight Systems profiles either as summaries in the CLI using `nsys stats [profile-file]` or in the GUI by installing Nsight locally following the directions from NVIDIA's get-started guide.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/docs/contributing/profiling.md",
+          "first_character_index": 4932,
+          "last_character_index": 5306
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "87790ff0-09f3-4aa6-8f8e-83180ded4c40",
+      "question": "¿Cuál es la versión mínima de bitsandbytes necesaria para la cuantización en vLLM?",
+      "answer": "The minimum version of bitsandbytes required for vLLM quantization is 0.46.1, which can be installed using `pip install bitsandbytes>=0.46.1`.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/docs/features/quantization/bnb.md",
+          "first_character_index": 0,
+          "last_character_index": 1744
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "e3f2374c-9598-469e-bdae-a2f0962044e2",
+      "question": "¿Cuáles son las tres abstracciones clave que se usan para el prefilling desagregado en vLLM?",
+      "answer": "The three key abstractions for disaggregated prefilling in vLLM are: Connector (allows kv consumer to retrieve KV caches from kv producer), LookupBuffer (provides insert and drop_select APIs for KV cache management), and Pipe (a single-direction FIFO pipe for tensor transmission with send_tensor and recv_tensor support).",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/docs/features/disagg_prefill.md",
+          "first_character_index": 2755,
+          "last_character_index": 4662
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "5e2555d2-a1a6-4402-ac72-4e7f46378439",
+      "question": "¿Cuáles son los tres principales patrones de uso que soporta vLLM?",
+      "answer": "vLLM supports three main usage patterns: Inference and Serving (running a single model instance), Deployment (scaling up model instances for production), and Training (training or fine-tuning models).",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/docs/usage/README.md",
+          "first_character_index": 0,
+          "last_character_index": 434
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "b4fb8f6b-b613-46fa-a0aa-aebcf9ed2b14",
+      "question": "¿Con cuántas muestras se recomienda empezar los datos de calibración en la cuantización INT4?",
+      "answer": "512 samples is the recommended starting point for calibration data in INT4 quantization, with the option to increase if accuracy drops.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/docs/features/quantization/int4.md",
+          "first_character_index": 3974,
+          "last_character_index": 5807
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "99f0b809-1905-4f24-82e6-fa7c7866418d",
+      "question": "¿Qué modelos cubre actualmente la validación de rendimiento de extremo a extremo de vLLM antes de cada versión?",
+      "answer": "The current coverage includes Llama3, Llama4, and Mixtral models, tested on NVIDIA H100 and AMD MI300x hardware. Note that coverage may change based on new model releases and hardware availability.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/RELEASE.md",
+          "first_character_index": 3440,
+          "last_character_index": 5003
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "50a943ce-91e1-47d4-8d8d-ddb218f7d730",
+      "question": "¿Qué tipos de datos soporta el backend de CPU ARM de vLLM?",
+      "answer": "vLLM's ARM CPU backend supports Float32, FP16, and BFloat16 datatypes for ARM64 CPUs with NEON support.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/docs/getting_started/installation/cpu/arm.inc.md",
+          "first_character_index": 0,
+          "last_character_index": 1636
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    },
+    {
+      "question_id": "9dc7f06a-bff9-403c-91d3-10c07b370096",
+      "question": "¿Dónde puedo encontrar un ejemplo completo de salidas estructuradas en el serving online de vLLM?",
+      "answer": "A full example of structured outputs for online serving can be found in the vLLM documentation at examples/online_serving/structured_outputs.md.",
+      "sources": [
+        {
+          "file_path": "data/raw/vllm-0.10.1/docs/features/structured_outputs.md",
+          "first_character_index": 5461,
+          "last_character_index": 5535
+        }
+      ],
+      "difficulty": "synthetic",
+      "is_valid": true
+    }
+  ]
+}

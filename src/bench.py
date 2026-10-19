@@ -12,7 +12,15 @@ from src.evaluator import Evaluator
 from src.models import MinimalSearchResults, RagDataset, StudentSearchResults
 from src.retriever import Retriever
 
-DATASETS_DIR = "data/datasets"
+# Dataset suites: (directory, filename suffix). "public" is the official
+# 42 benchmark; "es" is the Spanish complement (same ground truth,
+# translated questions) used to measure multilingual retrieval; "en" is
+# the same 20 questions in English, for a like-for-like comparison.
+SUITES = {
+    "public": ("data/datasets", "public"),
+    "es": ("bench/datasets/es", "es"),
+    "en": ("bench/datasets/en", "en"),
+}
 RESULTS_DIR = "bench/results"
 OUTPUT_DIR = "data/output/bench"
 DATASET_NAMES = ("docs", "code")
@@ -40,7 +48,7 @@ def git_revision() -> dict[str, Any]:
 
 
 def run_dataset(retriever: Retriever, name: str, mode: str, k: int,
-                output_dir: str) -> dict[str, Any]:
+                output_dir: str, suite: str = "public") -> dict[str, Any]:
     """Retrieve and evaluate one public dataset.
 
     Args:
@@ -54,9 +62,10 @@ def run_dataset(retriever: Retriever, name: str, mode: str, k: int,
     Returns:
         Dict with 'recall_at_k', 'seconds' and 'questions'.
     """
-    filename = f"dataset_{name}_public.json"
-    unanswered = os.path.join(DATASETS_DIR, "UnansweredQuestions", filename)
-    answered = os.path.join(DATASETS_DIR, "AnsweredQuestions", filename)
+    datasets_dir, suffix = SUITES[suite]
+    filename = f"dataset_{name}_{suffix}.json"
+    unanswered = os.path.join(datasets_dir, "UnansweredQuestions", filename)
+    answered = os.path.join(datasets_dir, "AnsweredQuestions", filename)
 
     with open(unanswered, "r", encoding="utf-8") as fh:
         dataset = RagDataset.model_validate_json(fh.read())
@@ -112,7 +121,7 @@ def load_history(results_dir: str = RESULTS_DIR) -> list[dict[str, Any]]:
     return runs
 
 
-def print_table(runs: list[dict[str, Any]]) -> None:
+def print_table(runs: list[dict[str, Any]], suite: str = "public") -> None:
     """Print a comparison table of bench runs.
 
     Args:
@@ -126,6 +135,8 @@ def print_table(runs: list[dict[str, Any]]) -> None:
     print("\n" + header)
     print("-" * len(header))
     for run in runs:
+        if run.get("suite", "public") != suite:
+            continue
         cells = []
         for name in DATASET_NAMES:
             recall = run["datasets"][name]["recall_at_k"]
@@ -143,6 +154,7 @@ def print_table(runs: list[dict[str, Any]]) -> None:
 
 
 def run_bench(label: str, mode: str = "smart", k: int = 10,
+              suite: str = "public",
               domain: str = "vllm", config: Optional[RagConfig] = None,
               save: bool = True) -> dict[str, Any]:
     """Run the public 42 datasets end to end and record the result.
@@ -163,6 +175,8 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
     """
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}, got '{mode}'")
+    if suite not in SUITES:
+        raise ValueError(f"suite must be one of {list(SUITES)}")
 
     config = config or get_config()
     retriever = Retriever.from_store(domain, config=config)
@@ -171,6 +185,7 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
     run: dict[str, Any] = {
         "label": label,
         "mode": mode,
+        "suite": suite,
         "k": k,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         **git_revision(),
@@ -181,19 +196,20 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
         "device": config.models.resolved_device(),
         "datasets": {},
     }
-    output_dir = os.path.join(OUTPUT_DIR, f"{label}_{mode}")
+    output_dir = os.path.join(OUTPUT_DIR, f"{label}_{mode}_{suite}")
     for name in DATASET_NAMES:
         run["datasets"][name] = run_dataset(
-            retriever, name, mode, k, output_dir
+            retriever, name, mode, k, output_dir, suite
         )
 
     if save:
         os.makedirs(RESULTS_DIR, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        path = os.path.join(RESULTS_DIR, f"{stamp}_{label}_{mode}.json")
+        tag = mode if suite == "public" else f"{mode}_{suite}"
+        path = os.path.join(RESULTS_DIR, f"{stamp}_{label}_{tag}.json")
         with open(path, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(run, fh, indent=2)
         print(f"Saved bench run to {path}")
 
-    print_table(load_history() if save else [run])
+    print_table(load_history() if save else [run], suite)
     return run

@@ -42,6 +42,19 @@ def test_classifier_ignores_product_name_and_first_word() -> None:
     assert doc > 0.0
 
 
+def test_classifier_counts_spanish_doc_markers() -> None:
+    retriever = make_retriever([], [])
+    code, doc = retriever.classify_query("¿Cómo instalo vLLM en una GPU?")
+    assert doc > 0.0
+
+    retriever.settings = RetrievalConfig(doc_signal_languages=["en"])
+    code, doc_en_only = retriever.classify_query(
+        "¿Cómo instalo vLLM en una GPU?"
+    )
+    # "gpu" is an English marker too; Spanish ones add on top of it.
+    assert doc > doc_en_only
+
+
 def test_child_maps_to_parent_source() -> None:
     parent = Chunk("parent text", "f.py", 10, 90, "code", id="p1")
     child = Chunk("child", "f.py", 20, 40, "code", parent_id="p1")

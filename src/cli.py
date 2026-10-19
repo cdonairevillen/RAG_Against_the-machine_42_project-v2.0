@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from pydantic import BaseModel
 from tqdm import tqdm
@@ -7,6 +7,7 @@ from tqdm import tqdm
 from src.config import CONFIG_FILE, RagConfig, load_config
 from src.retriever import Retriever
 from src.generator import Generator
+from src.embeddings import vector_name
 from src.ingestion.chunk import Chunk
 from src.models import (
     MinimalAnswer,
@@ -16,6 +17,9 @@ from src.models import (
     StudentSearchResultsAndAnswer,
     MinimalSource,
 )
+
+if TYPE_CHECKING:
+    from src.ingestion.pipeline import Ingester
 
 DEFAULT_DOMAIN = "vllm"
 
@@ -162,8 +166,17 @@ class CLI:
                 ),
             )
             ingester.build()
-            ingester.save_bm25(self.config.paths.processed_dir)
-            store.replace(domain, ingester.all_chunks())
+            emb = self.config.embeddings
+            vectors = self.embed_children(ingester) if emb.enabled else {}
+            ingester.save_bm25(
+                self.config.paths.processed_dir,
+                embedding_model=emb.model if emb.enabled else None,
+            )
+            store.replace(
+                domain, ingester.all_chunks(),
+                vector_name=vector_name(emb.model) if emb.enabled else None,
+                vectors=vectors,
+            )
             docs = sum(1 for c in ingester.chunks if c.chunk_type == "doc")
             print(
                 f"Indexed '{domain}': {len(ingester.parent_chunks)} "
@@ -172,6 +185,33 @@ class CLI:
             )
         except Exception as exc:
             print(f"Error during indexing: {exc}")
+
+    def embed_children(self, ingester: "Ingester") -> dict:
+        """Embed every child chunk with the configured model.
+
+        Args:
+            ingester: A built Ingester.
+
+        Returns:
+            Child chunk id -> embedding vector.
+        """
+        import time
+
+        from src.embeddings import Embedder, document_text
+
+        emb = self.config.embeddings
+        device = self.config.models.resolved_device()
+        print(f"Embedding {len(ingester.chunks)} children with "
+              f"{emb.model} on {device}...")
+        embedder = Embedder(emb.model, device=device,
+                            batch_size=emb.batch_size)
+        start = time.perf_counter()
+        matrix = embedder.encode_documents([
+            document_text(c.file_path, c.text) for c in ingester.chunks
+        ])
+        print(f"Embedded in {time.perf_counter() - start:.1f}s "
+              f"(dim {matrix.shape[1]})")
+        return {c.id: matrix[i] for i, c in enumerate(ingester.chunks)}
 
     def search(self, query: str, k: int = 10) -> None:
         """Search the knowledge base for a single query.
@@ -426,7 +466,7 @@ class CLI:
             print(f"Error during evaluation: {exc}")
 
     def bench(self, label: str = "run", mode: str = "smart",
-              k: int = 10) -> None:
+              k: int = 10, suite: str = "public") -> None:
         """Run both public datasets, evaluate and record the result.
 
         Results are appended to bench/results/ and compared against
@@ -437,12 +477,14 @@ class CLI:
             mode: 'smart' (search_dataset path) or 'generation'
                 (search_for_generation path).
             k: Number of sources retrieved per question.
+            suite: "public" (official 42 datasets) or "es" (Spanish
+                complement, same ground truth).
         """
         from src.bench import run_bench
 
         try:
             run_bench(
-                label=label, mode=mode, k=k,
+                label=label, mode=mode, k=k, suite=suite,
                 domain=self.domain, config=self.config,
             )
         except Exception as exc:

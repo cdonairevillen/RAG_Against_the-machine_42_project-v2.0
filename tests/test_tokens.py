@@ -44,3 +44,8 @@ def test_modes_decide_corpus_and_query_handling() -> None:
     assert query_uses_parts("code", "code")
     assert query_uses_parts("code", "all")
     assert not query_uses_parts("code", "doc")
+
+    assert corpus_part_types("doc") == ["doc"]
+    assert query_uses_parts("doc", "doc")
+    assert not query_uses_parts("doc", "code")
+    assert not query_uses_parts("doc", "all")

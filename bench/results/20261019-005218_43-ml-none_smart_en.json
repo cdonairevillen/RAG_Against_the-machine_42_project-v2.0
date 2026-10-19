@@ -1,0 +1,57 @@
+{
+  "label": "43-ml-none",
+  "mode": "smart",
+  "suite": "en",
+  "k": 10,
+  "timestamp": "2026-10-19T00:52:17",
+  "commit": "1a91f74",
+  "dirty": true,
+  "domain": "vllm",
+  "chunking": {
+    "code_chunk_size": 2000,
+    "doc_chunk_size": 2000,
+    "code_child_size": 600,
+    "doc_child_size": 600
+  },
+  "chunkers": {
+    ".py": "python_ast",
+    ".pyi": "python_ast",
+    ".md": "markdown_headers_packed",
+    ".rst": "markdown_headers_packed",
+    ".txt": "markdown_headers_packed"
+  },
+  "retrieval": {
+    "classifier_margin": 0.5,
+    "code_signal_weight": 0.5,
+    "doc_signal_weight": 0.5,
+    "skip_rerank_score": Infinity,
+    "bm25_score_floor": 5.5,
+    "reranker_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "rerank_fusion": "rrf",
+    "rrf_k": 60,
+    "code_aware_tokens": "code"
+  },
+  "device": "cuda",
+  "datasets": {
+    "docs": {
+      "recall_at_k": {
+        "1": 0.8,
+        "3": 0.9,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "seconds": 0.34,
+      "questions": 10
+    },
+    "code": {
+      "recall_at_k": {
+        "1": 0.5,
+        "3": 0.8,
+        "5": 0.9,
+        "10": 0.9
+      },
+      "seconds": 0.6,
+      "questions": 10
+    }
+  }
+}

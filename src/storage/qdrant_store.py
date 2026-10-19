@@ -1,4 +1,6 @@
-from typing import Any, Iterator
+from typing import Any, Iterator, Optional
+
+import numpy as np
 
 from qdrant_client import QdrantClient, models
 from tqdm import tqdm
@@ -26,9 +28,9 @@ def point_to_chunk(point_id: Any, payload: dict[str, Any] | None) -> Chunk:
 class QdrantChunkStore:
     """ChunkStore backed by a Qdrant server, one collection per domain.
 
-    Collections are created without vectors in Phase 1: Qdrant is the
-    source of truth for chunk records and their metadata. Dense and
-    sparse vectors are added to the same points in Phase 2.
+    Qdrant is the source of truth for chunk records and their metadata.
+    When dense retrieval is enabled, child points also carry a named
+    vector (one name per embedding model).
     """
 
     def __init__(self, client: QdrantClient, config: QdrantConfig) -> None:
@@ -52,12 +54,29 @@ class QdrantChunkStore:
             ) from exc
         return cls(client, config)
 
-    def replace(self, domain: str, chunks: list[Chunk]) -> None:
-        """Recreate the domain's collection and upload `chunks`."""
+    def replace(self, domain: str, chunks: list[Chunk],
+                vector_name: Optional[str] = None,
+                vectors: Optional[dict[str, np.ndarray]] = None) -> None:
+        """Recreate the domain's collection and upload `chunks`.
+
+        Args:
+            domain: Domain whose collection is replaced.
+            chunks: Parent and child chunks to store.
+            vector_name: Named dense vector to create, if any.
+            vectors: Chunk id -> embedding, for the chunks that have one
+                (children). Points without an entry carry no vector.
+        """
         name = self.config.collection(domain)
         if self.client.collection_exists(name):
             self.client.delete_collection(name)
-        self.client.create_collection(name, vectors_config={})
+        vectors = vectors or {}
+        vectors_config: dict[str, models.VectorParams] = {}
+        if vector_name and vectors:
+            size = len(next(iter(vectors.values())))
+            vectors_config[vector_name] = models.VectorParams(
+                size=size, distance=models.Distance.COSINE
+            )
+        self.client.create_collection(name, vectors_config=vectors_config)
         for field_name in INDEXED_FIELDS:
             self.client.create_payload_index(
                 name, field_name, models.PayloadSchemaType.KEYWORD
@@ -70,7 +89,12 @@ class QdrantChunkStore:
                 name,
                 points=[
                     models.PointStruct(
-                        id=c.id, vector={}, payload=chunk_to_payload(c)
+                        id=c.id,
+                        vector=(
+                            {vector_name: vectors[c.id].tolist()}
+                            if vector_name and c.id in vectors else {}
+                        ),
+                        payload=chunk_to_payload(c),
                     )
                     for c in chunks[start:start + batch]
                 ],
@@ -109,6 +133,36 @@ class QdrantChunkStore:
         )
         by_id = {str(p.id): point_to_chunk(p.id, p.payload) for p in points}
         return [by_id[i] for i in ids if i in by_id]
+
+    def search_dense(self, domain: str, vector_name: str,
+                     query_vector: list[float], limit: int,
+                     chunk_type: Optional[str] = None) -> list[int]:
+        """Nearest child chunks to a query vector.
+
+        Args:
+            domain: Domain to search.
+            vector_name: Named vector to search with.
+            query_vector: Embedded query.
+            limit: Maximum number of results.
+            chunk_type: Restrict to 'code' or 'doc' children.
+
+        Returns:
+            Ordinals (BM25 rows) of the matching children, best first.
+        """
+        must: list[models.Condition] = [models.FieldCondition(
+            key="level", match=models.MatchValue(value="child")
+        )]
+        if chunk_type:
+            must.append(models.FieldCondition(
+                key="chunk_type", match=models.MatchValue(value=chunk_type)
+            ))
+        result = self.client.query_points(
+            self.config.collection(domain), query=query_vector,
+            using=vector_name, limit=limit,
+            query_filter=models.Filter(must=must),
+            with_payload=["ordinal"], with_vectors=False,
+        )
+        return [int((p.payload or {})["ordinal"]) for p in result.points]
 
     def count(self, domain: str) -> int:
         """Return how many chunks are stored for a domain."""

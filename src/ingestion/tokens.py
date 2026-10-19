@@ -10,12 +10,16 @@ import bm25s
 #   "code"  - like "both", but only for code: parts are added to code
 #             chunks, and to queries run against the code/general index;
 #             doc chunks and doc-index queries stay as they are.
-TOKEN_MODES = ("none", "query", "both", "code")
+#   "doc"   - the mirror of "code": parts only for doc chunks and for
+#             queries run against the doc index.
+TOKEN_MODES = ("none", "query", "both", "code", "doc")
 
 
 def corpus_part_types(mode: str) -> list[str]:
     """Return the chunk types whose text gets identifier parts."""
-    return {"both": ["code", "doc"], "code": ["code"]}.get(mode, [])
+    return {
+        "both": ["code", "doc"], "code": ["code"], "doc": ["doc"],
+    }.get(mode, [])
 
 
 def query_uses_parts(mode: str, index: str) -> bool:
@@ -23,7 +27,9 @@ def query_uses_parts(mode: str, index: str) -> bool:
     identifier parts under `mode`."""
     if mode in ("query", "both"):
         return True
-    return mode == "code" and index in ("all", "code")
+    if mode == "code":
+        return index in ("all", "code")
+    return mode == "doc" and index == "doc"
 
 
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")

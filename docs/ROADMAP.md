@@ -144,6 +144,16 @@ saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web
 
 **Entregable:** `docs/BENCHMARK_REPORT.md`, sección *Retrieval* (tabla de configuraciones × recall docs/code × latencia).
 
+> ✅ **Completada (2026-10-19).** Detalle en `changelog/FASE_2.md` y `docs/BENCHMARK_REPORT.md`.
+> - **Línea base oficial:** docs **0.76 / 0.91 / 0.92 / 0.94**, code **0.51 / 0.72 / 0.80 / 0.88**. Las dos rutas son idénticas.
+> - **Configuración:** BM25 code-aware + embeddings `bge-m3` (en las dos ramas) + reranker `mmarco-mMiniLMv2-L12` con RRF + clasificador con señales en inglés y español.
+> - **Hecho:** CUDA con CPU como alternativa, rutas unificadas, tokenizador code-aware, embeddings, rerankers y clasificador.
+> - **No hecho, pasa a pendientes:**
+>   - Métricas MRR/nDCG.
+>   - Volver a medir LangChain.
+>   - Recall de `bge-reranker-v2-m3` (la medición se paró por falta de memoria del sistema).
+>   - Clasificador semántico.
+
 ## Fase 3 — Mejoras en la generación de respuesta
 
 **Objetivo:** respuestas más naturales, con fuentes estructuradas y modelos intercambiables.
@@ -156,6 +166,7 @@ saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web
   - Presupuesto de contexto en tokens (B9).
   - Citas `[n]` enlazadas a las fuentes estructuradas.
   - Prompts por modo.
+  - **Responder en el idioma de la pregunta** (hoy Qwen contesta en inglés a preguntas en español, aunque la recuperación ya es multilingüe).
   - **B15**: guardarraíles fuera de dominio. Hoy *"What is the capital of France?"* responde "Paris", aunque es literalmente el ejemplo de rechazo del prompt.
 - **Streaming de tokens**, que prepara la API de la Fase 6.
 - **Comparativa de LLMs** en la 3080 Ti: Qwen3-0.6B frente a Qwen3-1.7B / Qwen3-4B, SmolLM3-3B y Phi-4-mini.
@@ -232,6 +243,8 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 | P1 | D7: agente frente a acceso directo, y qué es lo por defecto | Antes de la Fase 5 |
 | P2 | ~~D9: alcance de la ingesta multimedia~~ → resuelto: todo lo posible, prioridad vídeo y audio. **Queda por concretar qué material y cuánto** | Antes de la Fase 4 |
 | P7 | ~~`.gitattributes` para normalizar los finales de línea~~ → resuelto: todo LF y `llm_sdk/` intacto (commit `5a1cc4b`) | Hecho |
+| P8 | ¿`bge-m3` por defecto aunque indexar en CPU lleve ~2 h? Alternativas: `e5-small` sin GPU o llevar un índice ya construido | Antes de probar en 42 |
+| P9 | ¿Medir `bge-reranker-v2-m3` como opción "solo GPU"? (la medición se paró por memoria) | Cuando quieras |
 | P3 | Qué datasets o dominios nuevos se añaden (D6) | Antes de la Fase 4 |
 | P4 | Modularización: qué opciones se exponen en la web y cómo se navega | Antes de la Fase 6 |
 | P5 | GPU de los ordenadores de 42 (para fijar los valores por defecto) | Durante la Fase 2 |
@@ -254,5 +267,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-18**: el campo `lang` del payload, previsto en la Fase 1, no se ha añadido todavía: vLLM es solo inglés. Entra con el modo CV multilingüe (Fase 4).
 - **2026-10-18**: Fase 1 completada. Ver `changelog/FASE_1.md`.
 - **2026-10-18**: Fase 2 iniciada: CUDA 12.6 (con CPU como alternativa), fusión RRF del reranker y rutas unificadas. Ver `changelog/FASE_2.md`.
+- **2026-10-19**: embeddings `bge-m3` por defecto (con `e5-small` como alternativa sin GPU); reranker `mmarco-mMiniLMv2-L12` (multilingüe); `Qwen3-Embedding` y `Qwen3-Reranker` descartados por coste; Jina descartado por licencia no comercial. Set complementario en inglés y español (20 preguntas) en `bench/datasets/`.
+- **2026-10-19**: Fase 2 completada (pasos 3–5 hechos de forma autónoma con tu autorización, para revisarlos). Ver `changelog/FASE_2.md`.
 - **2026-10-18**: las cifras del README (docs 0.89 / code 0.75 en R@10) eran de los datasets **públicos**, aunque estuvieran etiquetadas como privadas, y salían de configuraciones anteriores que no se reproducen con `v1.0-42`. Se acepta como línea base oficial `04-fase0-final / smart`. La etiqueta del README se corrige en la reescritura final.
 - **2026-10-18**: finales de línea normalizados a LF con `.gitattributes`, con `llm_sdk/` excluido (P7).
