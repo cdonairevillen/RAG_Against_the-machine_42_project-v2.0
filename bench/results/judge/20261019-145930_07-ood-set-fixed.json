@@ -1,0 +1,29 @@
+{
+  "label": "07-ood-set-fixed",
+  "judge_model": "openai/gpt-oss-120b",
+  "limit": 2,
+  "api_calls": 8,
+  "timestamp": "2026-10-19T14:59:30",
+  "sets": {
+    "public/docs": {
+      "judged": 2,
+      "mean_score": 1.0,
+      "correct": 0.0
+    },
+    "public/code": {
+      "judged": 2,
+      "mean_score": 2.0,
+      "correct": 1.0
+    },
+    "es/docs": {
+      "judged": 2,
+      "mean_score": 2.0,
+      "correct": 1.0
+    },
+    "es/code": {
+      "judged": 2,
+      "mean_score": 1.5,
+      "correct": 0.5
+    }
+  }
+}

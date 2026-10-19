@@ -118,10 +118,13 @@ eval-code:
 		--k 10
 
 bench: db-up
-	$(RUN) bench --label $(LABEL) --mode smart
+	$(RUN) bench --label $(LABEL)
 
 gen-bench: db-up
 	$(RUN) gen_bench --label $(LABEL)
+
+judge:
+	$(RUN) judge --label $(LABEL)
 
 test:
 	$(ENV) $(UV) run --project . pytest
@@ -154,4 +157,4 @@ meme:
 	@echo "Web running at http://localhost:8501"
 
 .PHONY: install data data-42 db-up db-down db-reset run web web-stop index search-docs search-code \
-        eval-docs eval-code bench gen-bench test lint clean meme
+        eval-docs eval-code bench gen-bench judge test lint clean meme

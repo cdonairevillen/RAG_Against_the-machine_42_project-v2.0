@@ -12,7 +12,7 @@ import bm25s
 #             doc chunks and doc-index queries stay as they are.
 #   "doc"   - the mirror of "code": parts only for doc chunks and for
 #             queries run against the doc index.
-TOKEN_MODES = ("none", "query", "both", "code", "doc")
+# The valid values are enforced by RetrievalConfig.code_aware_tokens.
 
 
 def corpus_part_types(mode: str) -> list[str]:

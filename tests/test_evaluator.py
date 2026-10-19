@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from src.evaluator import Evaluator
+from src.evaluation.evaluator import Evaluator
 
 
 def test_overlap_ratio_is_relative_to_ground_truth() -> None:

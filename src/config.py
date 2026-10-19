@@ -1,7 +1,7 @@
 import os
 import sys
 from functools import lru_cache
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -65,7 +65,9 @@ class RetrievalConfig(BaseModel):
     rerank_doc_branch: bool = False
     # Identifier splitting for BM25: "none", "query", "both" or "code".
     # Changing it needs a re-index (see src/ingestion/tokens.py).
-    code_aware_tokens: str = "code"
+    code_aware_tokens: Literal["none", "query", "both", "code", "doc"] = (
+        "code"
+    )
 
 
 class EmbeddingsConfig(BaseModel):
@@ -84,6 +86,21 @@ class EmbeddingsConfig(BaseModel):
     # Also fuse dense candidates in the doc branch of search_smart (the
     # code branch, including its doc safety net, always uses them).
     dense_in_doc_branch: bool = True
+
+
+class GenerationConfig(BaseModel):
+    """The LLM that writes the answers.
+
+    Qwen/Qwen3-0.6B is the base (comparable with other 42 RAGs); other
+    models are optional profiles. All load through llm_sdk.
+    """
+
+    model: str = "Qwen/Qwen3-0.6B"
+    max_new_tokens: int = 150
+    max_input_tokens: int = 3072
+    # llm_sdk default. False uses the transformers implementation instead
+    # of the model repo's own code (needed when that code is outdated).
+    trust_remote_code: bool = True
 
 
 class ModelsConfig(BaseModel):
@@ -132,6 +149,7 @@ class RagConfig(BaseModel):
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     models: ModelsConfig = Field(default_factory=ModelsConfig)
     embeddings: EmbeddingsConfig = Field(default_factory=EmbeddingsConfig)
+    generation: GenerationConfig = Field(default_factory=GenerationConfig)
     sources: dict[str, SourceConfig] = Field(default_factory=dict)
     # Active profile ("default" = the stable base configuration) and the
     # profiles rag.toml offers, e.g. for a model selector in the web.
@@ -174,6 +192,7 @@ def apply_env_overrides(data: dict[str, Any],
         "retrieval": RetrievalConfig,
         "models": ModelsConfig,
         "embeddings": EmbeddingsConfig,
+        "generation": GenerationConfig,
     }
     for section, model in sections.items():
         for key in model.model_fields:

@@ -5,6 +5,7 @@ from typing import Any, Iterator
 import torch
 from llm_sdk import Small_LLM_Model
 
+from src.config import GenerationConfig
 from src.language import LANGUAGE_NAMES, detect_language
 
 NOT_FOUND_PATTERNS = (
@@ -94,8 +95,8 @@ def clean_output(text: str) -> str:
 
 
 class Generator:
-    """Loads Qwen/Qwen3-0.6B and generates grounded answers via
-    greedy decoding.
+    """Loads the configured LLM (Qwen/Qwen3-0.6B by default) through
+    llm_sdk and generates grounded answers via greedy decoding.
 
     Uses the model's official chat template with thinking disabled,
     numbered sources cited as [n], and an explicit answer language
@@ -112,29 +113,48 @@ class Generator:
         model: Loaded Small_LLM_Model instance.
         max_new_tokens: Maximum tokens to generate per answer.
         max_input_tokens: Token budget for the whole prompt.
-        repo_root: Root of the vLLM repo (kept for compatibility).
     """
 
-    MODEL_NAME = "Qwen/Qwen3-0.6B"
-
-    def __init__(self, max_new_tokens: int = 150,
-                 max_input_tokens: int = 3072,
-                 repo_root: str = "data/raw/vllm-0.10.1") -> None:
-        """Load the LLM. First run downloads weights (~600 MB).
+    def __init__(self, config: GenerationConfig | None = None) -> None:
+        """Load the LLM. The first run downloads its weights.
 
         Args:
-            max_new_tokens: Cap on generated tokens per answer.
-            max_input_tokens: Token budget for system + sources +
-                question; sources are trimmed to fit it.
-            repo_root: Root of the vLLM repo, kept for backward
-                compatibility with callers that pass it.
+            config: Model and token limits (defaults to the base,
+                Qwen/Qwen3-0.6B with 150 new tokens).
         """
-        print(f"Loading {self.MODEL_NAME}...")
-        self.model = Small_LLM_Model(model_name=self.MODEL_NAME)
-        self.max_new_tokens = max_new_tokens
-        self.max_input_tokens = max_input_tokens
-        self.repo_root = repo_root
+        config = config or GenerationConfig()
+        self.model_name = config.model
+        print(f"Loading {self.model_name}...")
+        self.model = Small_LLM_Model(
+            model_name=self.model_name,
+            trust_remote_code=config.trust_remote_code,
+        )
+        self.max_new_tokens = config.max_new_tokens
+        self.max_input_tokens = config.max_input_tokens
+        self.eos_token_ids = self.stop_token_ids()
         print("Model loaded.")
+
+    def stop_token_ids(self) -> list[int]:
+        """Tokens that end an answer for this model.
+
+        Qwen ends turns with <|im_end|>; other families use their own
+        end-of-turn token, declared in the model's generation config.
+        """
+        ids: set[int] = set()
+        declared = getattr(
+            self.model._model.generation_config, "eos_token_id", None
+        )
+        if isinstance(declared, int):
+            ids.add(declared)
+        elif declared:
+            ids.update(declared)
+        if self.tokenizer.eos_token_id is not None:
+            ids.add(self.tokenizer.eos_token_id)
+        end_of_turn = self.tokenizer.convert_tokens_to_ids("<|im_end|>")
+        unknown = self.tokenizer.unk_token_id
+        if isinstance(end_of_turn, int) and end_of_turn != unknown:
+            ids.add(end_of_turn)
+        return sorted(ids)
 
     @property
     def tokenizer(self) -> Any:
@@ -267,8 +287,8 @@ class Generator:
             **inputs,
             "max_new_tokens": self.max_new_tokens,
             "do_sample": False,
-            "pad_token_id": self.tokenizer.eos_token_id,
-            "eos_token_id": self.tokenizer.encode("<|im_end|>")[0],
+            "pad_token_id": self.tokenizer.pad_token_id,
+            "eos_token_id": self.eos_token_ids,
         }
 
     def generate(self, **kwargs: Any) -> Any:

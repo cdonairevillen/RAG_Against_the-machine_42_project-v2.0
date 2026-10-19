@@ -272,7 +272,9 @@ def load_generator() -> object:
         Loaded Generator instance cached in session state.
     """
     from src.generator import Generator
-    return Generator()
+    from src.config import get_config
+
+    return Generator(get_config().generation)
 
 
 def load_recall_metrics() -> dict:
@@ -282,7 +284,7 @@ def load_recall_metrics() -> dict:
         Dict with 'docs' and 'code' keys, each containing recall
         scores, or empty dicts if files are not found.
     """
-    from src.evaluator import Evaluator
+    from src.evaluation.evaluator import Evaluator
 
     metrics: dict = {"docs": {}, "code": {}}
     evaluator = Evaluator()

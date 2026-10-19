@@ -116,7 +116,7 @@ class CLI:
         """
         if self.generator is None:
             try:
-                self.generator = Generator()
+                self.generator = Generator(self.config.generation)
             except Exception as exc:
                 print(f"Error loading model: {exc}")
                 raise
@@ -440,7 +440,7 @@ class CLI:
             max_context_length: Kept for moulinette CLI
                 compatibility; unused.
         """
-        from src.evaluator import Evaluator
+        from src.evaluation.evaluator import Evaluator
 
         if not os.path.isfile(student_answer_path):
             print(f"Error: file not found: {student_answer_path}")
@@ -459,6 +459,23 @@ class CLI:
         except Exception as exc:
             print(f"Error during evaluation: {exc}")
 
+    def judge(self, label: str, limit: Optional[int] = 10) -> None:
+        """Grade a gen_bench run's answers with an LLM judge (Groq).
+
+        Uses JUDGE_BASE_URL, JUDGE_MODEL and GROQ_API_KEY from .env.
+        Verdicts are cached, so re-running costs no extra quota.
+
+        Args:
+            label: gen_bench run to judge.
+            limit: Answers judged per set (default 10).
+        """
+        from src.evaluation.judge import JudgeError, run_judge
+
+        try:
+            run_judge(label, limit=limit)
+        except (JudgeError, OSError) as exc:
+            print(f"Judge unavailable: {exc}")
+
     def gen_bench(self, label: str = "run", k: int = 5,
                   limit: Optional[int] = None) -> None:
         """Generate answers for the benchmark sets and score them.
@@ -472,7 +489,7 @@ class CLI:
             k: Sources passed to the generator.
             limit: Questions per public dataset (default: all 100).
         """
-        from src.gen_bench import run_gen_bench
+        from src.evaluation.gen_bench import run_gen_bench
 
         try:
             run_gen_bench(label=label, k=k, limit=limit,
@@ -480,8 +497,8 @@ class CLI:
         except Exception as exc:
             print(f"Error during gen_bench: {exc}")
 
-    def bench(self, label: str = "run", mode: str = "smart",
-              k: int = 10, suite: str = "public") -> None:
+    def bench(self, label: str = "run", k: int = 10,
+              suite: str = "public") -> None:
         """Run both public datasets, evaluate and record the result.
 
         Results are appended to bench/results/ and compared against
@@ -489,17 +506,16 @@ class CLI:
 
         Args:
             label: Short name for this run (e.g. 'baseline').
-            mode: 'smart' (search_dataset path). The answer flow is
-                measured by gen_bench.
             k: Number of sources retrieved per question.
-            suite: "public" (official 42 datasets) or "es" (Spanish
-                complement, same ground truth).
+            suite: "public" (official 42 datasets), "en" or "es" (the
+                20-question complement, same ground truth). The answer
+                flow is measured by gen_bench.
         """
-        from src.bench import run_bench
+        from src.evaluation.bench import run_bench
 
         try:
             run_bench(
-                label=label, mode=mode, k=k, suite=suite,
+                label=label, k=k, suite=suite,
                 domain=self.domain, config=self.config,
             )
         except Exception as exc:

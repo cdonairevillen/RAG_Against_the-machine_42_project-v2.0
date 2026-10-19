@@ -46,6 +46,13 @@ rrf_k = 60
 # queries only). Changing it requires `make index`.
 code_aware_tokens = "code"
 
+[generation]
+# The base LLM (comparable with other 42 RAGs). Other models are optional
+# profiles below; all load through llm_sdk.
+model = "Qwen/Qwen3-0.6B"
+max_new_tokens = 150
+max_input_tokens = 3072
+
 [embeddings]
 # Dense retrieval fused with BM25 (RRF), in both branches. Changing the
 # model needs `make index`. Without a GPU, indexing with bge-m3 takes
@@ -92,3 +99,24 @@ reranker_model = "BAAI/bge-reranker-v2-m3"
 # Index in ~13 min on CPU instead of ~2 h with bge-m3 (lower recall,
 # see docs/BENCHMARK_REPORT.md).
 model = "intfloat/multilingual-e5-small"
+
+# Optional LLMs (generation only; no re-index needed): the rest of the
+# Qwen3 family, plus Phi-4-mini as an alternative from another family.
+# Quality and speed in docs/BENCHMARK_REPORT.md (SmolLM3-3B was measured
+# and dropped: lowest F1 and most false refusals on code).
+[profiles."llm-qwen3-1.7b".generation]
+model = "Qwen/Qwen3-1.7B"
+
+[profiles.llm-qwen3-4b.generation]
+model = "Qwen/Qwen3-4B"
+
+# 4B (~8 GB) + bge-m3 + reranker do not fit together in a 12 GB GPU:
+# retrieval runs on CPU (same results, measured in Phase 2).
+[profiles.llm-qwen3-4b.models]
+device = "cpu"
+
+[profiles.llm-phi4-mini.generation]
+model = "microsoft/Phi-4-mini-instruct"
+# Its repo code imports names removed from transformers 5; the native
+# Phi3 implementation is used instead.
+trust_remote_code = false

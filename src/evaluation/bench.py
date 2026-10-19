@@ -8,7 +8,7 @@ from typing import Any, Optional
 from tqdm import tqdm
 
 from src.config import RagConfig, get_config
-from src.evaluator import Evaluator
+from src.evaluation.evaluator import Evaluator
 from src.models import MinimalSearchResults, RagDataset, StudentSearchResults
 from src.retriever import Retriever
 
@@ -22,9 +22,11 @@ SUITES = {
     "en": ("bench/datasets/en", "en"),
 }
 RESULTS_DIR = "bench/results"
+# Retrieval path measured (the official 42 one). Kept in result names
+# and records so they stay comparable with the earlier runs.
+MODE = "smart"
 OUTPUT_DIR = "data/output/bench"
 DATASET_NAMES = ("docs", "code")
-MODES = ("smart",)
 
 
 def git_revision() -> dict[str, Any]:
@@ -47,15 +49,13 @@ def git_revision() -> dict[str, Any]:
         return {"commit": "unknown", "dirty": True}
 
 
-def run_dataset(retriever: Retriever, name: str, mode: str, k: int,
+def run_dataset(retriever: Retriever, name: str, k: int,
                 output_dir: str, suite: str = "public") -> dict[str, Any]:
     """Retrieve and evaluate one public dataset.
 
     Args:
         retriever: Loaded Retriever (with reranker).
         name: Dataset name, 'docs' or 'code'.
-        mode: 'smart' (search_smart, the official 42 path). The answer
-            flow (relevance gate + generation) is measured by gen_bench.
         k: Number of sources retrieved per question.
         output_dir: Where the StudentSearchResults JSON is written.
 
@@ -73,7 +73,7 @@ def run_dataset(retriever: Retriever, name: str, mode: str, k: int,
     search = retriever.search_smart
     results: list[MinimalSearchResults] = []
     start = time.perf_counter()
-    for question in tqdm(dataset.rag_questions, desc=f"{name} ({mode})"):
+    for question in tqdm(dataset.rag_questions, desc=f"{name} ({MODE})"):
         results.append(MinimalSearchResults(
             question_id=question.question_id,
             question_str=question.question,
@@ -150,7 +150,7 @@ def print_table(runs: list[dict[str, Any]], suite: str = "public") -> None:
         )
 
 
-def run_bench(label: str, mode: str = "smart", k: int = 10,
+def run_bench(label: str, k: int = 10,
               suite: str = "public",
               domain: str = "vllm", config: Optional[RagConfig] = None,
               save: bool = True) -> dict[str, Any]:
@@ -158,7 +158,6 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
 
     Args:
         label: Short name for this run (e.g. 'baseline', 'fix-b1').
-        mode: 'smart' (kept in the results for history).
         k: Number of sources retrieved per question.
         domain: Indexed source the datasets are about.
         config: Pipeline configuration (defaults to rag.toml).
@@ -168,10 +167,8 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
         The bench run dict.
 
     Raises:
-        ValueError: If mode is not one of MODES.
+        ValueError: If suite is unknown.
     """
-    if mode not in MODES:
-        raise ValueError(f"mode must be one of {MODES}, got '{mode}'")
     if suite not in SUITES:
         raise ValueError(f"suite must be one of {list(SUITES)}")
 
@@ -181,7 +178,7 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
 
     run: dict[str, Any] = {
         "label": label,
-        "mode": mode,
+        "mode": MODE,
         "suite": suite,
         "k": k,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -194,16 +191,16 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
         "device": config.models.resolved_device(),
         "datasets": {},
     }
-    output_dir = os.path.join(OUTPUT_DIR, f"{label}_{mode}_{suite}")
+    output_dir = os.path.join(OUTPUT_DIR, f"{label}_{MODE}_{suite}")
     for name in DATASET_NAMES:
         run["datasets"][name] = run_dataset(
-            retriever, name, mode, k, output_dir, suite
+            retriever, name, k, output_dir, suite
         )
 
     if save:
         os.makedirs(RESULTS_DIR, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        tag = mode if suite == "public" else f"{mode}_{suite}"
+        tag = MODE if suite == "public" else f"{MODE}_{suite}"
         path = os.path.join(RESULTS_DIR, f"{stamp}_{label}_{tag}.json")
         with open(path, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(run, fh, indent=2)

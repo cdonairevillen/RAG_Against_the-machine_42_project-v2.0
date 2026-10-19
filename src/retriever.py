@@ -110,16 +110,14 @@ def rrf_merge(lists: list[list[MinimalSource]],
 class Retriever:
     """Searches the indexed knowledge base using dual BM25 indices.
 
-    Provides several search modes:
-        search()                — fast BM25-only, maps children to
-                                   parents.
-        search_no_rerank()      — same as search(), explicit name.
-        search_smart()          — classifier-guided: BM25 doc index
-                                   for doc queries, reranker-filtered
-                                   code index for code queries. The
-                                   default and best-performing mode.
-        search_for_generation() — BM25 + reranker over the unified
-                                   index, used before the LLM.
+    Search modes:
+        search()                — fast BM25-only over the unified index,
+                                   mapped to parents (CLI `search`).
+        search_smart()          — classifier-guided hybrid retrieval
+                                   (BM25 + dense + reranker fused with
+                                   RRF). The benchmarked 42 path.
+        search_for_generation() — search_smart() + relevance gate; the
+                                   retrieval step of RagPipeline.
 
     Attributes:
         chunks: All indexed child Chunk objects.
@@ -328,19 +326,6 @@ class Retriever:
         return retriever
 
     def search(self, query: str, k: int = 10) -> list[MinimalSource]:
-        """Fast BM25-only retrieval mapping children to parents.
-
-        Args:
-            query: Natural-language search string.
-            k: Number of results to return.
-
-        Returns:
-            Ranked list of parent MinimalSource objects.
-        """
-        return self.search_no_rerank(query, k)
-
-    def search_no_rerank(self, query: str,
-                         k: int = 10) -> list[MinimalSource]:
         """BM25 retrieval over the unified index, mapped to parents.
 
         Args:
@@ -576,7 +561,7 @@ class Retriever:
             )
 
         if len(doc_sources) < k:
-            unified = self.search_no_rerank(expanded, k * 2)
+            unified = self.search(expanded, k * 2)
             seen_unified = {
                 (s.file_path, s.first_character_index)
                 for s in doc_sources

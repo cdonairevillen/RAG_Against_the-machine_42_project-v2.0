@@ -61,14 +61,6 @@ class Embedder:
         self.batch_size = batch_size
         self.model = SentenceTransformer(model, device=device)
 
-    @property
-    def dimension(self) -> int:
-        """Size of the vectors produced by the model."""
-        dim = self.model.get_sentence_embedding_dimension()
-        if dim is None:
-            raise RuntimeError(f"Unknown dimension for {self.model_name}")
-        return int(dim)
-
     def encode_documents(self, texts: list[str],
                          show_progress: bool = True) -> np.ndarray:
         """Embed documents (L2-normalised float32 matrix)."""

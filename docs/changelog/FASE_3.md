@@ -1,7 +1,7 @@
 # CHANGELOG — Fase 3: Mejoras en la generación de respuesta
 
 **Fecha de inicio:** 2026-10-19
-**Estado:** 🟡 en curso. Hecho: benchmark de generación, prompt nuevo, guardarraíl fuera de dominio (B15), flujo de respuesta unificado y streaming. Pendiente: capa de LLM con modelos opcionales, comparativa de LLMs y juez.
+**Estado:** ✅ completada (2026-10-19). Benchmark de generación, prompt nuevo, guardarraíl fuera de dominio (B15), flujo de respuesta unificado, streaming, LLM opcionales con comparativa y juez, revisión de código muerto y evaluadores agrupados en `src/evaluation/`.
 
 ---
 
@@ -96,32 +96,87 @@ Medido paso a paso: `01` prompt v2, `04` regla de "no encontrado" suavizada (des
 - ⚠️ **En tu equipo, el Control de aplicaciones de Windows bloquea `streamlit.exe`** (el lanzador de pip, como pasó con `pyarrow`). Funciona con `python -m streamlit run src/web.py`, y **`make web` ya lo lanza así**.
 - **Sigue pendiente B5:** el modelo se carga por sesión de navegador; se resuelve en la reescritura de la web (Fase 6).
 
+### 2.7 Revisión de código muerto (a petición tuya)
+
+Tras las reestructuraciones (ingesta a `src/ingestion/`, flujo único en `src/rag.py`, fin del modo `generation`) se revisó el código con **`vulture`** (análisis estático, ejecutado puntualmente con `uvx`, sin añadirlo al proyecto) y se comprobó a mano cada hallazgo.
+
+**Eliminado:**
+
+| Qué | Por qué |
+|---|---|
+| `Embedder.dimension` | Nunca se usó (la dimensión se lee del propio vector) |
+| `Generator.MODEL_NAME` | El modelo viene ahora de `[generation]` en `rag.toml` |
+| `Generator(repo_root=…)` | Se mantenía "por compatibilidad", pero ya nadie lo pasaba |
+| `Retriever.search_no_rerank()` | Era un alias de `search()`; queda solo `search()` |
+| `bench --mode` y `MODES` | Desde que se unificaron las rutas solo quedaba `smart`. Se mantiene `"mode": "smart"` en los resultados para no romper la comparación con los 90 ya guardados |
+| Copias de `build_context_blocks` / `is_not_found` en la CLI y la web | Sustituidas por el flujo único (`src/rag.py`) |
+
+**Convertido en algo útil:** `TOKEN_MODES` describía los modos válidos de `code_aware_tokens`, pero nada los comprobaba. Ahora el tipo de la configuración es `Literal[...]`, así que un valor mal escrito (`"cod"`) da un error claro en lugar de comportarse como `"none"` sin avisar.
+
+**Se queda, aunque `vulture` lo marca:**
+- Los comandos de la CLI (`search_dataset`, `evaluate`, `bench`…): Fire los invoca por nombre.
+- `max_context_length` en `evaluate`: compatibilidad con la llamada de la moulinette de 42.
+- `question_str`: formato JSON de 42.
+- `Chunk.modality`: se guarda en Qdrant y es la base de la Fase 4b.
+- `available_profiles`: lista para el selector de la web (Fase 6), con test.
+
+**Documentación desactualizada corregida:** la docstring de `Retriever` describía `search_for_generation` como "BM25 + reranker over the unified index", que era la ruta antigua.
+
+**Verificado:** recall idéntico a `49-fase2-final` (`52-deadcode-check`), 58 tests, lint limpio, y `search` y `answer` probados desde la CLI.
+
+### 2.8 LLM opcionales y juez
+
+- **`[generation]` en `rag.toml`:** modelo, `max_new_tokens`, `max_input_tokens` y `trust_remote_code`. La base es `Qwen/Qwen3-0.6B`. **Todos los modelos se cargan a través de `llm_sdk`** (que acepta `model_name`), sin tocar la carpeta del SDK.
+- **El generador ya no da por hecho que el modelo es Qwen:** los tokens de fin de respuesta se toman de la configuración de cada modelo (antes estaba fijo `<|im_end|>`).
+- **Perfiles** (decisión tuya tras la comparativa): `llm-qwen3-1.7b`, `llm-qwen3-4b` y `llm-phi4-mini`. **SmolLM3-3B, medido y descartado.** Resultados en `docs/BENCHMARK_REPORT.md` §5.
+- **Dos problemas resueltos al medir:**
+  - **Phi-4-mini:** el código de su repositorio importa nombres que ya no existen en transformers 5 (`LossKwargs`). Con `trust_remote_code = false` se usa la implementación nativa de transformers (arquitectura `phi3`).
+  - **Qwen3-4B:** no cabe en 12 GB junto con `bge-m3` y el reranker (accelerate intenta mover parte del modelo a la CPU y el SDK no lo permite). Su perfil pone la recuperación en CPU, que ya se comprobó que da los mismos resultados.
+- **Juez (`src/judge.py`, `make judge LABEL=…`):**
+  - LLM como juez sobre una API compatible con OpenAI (Groq, `openai/gpt-oss-120b`), con nota 0–2 frente a la respuesta de referencia de 42.
+  - **Solo se ejecuta a petición**, sobre las respuestas ya guardadas por `gen-bench`; el programa normal nunca lo usa.
+  - **Ahorro de cuota:** caché en disco (`data/output/judge_cache.json`), las respuestas "no encontrado" no se envían, pausa entre peticiones y reintentos ante 429. En total, unas 190 llamadas para comparar los cinco modelos.
+  - Lee `JUDGE_BASE_URL`, `JUDGE_MODEL` y `GROQ_API_KEY` del `.env` (ignorado por git); la clave nunca se imprime. Sin dependencias nuevas (`urllib`).
+  - **Resuelve el problema del F1 en español:** el juez evalúa el significado, no el idioma.
+
+### 2.9 Evaluadores agrupados en `src/evaluation/`
+
+- `evaluator.py` (recall de 42), `bench.py`, `gen_bench.py` y `judge.py` pasan de `src/` a **`src/evaluation/`**: se distingue a simple vista qué es el RAG y qué son las herramientas para medirlo. Movidos con `git mv` para conservar el historial; `judge.py` era nuevo y se movió normalmente.
+- **Sin cambios de comportamiento:** los comandos (`make bench`, `make gen-bench`, `make judge`, `evaluate`/`search_dataset` de 42) son los mismos. Verificado con el recall idéntico a `49` (`53-evaluation-package`), los comandos de 42, el juez (con 0 llamadas a la API gracias a la caché), 61 tests y lint limpio.
+
 ---
 
-## 3. Ficheros (hasta ahora)
+## 3. Ficheros
 
 | Fichero | Cambio |
 |---|---|
 | `src/rag.py` | **Nuevo**: `RagPipeline`, `RagAnswer`, `build_context_blocks` |
-| `src/gen_bench.py` | **Nuevo**: benchmark de generación |
+| `src/evaluation/gen_bench.py` | **Nuevo**: benchmark de generación |
+| `src/evaluation/judge.py` | **Nuevo**: juez LLM (Groq), con caché |
+| `src/evaluation/` | `evaluator.py` y `bench.py` movidos aquí (§2.9) |
 | `src/language.py` | **Nuevo**: detección de idioma (es/en) |
 | `src/generator.py` | Chat template oficial, fuentes `[n]`, idioma, presupuesto en tokens, `clean_output`, `stream_answer` |
 | `src/retriever.py` | Filtro de relevancia con el reranker (`top_relevance`) |
-| `src/config.py`, `rag.toml` | `relevance_threshold = 0.0` |
+| `src/config.py`, `rag.toml` | `relevance_threshold = 0.0`; `[generation]`; perfiles `llm-qwen3-1.7b`, `llm-qwen3-4b` y `llm-phi4-mini`; `code_aware_tokens` validado |
 | `src/cli.py` | `answer`/`answer_dataset` vía `RagPipeline`, streaming, `gen_bench` |
 | `src/bench.py`, `Makefile` | Fuera el modo `generation` y `bench-gen`; añadido `gen-bench`; `make web` con `python -m streamlit` |
 | `src/web.py` | `RagPipeline` + streaming; respuesta escapada (B6) |
 | `bench/datasets/ood/questions.json` | **Nuevo**: set fuera de dominio |
-| `tests/test_generator.py`, `tests/test_gen_bench.py` | **Nuevos** |
+| `tests/test_generator.py`, `tests/test_gen_bench.py`, `tests/test_judge.py` | **Nuevos** |
 | `llm_sdk/**` | **Sin tocar** |
 
-**Tests:** 58. Lint limpio.
+**Tests:** 61. Lint limpio.
 
 ---
 
 ## 4. Pendiente en la Fase 3
 
 1. ~~`make web` con `python -m streamlit`~~ → hecho.
-2. Capa de LLM: Qwen3-0.6B vía `llm_sdk` como base, y modelos opcionales como perfiles (como en la Fase 2).
-3. Comparativa de LLMs (Qwen3-1.7B / 4B, SmolLM3-3B, Phi-4-mini) en la 3080 Ti, con el juez `openai/gpt-oss-120b` (Groq) como complemento, con caché y pocas preguntas para no gastar la cuota gratuita.
-4. Cierre: `BENCHMARK_REPORT.md` (sección de generación) y roadmap.
+2. ~~Capa de LLM y perfiles opcionales~~ → hecho (§2.8).
+3. ~~Comparativa de LLMs con juez~~ → hecho (§2.8 y `BENCHMARK_REPORT.md` §5).
+4. ~~Cierre: `BENCHMARK_REPORT.md` y roadmap~~ → hecho.
+
+**Para revisar contigo:**
+- **Modelo recomendado en la web:** se decide en la Fase 6.
+- **Velocidad en CPU de los LLM opcionales:** no medida. Te parece aceptable que aumente.
+- **Las 2 preguntas legítimas de code que rechaza el filtro** (§2.3): si se quieren recuperar, el umbral es configurable (`relevance_threshold`).

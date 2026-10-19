@@ -1,0 +1,29 @@
+{
+  "label": "10-llm-default",
+  "judge_model": "openai/gpt-oss-120b",
+  "limit": 10,
+  "api_calls": 32,
+  "timestamp": "2026-10-19T15:19:31",
+  "sets": {
+    "public/docs": {
+      "judged": 10,
+      "mean_score": 1.0,
+      "correct": 0.2
+    },
+    "public/code": {
+      "judged": 10,
+      "mean_score": 1.2,
+      "correct": 0.6
+    },
+    "es/docs": {
+      "judged": 10,
+      "mean_score": 1.7,
+      "correct": 0.7
+    },
+    "es/code": {
+      "judged": 10,
+      "mean_score": 1.1,
+      "correct": 0.4
+    }
+  }
+}

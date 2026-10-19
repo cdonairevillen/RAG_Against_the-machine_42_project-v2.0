@@ -1,0 +1,29 @@
+{
+  "label": "10-llm-llm-phi4-mini",
+  "judge_model": "openai/gpt-oss-120b",
+  "limit": 10,
+  "api_calls": 40,
+  "timestamp": "2026-10-19T15:33:09",
+  "sets": {
+    "public/docs": {
+      "judged": 10,
+      "mean_score": 1.4,
+      "correct": 0.6
+    },
+    "public/code": {
+      "judged": 10,
+      "mean_score": 1.2,
+      "correct": 0.5
+    },
+    "es/docs": {
+      "judged": 10,
+      "mean_score": 1.8,
+      "correct": 0.9
+    },
+    "es/code": {
+      "judged": 10,
+      "mean_score": 1.4,
+      "correct": 0.7
+    }
+  }
+}

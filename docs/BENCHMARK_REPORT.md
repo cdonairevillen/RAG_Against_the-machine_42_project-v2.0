@@ -166,3 +166,44 @@ El clasificador léxico decide la rama (docs o code) comparando las puntuaciones
 | **Fin de la Fase 2** | **0.92** | **0.94** | **0.80** | **0.88** |
 
 **Configuración por defecto:** BM25 code-aware (`code`) + `bge-m3` (en las dos ramas) + reranker `mmarco-mMiniLMv2-L12` con fusión RRF, el reranker siempre activo en la rama de code y clasificador con señales en inglés y español.
+
+---
+
+## 5. Generación: comparativa de LLMs (Fase 3)
+
+**Condiciones comunes:**
+- La recuperación por defecto (`bge-m3` + `mmarco` + filtro de relevancia) y el mismo prompt (v3a), k = 5, decodificación greedy y 150 tokens de salida.
+- **`gen-bench` con 25 preguntas** de cada dataset oficial, las 20 del set en español y las 40 fuera de dominio.
+- **Juez:** `openai/gpt-oss-120b` vía Groq, nota 0–2 frente a la respuesta de referencia de 42, sobre **10 respuestas por set**. Cada respuesta mueve la media del set en 0.1–0.2: solo las diferencias grandes son fiables.
+- Ejecuciones `10-llm-*` en `bench/results/gen/` y `bench/results/judge/`.
+
+| Modelo | Juez (media 0–2) | F1 docs / code | Falsos "no encontrado" en code | s/respuesta (docs / code, GPU) | Descarga | Licencia |
+|---|---|---|---|---|---|---|
+| **Qwen3-0.6B** (base) | 1.25 | 0.471 / 0.450 | 0.12 | 3.9 / 2.7 | ~1.2 GB | Apache 2.0 |
+| Qwen3-1.7B | 1.53 | 0.497 / 0.494 | 0.08 | 4.0 / 3.1 | ~4 GB | Apache 2.0 |
+| Qwen3-4B | **1.60** | **0.575 / 0.498** | **0.04** | 5.1 / 4.8 * | ~8 GB | Apache 2.0 |
+| Phi-4-mini (3.8B) | 1.45 | 0.492 / 0.426 | 0.12 | 3.8 / 2.7 | ~7.7 GB | MIT |
+| SmolLM3-3B (descartado) | 1.45 | 0.368 / 0.353 | 0.24 | 5.4 / 3.0 | ~6 GB | Apache 2.0 |
+
+\* Qwen3-4B no cabe en 12 GB de GPU junto con `bge-m3` y el reranker: su perfil ejecuta la recuperación en CPU (mismos resultados, más latencia).
+
+**Juez por set (0–2):**
+
+| Modelo | Docs EN | Code EN | Docs ES | Code ES |
+|---|---|---|---|---|
+| Qwen3-0.6B | 1.00 | 1.20 | 1.70 | 1.10 |
+| Qwen3-1.7B | 1.30 | 1.30 | 1.90 | 1.60 |
+| Qwen3-4B | 1.60 | 1.30 | 1.80 | 1.70 |
+| Phi-4-mini | 1.40 | 1.20 | 1.80 | 1.40 |
+| SmolLM3-3B | 1.10 | 1.30 | 1.60 | 1.80 |
+
+**Otros resultados:**
+- Todos responden en el idioma de la pregunta (90–100 %) y rechazan el 100 % de las preguntas claramente ajenas (el filtro va antes del LLM).
+- En las "casi del dominio" en español, Qwen3-4B (0.90) y Phi-4-mini (0.80) rechazan mejor que la base (0.70).
+
+**Decisión (tuya):**
+- **Familia Qwen3 completa:** 0.6B (base, obligatoria), y 1.7B y 4B como perfiles.
+- **Phi-4-mini** como alternativa de otra familia.
+- **SmolLM3-3B descartado:** el F1 más bajo y el doble de falsos rechazos en code que la base.
+- **Qué modelo se recomienda en la web:** se decide en la Fase 6.
+- **Velocidad en CPU de los opcionales: no medida.** Por tamaño, los de 3–4B serán bastante más lentos sin GPU.

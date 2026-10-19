@@ -1,0 +1,78 @@
+{
+  "label": "10-llm-llm-phi4-mini",
+  "k": 5,
+  "limit": 25,
+  "timestamp": "2026-10-19T15:24:02",
+  "commit": "2bd2229",
+  "dirty": true,
+  "profile": "llm-phi4-mini",
+  "generator": "microsoft/Phi-4-mini-instruct",
+  "max_new_tokens": 150,
+  "device": "cuda",
+  "sets": {
+    "public/docs": {
+      "questions": 25,
+      "f1": 0.4923,
+      "f1_answered": 0.4923,
+      "false_not_found": 0.0,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.88,
+      "cites": 0.88,
+      "citation_correct": 0.9091,
+      "language_match": 1.0,
+      "seconds_per_answer": 3.84
+    },
+    "public/code": {
+      "questions": 25,
+      "f1": 0.4264,
+      "f1_answered": 0.4773,
+      "false_not_found": 0.12,
+      "refused_with_answer": 0.08,
+      "answer_in_context": 0.76,
+      "cites": 1.0,
+      "citation_correct": 0.8636,
+      "language_match": 0.9545,
+      "seconds_per_answer": 2.72
+    },
+    "es/docs": {
+      "questions": 10,
+      "f1": 0.211,
+      "f1_answered": 0.211,
+      "false_not_found": 0.0,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.9,
+      "cites": 1.0,
+      "citation_correct": 0.9,
+      "language_match": 1.0,
+      "seconds_per_answer": 2.53
+    },
+    "es/code": {
+      "questions": 10,
+      "f1": 0.2246,
+      "f1_answered": 0.2246,
+      "false_not_found": 0.0,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.8,
+      "cites": 0.9,
+      "citation_correct": 1.0,
+      "language_match": 1.0,
+      "seconds_per_answer": 2.62
+    },
+    "ood/en-far": {
+      "questions": 10,
+      "correct_not_found": 1.0
+    },
+    "ood/en-near": {
+      "questions": 10,
+      "correct_not_found": 0.9
+    },
+    "ood/es-far": {
+      "questions": 10,
+      "correct_not_found": 1.0
+    },
+    "ood/es-near": {
+      "questions": 10,
+      "correct_not_found": 0.8
+    }
+  }
+}

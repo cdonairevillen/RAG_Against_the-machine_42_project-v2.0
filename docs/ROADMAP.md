@@ -174,6 +174,14 @@ saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web
 
 **Entregable:** `BENCHMARK_REPORT.md`, sección *Generación*.
 
+> ✅ **Completada (2026-10-19).** Detalle en `changelog/FASE_3.md` y `BENCHMARK_REPORT.md` §5.
+> - **Benchmark de generación** (`make gen-bench`) y **juez** (`make judge`, Groq `gpt-oss-120b`, con caché).
+> - **Prompt nuevo:** chat template oficial, citas `[n]`, idioma de la pregunta (ES: 90–100 %) y presupuesto en tokens (B9).
+> - **B15 resuelto:** filtro con el reranker; rechaza el 100 % de lo claramente ajeno.
+> - **Flujo único** (`src/rag.py`) para CLI, web y benchmark, con streaming.
+> - **LLM:** Qwen3-0.6B como base; Qwen3-1.7B, Qwen3-4B y Phi-4-mini como perfiles (SmolLM3 descartado).
+> - Evaluadores agrupados en `src/evaluation/`.
+
 ## Pruebas 42 — Checkpoint
 
 No deben empeorar los resultados obtenidos durante la evaluación.
@@ -269,5 +277,8 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-18**: Fase 2 iniciada: CUDA 12.6 (con CPU como alternativa), fusión RRF del reranker y rutas unificadas. Ver `changelog/FASE_2.md`.
 - **2026-10-19**: embeddings `bge-m3` por defecto (con `e5-small` como alternativa sin GPU); reranker `mmarco-mMiniLMv2-L12` (multilingüe); `Qwen3-Embedding` y `Qwen3-Reranker` descartados por coste; Jina descartado por licencia no comercial. Set complementario en inglés y español (20 preguntas) en `bench/datasets/`.
 - **2026-10-19**: Fase 2 completada (pasos 3–5 hechos de forma autónoma con tu autorización, para revisarlos). Ver `changelog/FASE_2.md`.
+- **2026-10-19**: perfiles: base estable (`bge-m3` + `mmarco` + Qwen3-0.6B) y modelos extra como opciones explícitas (`gpu-quality`, `cpu-light`, `llm-*`). Base para los selectores de la web (Fase 6).
+- **2026-10-19**: el caso estrella de B15 ("capital of France") estaba en la documentación de vLLM como ejemplo de la API; no era una alucinación.
+- **2026-10-19**: Fase 3 completada. Ver `changelog/FASE_3.md`.
 - **2026-10-18**: las cifras del README (docs 0.89 / code 0.75 en R@10) eran de los datasets **públicos**, aunque estuvieran etiquetadas como privadas, y salían de configuraciones anteriores que no se reproducen con `v1.0-42`. Se acepta como línea base oficial `04-fase0-final / smart`. La etiqueta del README se corrige en la reescritura final.
 - **2026-10-18**: finales de línea normalizados a LF con `.gitattributes`, con `llm_sdk/` excluido (P7).

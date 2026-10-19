@@ -1,4 +1,4 @@
-from src.gen_bench import cited_files, detect_language, token_f1
+from src.evaluation.gen_bench import cited_files, detect_language, token_f1
 from src.models import MinimalSource
 
 

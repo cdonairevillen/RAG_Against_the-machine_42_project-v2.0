@@ -7,9 +7,9 @@ from typing import Any, Optional
 
 from tqdm import tqdm
 
-from src.bench import SUITES, git_revision
+from src.evaluation.bench import SUITES, git_revision
 from src.config import RagConfig, get_config
-from src.evaluator import Evaluator
+from src.evaluation.evaluator import Evaluator
 from src.generator import Generator
 from src.language import ARTICLES, detect_language, words
 from src.models import MinimalSource
@@ -115,7 +115,7 @@ def run_gen_bench(label: str, k: int = 5, limit: Optional[int] = None,
     config = config or get_config()
     retriever = Retriever.from_store(domain, config=config)
     retriever.load_reranker()
-    generator = Generator()
+    generator = Generator(config.generation)
     pipeline = RagPipeline(retriever, generator)
 
     details: list[dict[str, Any]] = []
@@ -184,7 +184,7 @@ def run_gen_bench(label: str, k: int = 5, limit: Optional[int] = None,
         "label": label, "k": k, "limit": limit,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         **git_revision(), "profile": config.profile,
-        "generator": Generator.MODEL_NAME,
+        "generator": generator.model_name,
         "max_new_tokens": generator.max_new_tokens,
         "device": config.models.resolved_device(),
         "sets": sets,
