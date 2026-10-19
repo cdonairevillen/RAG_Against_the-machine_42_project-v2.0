@@ -706,12 +706,14 @@ class Retriever:
 
     def search_for_generation(self, query: str,
                               k: int = 10) -> list[MinimalSource]:
-        """Retrieval for LLM generation: relevance filter + search_smart().
+        """Retrieval for LLM generation: search_smart() + relevance gate.
 
-        Same ranking as the benchmarked path (search_smart), plus a
-        relevance filter: when no chunk reaches bm25_score_floor the
-        question is considered out of domain and nothing is returned,
-        so the LLM answers "not found" instead of guessing.
+        Same ranking as the benchmarked path (search_smart), plus an
+        out-of-domain gate: when the best source is not relevant enough
+        nothing is returned, so the LLM answers "not found" instead of
+        guessing. The gate uses the cross-encoder score of the best
+        source (relevance_threshold); without a reranker it falls back
+        to the BM25 floor, a much weaker signal.
 
         Args:
             query: Natural-language search string.
@@ -724,11 +726,40 @@ class Retriever:
         if not query or not query.strip() or k <= 0:
             return []
 
-        floor = self.settings.bm25_score_floor
-        if self.get_top_bm25_score(query) < floor:
-            return []
+        threshold = self.settings.relevance_threshold
+        if self.reranker is None or threshold is None:
+            if self.get_top_bm25_score(query) < self.settings.bm25_score_floor:
+                return []
+            return self.search_smart(query, k)
 
-        return self.search_smart(query, k)
+        results = self.search_smart(query, k)
+        if results and self.top_relevance(query, results) < threshold:
+            return []
+        return results
+
+    def top_relevance(self, query: str,
+                      sources: list[MinimalSource]) -> float:
+        """Best cross-encoder score of the query against the sources.
+
+        Args:
+            query: The user's question.
+            sources: Retrieved parent sources.
+
+        Returns:
+            The highest reranker logit (0 = 50% relevance), or -inf if
+            no source text is available.
+        """
+        if self.reranker is None:
+            return float("-inf")
+        parent_map = self.get_parent_chunk_map()
+        pairs = [
+            (query, parent_map[(s.file_path, s.first_character_index)].text)
+            for s in sources
+            if (s.file_path, s.first_character_index) in parent_map
+        ]
+        if not pairs:
+            return float("-inf")
+        return float(max(self.reranker.predict(pairs)))
 
     def search_bm25(self, query: str, k: int,
                     min_score: float = 0.0) -> list[MinimalSource]:

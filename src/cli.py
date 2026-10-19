@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from tqdm import tqdm
 
 from src.config import CONFIG_FILE, RagConfig, load_config
+from src.rag import RagPipeline
 from src.retriever import Retriever
 from src.generator import Generator
 from src.embeddings import vector_name
@@ -298,46 +299,45 @@ class CLI:
             label="student_search_results",
         )
 
-    def answer(self, query: str, k: int = 10) -> None:
+    def get_pipeline(self) -> RagPipeline:
+        """The shared answer flow (retriever with reranker + generator)."""
+        return RagPipeline(
+            self.get_retriever(with_reranker=True), self.get_generator()
+        )
+
+    def answer(self, query: str, k: int = 10, stream: bool = True) -> None:
         """Answer a single question using retrieved and reranked
         context.
 
         Args:
             query: Natural-language question.
             k: Number of chunks to retrieve as context.
+            stream: Print the answer as it is generated.
         """
         if not query or not query.strip():
             print("Empty query — nothing to answer.")
             return
         try:
-            retriever = self.get_retriever(with_reranker=True)
-            sources = retriever.search_for_generation(query, k=k)
+            pipeline = self.get_pipeline()
+            print(f"\nPrompt: \"{query}\"\n")
+            print("=== Answer ===")
+            if stream:
+                result = pipeline.answer(
+                    query, k=k,
+                    on_piece=lambda p: print(p, end="", flush=True),
+                )
+                print()
+            else:
+                result = pipeline.answer(query, k=k)
+                print(result.text)
         except Exception as exc:
-            print(f"Error during retrieval: {exc}")
+            print(f"Error while answering: {exc}")
             return
 
-        if not sources:
-            print("No relevant sources found.")
-            return
-
-        parent_map = retriever.get_parent_chunk_map()
-        context_blocks = self.build_context_blocks(sources, parent_map)
-
-        try:
-            generator = self.get_generator()
-            response = generator.answer_with_text(query, context_blocks)
-        except Exception as exc:
-            print(f"Error during generation: {exc}")
-            return
-
-        print(f"\nPrompt: \"{query}\"\n")
-        print("=== Answer ===")
-        print(response)
-
-        if not self.is_not_found(response):
+        if not result.not_found:
             print("\n=== Sources ===")
-            for i, src in enumerate(sources):
-                chunk = self.find_chunk(retriever, src)
+            for i, src in enumerate(result.sources):
+                chunk = self.find_chunk(pipeline.retriever, src)
                 print(f"[{i + 1}] filepath: {src.file_path}")
                 print(f"    chunk:    {i}")
                 print(
@@ -398,22 +398,13 @@ class CLI:
                     retrieved_sources=sources,
                 ))
         else:
-            generator = self.generator
-            assert generator is not None
-            parent_map = retriever.get_parent_chunk_map()
+            pipeline = self.get_pipeline()
             for question in tqdm(dataset.rag_questions, desc=desc):
-                sources = retriever.search_for_generation(
-                    question.question, k=k
-                )
-                context_blocks = self.build_context_blocks(
-                    sources, parent_map
-                )
                 try:
-                    response = generator.answer_with_text(
-                        question.question, context_blocks
-                    )
+                    result = pipeline.answer(question.question, k=k)
+                    response, sources = result.text, result.sources
                 except Exception:
-                    response = "Error generating answer."
+                    response, sources = "Error generating answer.", []
                 answers.append(MinimalAnswer(
                     question_id=question.question_id,
                     question_str=question.question,
@@ -468,6 +459,27 @@ class CLI:
         except Exception as exc:
             print(f"Error during evaluation: {exc}")
 
+    def gen_bench(self, label: str = "run", k: int = 5,
+                  limit: Optional[int] = None) -> None:
+        """Generate answers for the benchmark sets and score them.
+
+        Measures token F1 against the 42 reference answers, citations,
+        answer language (Spanish set) and "not found" on out-of-domain
+        questions. Results go to bench/results/gen/.
+
+        Args:
+            label: Short name for this run.
+            k: Sources passed to the generator.
+            limit: Questions per public dataset (default: all 100).
+        """
+        from src.gen_bench import run_gen_bench
+
+        try:
+            run_gen_bench(label=label, k=k, limit=limit,
+                          domain=self.domain, config=self.config)
+        except Exception as exc:
+            print(f"Error during gen_bench: {exc}")
+
     def bench(self, label: str = "run", mode: str = "smart",
               k: int = 10, suite: str = "public") -> None:
         """Run both public datasets, evaluate and record the result.
@@ -477,8 +489,8 @@ class CLI:
 
         Args:
             label: Short name for this run (e.g. 'baseline').
-            mode: 'smart' (search_dataset path) or 'generation'
-                (search_for_generation path).
+            mode: 'smart' (search_dataset path). The answer flow is
+                measured by gen_bench.
             k: Number of sources retrieved per question.
             suite: "public" (official 42 datasets) or "es" (Spanish
                 complement, same ground truth).
@@ -492,44 +504,6 @@ class CLI:
             )
         except Exception as exc:
             print(f"Error during bench: {exc}")
-
-    @staticmethod
-    def build_context_blocks(sources: list[MinimalSource],
-                             parent_map: dict) -> list[str]:
-        """Build LLM context blocks from in-memory parent chunks.
-
-        Args:
-            sources: Retrieved MinimalSource objects.
-            parent_map: Map from (file_path, first_char) to parent
-                Chunk, as returned by Retriever.get_parent_chunk_map().
-
-        Returns:
-            List of formatted '--- file: path ---\\ntext' blocks.
-        """
-        context_blocks: list[str] = []
-        for src in sources:
-            parent = parent_map.get(
-                (src.file_path, src.first_character_index)
-            )
-            if parent:
-                context_blocks.append(
-                    f"--- file: {src.file_path} ---\n{parent.text}"
-                )
-        return context_blocks
-
-    @staticmethod
-    def is_not_found(response: str) -> bool:
-        """Check whether a generated answer means "not found".
-
-        Args:
-            response: Generated answer text.
-
-        Returns:
-            True if the response indicates no answer was found.
-        """
-        from src.generator import is_not_found
-
-        return is_not_found(response)
 
     @staticmethod
     def find_chunk(retriever: Retriever,

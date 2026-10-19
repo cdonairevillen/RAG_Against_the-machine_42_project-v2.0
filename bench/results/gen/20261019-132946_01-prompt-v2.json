@@ -1,0 +1,70 @@
+{
+  "label": "01-prompt-v2",
+  "k": 5,
+  "limit": 50,
+  "timestamp": "2026-10-19T13:29:46",
+  "commit": "aac1494",
+  "dirty": true,
+  "profile": "default",
+  "generator": "Qwen/Qwen3-0.6B",
+  "max_new_tokens": 150,
+  "device": "cuda",
+  "sets": {
+    "public/docs": {
+      "questions": 50,
+      "f1": 0.506,
+      "f1_answered": 0.506,
+      "false_not_found": 0.0,
+      "cites": 0.86,
+      "citation_correct": 0.7907,
+      "language_match": 0.98,
+      "seconds_per_answer": 2.83
+    },
+    "public/code": {
+      "questions": 50,
+      "f1": 0.4,
+      "f1_answered": 0.4732,
+      "false_not_found": 0.18,
+      "cites": 1.0,
+      "citation_correct": 0.8537,
+      "language_match": 1.0,
+      "seconds_per_answer": 2.44
+    },
+    "es/docs": {
+      "questions": 10,
+      "f1": 0.1611,
+      "f1_answered": 0.179,
+      "false_not_found": 0.1,
+      "cites": 1.0,
+      "citation_correct": 0.7778,
+      "language_match": 0.8889,
+      "seconds_per_answer": 1.53
+    },
+    "es/code": {
+      "questions": 10,
+      "f1": 0.2414,
+      "f1_answered": 0.2683,
+      "false_not_found": 0.1,
+      "cites": 1.0,
+      "citation_correct": 1.0,
+      "language_match": 1.0,
+      "seconds_per_answer": 1.97
+    },
+    "ood/en-far": {
+      "questions": 10,
+      "correct_not_found": 0.7
+    },
+    "ood/en-near": {
+      "questions": 10,
+      "correct_not_found": 0.8
+    },
+    "ood/es-far": {
+      "questions": 10,
+      "correct_not_found": 0.8
+    },
+    "ood/es-near": {
+      "questions": 10,
+      "correct_not_found": 0.5
+    }
+  }
+}

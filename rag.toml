@@ -28,8 +28,11 @@ code_signal_weight = 0.5
 doc_signal_weight = 0.5
 # Code-mode queries are always reranked (v1 skipped it above 9.0).
 skip_rerank_score = inf
-# Out-of-domain filter used before generation only. Known to be a weak
-# signal; to be replaced in Phase 3 (B15).
+# Out-of-domain gate before generation (B15): minimum cross-encoder
+# logit of the best source (0 = 50% relevance). Measured: rejects 82% of
+# out-of-domain questions and 0.9% of legitimate ones.
+relevance_threshold = 0.0
+# Fallback gate when no reranker is loaded (weak signal, kept as such).
 bm25_score_floor = 5.5
 # Multilingual (ms-marco-MiniLM-L-6-v2 is English only); see
 # docs/BENCHMARK_REPORT.md.

@@ -1,7 +1,7 @@
 import os
 import sys
 from functools import lru_cache
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -57,6 +57,10 @@ class RetrievalConfig(BaseModel):
     doc_signal_languages: list[str] = Field(
         default_factory=lambda: ["en", "es"]
     )
+    # Out-of-domain gate before generation: minimum cross-encoder logit
+    # of the best source (0 = 50% relevance). None disables it and falls
+    # back to bm25_score_floor.
+    relevance_threshold: Optional[float] = 0.0
     # Rerank the doc branch too (v1 removed it: ms-marco hurt docs).
     rerank_doc_branch: bool = False
     # Identifier splitting for BM25: "none", "query", "both" or "code".

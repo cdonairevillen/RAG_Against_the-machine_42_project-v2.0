@@ -1,0 +1,245 @@
+{
+  "description": "Out-of-domain questions: the vLLM corpus cannot answer them. 'far' = unrelated topics; 'near' = related vocabulary (other ML/serving tools) but not about vLLM. Used to measure how often the system correctly answers 'not found'. Checked against the corpus: 'What is the capital of France?' was removed because the vLLM docs use it (with its answer) as an API example.",
+  "questions": [
+    {
+      "id": "en-far-01",
+      "lang": "en",
+      "kind": "far",
+      "question": "What is the tallest mountain in the world?"
+    },
+    {
+      "id": "en-far-02",
+      "lang": "en",
+      "kind": "far",
+      "question": "Who won the 2018 football World Cup?"
+    },
+    {
+      "id": "en-far-03",
+      "lang": "en",
+      "kind": "far",
+      "question": "How do I bake a chocolate cake?"
+    },
+    {
+      "id": "en-far-04",
+      "lang": "en",
+      "kind": "far",
+      "question": "What is the boiling point of water at sea level?"
+    },
+    {
+      "id": "en-far-05",
+      "lang": "en",
+      "kind": "far",
+      "question": "Who painted the Mona Lisa?"
+    },
+    {
+      "id": "en-far-06",
+      "lang": "en",
+      "kind": "far",
+      "question": "How many players are there in a basketball team on court?"
+    },
+    {
+      "id": "en-far-07",
+      "lang": "en",
+      "kind": "far",
+      "question": "What is the best way to learn to play the guitar?"
+    },
+    {
+      "id": "en-far-08",
+      "lang": "en",
+      "kind": "far",
+      "question": "Which planet is the largest in the solar system?"
+    },
+    {
+      "id": "en-far-09",
+      "lang": "en",
+      "kind": "far",
+      "question": "How long should I boil an egg for a soft yolk?"
+    },
+    {
+      "id": "en-far-10",
+      "lang": "en",
+      "kind": "far",
+      "question": "What year did the Berlin Wall fall?"
+    },
+    {
+      "id": "en-near-01",
+      "lang": "en",
+      "kind": "near",
+      "question": "How do I configure a reverse proxy in nginx?"
+    },
+    {
+      "id": "en-near-02",
+      "lang": "en",
+      "kind": "near",
+      "question": "How do I train a model with PyTorch Lightning on multiple GPUs?"
+    },
+    {
+      "id": "en-near-03",
+      "lang": "en",
+      "kind": "near",
+      "question": "What is the default learning rate of the Adam optimizer in Keras?"
+    },
+    {
+      "id": "en-near-04",
+      "lang": "en",
+      "kind": "near",
+      "question": "How do I deploy a Django application on Heroku?"
+    },
+    {
+      "id": "en-near-05",
+      "lang": "en",
+      "kind": "near",
+      "question": "How do I create a pivot table in pandas?"
+    },
+    {
+      "id": "en-near-06",
+      "lang": "en",
+      "kind": "near",
+      "question": "What port does PostgreSQL listen on by default?"
+    },
+    {
+      "id": "en-near-07",
+      "lang": "en",
+      "kind": "near",
+      "question": "How do I fine-tune BERT with the Hugging Face Trainer for sentiment analysis?"
+    },
+    {
+      "id": "en-near-08",
+      "lang": "en",
+      "kind": "near",
+      "question": "How do I write a Dockerfile for a Node.js application?"
+    },
+    {
+      "id": "en-near-09",
+      "lang": "en",
+      "kind": "near",
+      "question": "What is the difference between TensorFlow 1 and TensorFlow 2 sessions?"
+    },
+    {
+      "id": "en-near-10",
+      "lang": "en",
+      "kind": "near",
+      "question": "How do I set up a Kubernetes ingress controller with TLS?"
+    },
+    {
+      "id": "es-far-01",
+      "lang": "es",
+      "kind": "far",
+      "question": "¿Cuál es la montaña más alta del mundo?"
+    },
+    {
+      "id": "es-far-02",
+      "lang": "es",
+      "kind": "far",
+      "question": "¿Quién ganó el Mundial de fútbol de 2018?"
+    },
+    {
+      "id": "es-far-03",
+      "lang": "es",
+      "kind": "far",
+      "question": "¿Cómo se hace un bizcocho de chocolate?"
+    },
+    {
+      "id": "es-far-04",
+      "lang": "es",
+      "kind": "far",
+      "question": "¿A qué temperatura hierve el agua al nivel del mar?"
+    },
+    {
+      "id": "es-far-05",
+      "lang": "es",
+      "kind": "far",
+      "question": "¿Quién pintó la Mona Lisa?"
+    },
+    {
+      "id": "es-far-06",
+      "lang": "es",
+      "kind": "far",
+      "question": "¿Cuántos jugadores tiene un equipo de baloncesto en pista?"
+    },
+    {
+      "id": "es-far-07",
+      "lang": "es",
+      "kind": "far",
+      "question": "¿Cuál es la mejor forma de aprender a tocar la guitarra?"
+    },
+    {
+      "id": "es-far-08",
+      "lang": "es",
+      "kind": "far",
+      "question": "¿Cuál es el planeta más grande del sistema solar?"
+    },
+    {
+      "id": "es-far-09",
+      "lang": "es",
+      "kind": "far",
+      "question": "¿Cuánto tiempo hay que cocer un huevo para que la yema quede blanda?"
+    },
+    {
+      "id": "es-far-10",
+      "lang": "es",
+      "kind": "far",
+      "question": "¿En qué año cayó el muro de Berlín?"
+    },
+    {
+      "id": "es-near-01",
+      "lang": "es",
+      "kind": "near",
+      "question": "¿Cómo configuro un proxy inverso en nginx?"
+    },
+    {
+      "id": "es-near-02",
+      "lang": "es",
+      "kind": "near",
+      "question": "¿Cómo entreno un modelo con PyTorch Lightning en varias GPUs?"
+    },
+    {
+      "id": "es-near-03",
+      "lang": "es",
+      "kind": "near",
+      "question": "¿Cuál es la tasa de aprendizaje por defecto del optimizador Adam en Keras?"
+    },
+    {
+      "id": "es-near-04",
+      "lang": "es",
+      "kind": "near",
+      "question": "¿Cómo despliego una aplicación Django en Heroku?"
+    },
+    {
+      "id": "es-near-05",
+      "lang": "es",
+      "kind": "near",
+      "question": "¿Cómo creo una tabla dinámica en pandas?"
+    },
+    {
+      "id": "es-near-06",
+      "lang": "es",
+      "kind": "near",
+      "question": "¿En qué puerto escucha PostgreSQL por defecto?"
+    },
+    {
+      "id": "es-near-07",
+      "lang": "es",
+      "kind": "near",
+      "question": "¿Cómo hago fine-tuning de BERT con el Trainer de Hugging Face para análisis de sentimiento?"
+    },
+    {
+      "id": "es-near-08",
+      "lang": "es",
+      "kind": "near",
+      "question": "¿Cómo escribo un Dockerfile para una aplicación Node.js?"
+    },
+    {
+      "id": "es-near-09",
+      "lang": "es",
+      "kind": "near",
+      "question": "¿Qué diferencia hay entre las sesiones de TensorFlow 1 y TensorFlow 2?"
+    },
+    {
+      "id": "es-near-10",
+      "lang": "es",
+      "kind": "near",
+      "question": "¿Cómo configuro un ingress controller de Kubernetes con TLS?"
+    }
+  ]
+}

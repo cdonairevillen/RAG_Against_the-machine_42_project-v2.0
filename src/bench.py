@@ -24,7 +24,7 @@ SUITES = {
 RESULTS_DIR = "bench/results"
 OUTPUT_DIR = "data/output/bench"
 DATASET_NAMES = ("docs", "code")
-MODES = ("smart", "generation")
+MODES = ("smart",)
 
 
 def git_revision() -> dict[str, Any]:
@@ -54,8 +54,8 @@ def run_dataset(retriever: Retriever, name: str, mode: str, k: int,
     Args:
         retriever: Loaded Retriever (with reranker).
         name: Dataset name, 'docs' or 'code'.
-        mode: 'smart' (search_smart) or 'generation'
-            (search_for_generation).
+        mode: 'smart' (search_smart, the official 42 path). The answer
+            flow (relevance gate + generation) is measured by gen_bench.
         k: Number of sources retrieved per question.
         output_dir: Where the StudentSearchResults JSON is written.
 
@@ -70,10 +70,7 @@ def run_dataset(retriever: Retriever, name: str, mode: str, k: int,
     with open(unanswered, "r", encoding="utf-8") as fh:
         dataset = RagDataset.model_validate_json(fh.read())
 
-    search = (
-        retriever.search_smart if mode == "smart"
-        else retriever.search_for_generation
-    )
+    search = retriever.search_smart
     results: list[MinimalSearchResults] = []
     start = time.perf_counter()
     for question in tqdm(dataset.rag_questions, desc=f"{name} ({mode})"):
@@ -161,7 +158,7 @@ def run_bench(label: str, mode: str = "smart", k: int = 10,
 
     Args:
         label: Short name for this run (e.g. 'baseline', 'fix-b1').
-        mode: 'smart' or 'generation'.
+        mode: 'smart' (kept in the results for history).
         k: Number of sources retrieved per question.
         domain: Indexed source the datasets are about.
         config: Pipeline configuration (defaults to rag.toml).

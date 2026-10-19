@@ -1,3 +1,4 @@
+import html
 import os
 import sys
 import streamlit as st
@@ -361,20 +362,6 @@ def render_source_card(index: int, file_path: str, first_char: int,
 </div>""", unsafe_allow_html=True)
 
 
-def is_not_found(answer: str) -> bool:
-    """Check whether a generated answer means "not found".
-
-    Args:
-        answer: Generated answer text.
-
-    Returns:
-        True if the answer indicates no answer was found.
-    """
-    from src.generator import is_not_found as generator_is_not_found
-
-    return generator_is_not_found(answer)
-
-
 def main() -> None:
     """Main Streamlit application entry point."""
 
@@ -465,70 +452,48 @@ def main() -> None:
         run = st.button("Search & Answer", use_container_width=False)
 
         if run and query and query.strip():
+            from src.rag import RagPipeline
+
+            pipeline = RagPipeline(retriever, generator)
+            st.markdown(
+                '<div class="section-label">Answer</div>',
+                unsafe_allow_html=True,
+            )
+            box = st.empty()
+            streamed: list[str] = []
+
+            def show(text: str) -> None:
+                # Escaped: answers quote code, which may contain "<...>".
+                box.markdown(
+                    f'<div class="answer-box">{html.escape(text)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            def on_piece(piece: str) -> None:
+                streamed.append(piece)
+                show("".join(streamed))
+
             with st.spinner("Retrieving relevant chunks..."):
-                sources = retriever.search_for_generation(
-                    query, k=k_val
-                )
+                result = pipeline.answer(query, k=k_val, on_piece=on_piece)
+            show(NOT_FOUND_MESSAGE if result.not_found else result.text)
 
-            if not sources:
-                st.markdown(
-                    f'<div class="answer-box">{NOT_FOUND_MESSAGE}</div>',
-                    unsafe_allow_html=True,
-                )
-            else:
+            if not result.not_found:
                 parent_map = retriever.get_parent_chunk_map()
-                context_blocks = []
-                for src in sources:
+                st.markdown(
+                    '<div class="section-label">Sources</div>',
+                    unsafe_allow_html=True,
+                )
+                for i, source in enumerate(result.sources, 1):
                     parent = parent_map.get(
-                        (src.file_path, src.first_character_index)
+                        (source.file_path, source.first_character_index)
                     )
-                    if parent:
-                        context_blocks.append(
-                            f"--- file: {src.file_path} ---\n"
-                            f"{parent.text}"
-                        )
-
-                with st.spinner("Generating answer..."):
-                    answer = generator.answer_with_text(
-                        query, context_blocks
+                    render_source_card(
+                        index=i,
+                        file_path=source.file_path,
+                        first_char=source.first_character_index,
+                        last_char=source.last_character_index,
+                        text_preview=parent.text if parent else "",
                     )
-
-                if not answer or answer.strip() in (
-                    "No question provided.",
-                    "No relevant sources found.",
-                ):
-                    answer = NOT_FOUND_MESSAGE
-
-                st.markdown(
-                    '<div class="section-label">Answer</div>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f'<div class="answer-box">{answer}</div>',
-                    unsafe_allow_html=True,
-                )
-
-                if not is_not_found(answer):
-                    st.markdown(
-                        '<div class="section-label">Sources</div>',
-                        unsafe_allow_html=True,
-                    )
-                    for i, source in enumerate(sources, 1):
-                        parent = parent_map.get(
-                            (
-                                source.file_path,
-                                source.first_character_index,
-                            )
-                        )
-                        text_preview = parent.text if parent else ""
-
-                        render_source_card(
-                            index=i,
-                            file_path=source.file_path,
-                            first_char=source.first_character_index,
-                            last_char=source.last_character_index,
-                            text_preview=text_preview,
-                        )
 
         elif run and (not query or not query.strip()):
             st.warning("Write a question first.")

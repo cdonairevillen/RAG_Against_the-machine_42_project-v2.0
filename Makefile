@@ -85,7 +85,7 @@ run:
 	$(RUN) $(ARGS)
 
 web: db-up
-	$(ENV) $(UV) run streamlit run src/web.py &
+	$(ENV) $(UV) run --project . $(PY) -m streamlit run src/web.py &
 	@echo "Web running at http://localhost:8501"
 
 web-stop:
@@ -120,8 +120,8 @@ eval-code:
 bench: db-up
 	$(RUN) bench --label $(LABEL) --mode smart
 
-bench-gen: db-up
-	$(RUN) bench --label $(LABEL) --mode generation
+gen-bench: db-up
+	$(RUN) gen_bench --label $(LABEL)
 
 test:
 	$(ENV) $(UV) run --project . pytest
@@ -150,8 +150,8 @@ meme:
 	@echo "Killing in the name of... bad retrieval scores"
 	@xdg-open "https://www.youtube.com/watch?v=bWXazVhlyxQ" 2>/dev/null & true
 	@echo "https://www.youtube.com/watch?v=bWXazVhlyxQ"
-	$(ENV) $(UV) run streamlit run src/web.py &
+	$(ENV) $(UV) run --project . $(PY) -m streamlit run src/web.py &
 	@echo "Web running at http://localhost:8501"
 
 .PHONY: install data data-42 db-up db-down db-reset run web web-stop index search-docs search-code \
-        eval-docs eval-code bench bench-gen test lint clean meme
+        eval-docs eval-code bench gen-bench test lint clean meme
