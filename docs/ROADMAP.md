@@ -198,24 +198,45 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 
 ## Fase 4 — Inserción de modos
 
-**Objetivo:** el RAG deja de ser "solo vLLM".
+**Objetivo:** el RAG deja de ser "solo vLLM": cultura general multilingüe, tu CV y multimedia, cada uno como dominio propio y con su forma de medirse.
 
-- **Modo CV**:
-  - Tus datos en Markdown/YAML + el PDF del CV vía Docling, en la colección `cv`.
-  - Multilingüe.
-  - Guardarraíles: si algo no está en los datos, no se inventa y se ofrece contacto.
-  - Revisión de privacidad antes de indexar.
-- **Nuevos dominios** (D6): ingesta de otros datasets con la infraestructura de la Fase 1. Están pendientes de elegir cuáles.
-- **Router de modo/dominio**: decide la colección según el modo activo o la pregunta.
-- **4b — Multimedia** (D9: todo lo posible, prioridad vídeo y audio). Ver `RESPUESTA.md` §4.2.1.
-  - **Audio y vídeo**:
-    - Transcripción con `faster-whisper` y marcas de tiempo; las fuentes enlazan al minuto exacto.
-    - Escenas clave con PySceneDetect + captions.
-    - Diarización (quién habla) como opcional; las licencias y el acceso a los modelos están **a verificar**.
-  - **Imágenes**: OCR + captions (nivel A), más búsqueda de imágenes por texto con CLIP/SigLIP (nivel B, vectores con nombre en Qdrant).
-  - **VLM generativo** (nivel C): solo como opción local en la 3080 Ti.
-  - **Ingesta offline**; en producción solo se sirven el índice y las miniaturas. Los vídeos se alojan fuera (YouTube o similar) y se enlazan con `&t=`.
-  - Set de evaluación propio (el workbench de 42 no cubre multimedia).
+**Orden decidido:** 4a cultura general → 4b modo CV → 4c multimedia. El **router** se construye en 4a, en cuanto exista un segundo dominio, y crece con cada uno.
+
+### 4a — Cultura general: XQuAD (después, MLQA)
+
+- **Dataset:** XQuAD (Google, CC-BY-SA 4.0). Las **mismas** preguntas, sobre los mismos párrafos de Wikipedia, traducidas profesionalmente a 12 idiomas, entre ellos **inglés y español**.
+  - Según su ficha, ~1 190 preguntas sobre ~240 párrafos; **a verificar** al descargarlo.
+- **Por qué:** permite medir el multilingüismo con exactitud: *recall en inglés frente a español con las mismas preguntas y las mismas fuentes*. Es la versión a escala del set complementario de 20 preguntas.
+- **Benchmark como el de 42:** se convierte al formato `RagDataset` (pregunta, respuesta y pasaje fuente con offsets), así que `make bench` y `make gen-bench` funcionan igual. El evaluador de 42 no se toca.
+- **Ingesta:** dominio `xquad`, con su propia colección en Qdrant (`rag_xquad`) y un chunker adecuado para párrafos de Wikipedia.
+- **Router:** decide entre `vllm` y `xquad` (y después los demás) según la pregunta o el modo elegido.
+- **Licencia:** CC-BY-SA exige **citar la fuente** de forma visible en la web y publicar los derivados con la misma licencia.
+- **Después:** MLQA (Meta, CC-BY-SA 3.0, miles de preguntas por idioma) como corpus más grande y exigente.
+
+### 4b — Modo CV
+
+- **Material** (en `data/raw/cv/`, **ignorado por git**; se movió desde la raíz, donde se habría subido con `git add .`):
+  - CV en `.docx` y perfil de LinkedIn en PDF.
+  - `autobiography.md`, una autobiografía con gustos, aficiones y viajes, **por escribir juntos más adelante**.
+- **Ingesta:** Docling para el `.docx` y el PDF; Markdown para la autobiografía. Colección `cv`.
+- **Multilingüe**, con guardarraíles: si algo no está en los datos, no se inventa y se ofrece contacto.
+- **Revisión de privacidad antes de indexar:** qué datos personales entran y cuáles no. Lo decides tú.
+- **El juez externo (Groq) no se usa con datos personales** salvo que lo decidas expresamente.
+
+### 4c — Multimedia: *Nosferatu* (1922) frente a *Drácula* (1897)
+
+- **Por qué este par:** conserva tu idea de comparar libro y película, con material de **dominio público**. *Nosferatu* es una adaptación no autorizada de *Drácula*, con cambios de nombres y de trama, lo que da preguntas comparativas interesantes.
+- **Descartado:** *El Señor de los Anillos* (libros y películas con derechos de autor). La alternativa legal, wikis bajo CC-BY-SA, no tendría multimedia.
+- **Material:**
+  - *Drácula* en texto (Project Gutenberg).
+  - *Nosferatu*, la película o sus clips (Internet Archive).
+  - **Pendiente:** verificar el dominio público en España y en EE. UU. para las dos obras antes de usarlas.
+- **Ingesta multimedia (nivel A del análisis):**
+  - Al ser **muda**, no hay audio que transcribir: **OCR de los intertítulos** y **descripción de escenas** (PySceneDetect + captions con un modelo de visión pequeño), con marcas de tiempo.
+  - Las fuentes enlazan al minuto exacto de la película.
+  - Búsqueda de imágenes por texto con CLIP/SigLIP (nivel B) como opcional.
+- **Evaluación:** el benchmark de 42 no cubre multimedia, así que hace falta un set propio de preguntas (sobre la película, sobre el libro y comparativas).
+- **Almacenamiento:** el vídeo no se sube al Space; se aloja fuera y se enlaza con la marca de tiempo. En el índice solo van el texto extraído y miniaturas.
 
 ## Fase 5 — Agentes y RAG como servidor MCP
 
@@ -255,11 +276,11 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 | # | Tema | Cuándo hay que decidirlo |
 |---|---|---|
 | P1 | D7: agente frente a acceso directo, y qué es lo por defecto | Antes de la Fase 5 |
-| P2 | ~~D9: alcance de la ingesta multimedia~~ → resuelto: todo lo posible, prioridad vídeo y audio. **Queda por concretar qué material y cuánto** | Antes de la Fase 4 |
+| P2 | ~~Material multimedia~~ → resuelto: *Nosferatu* (1922) frente a *Drácula* (1897), de dominio público. **Pendiente: verificar el dominio público (ES/EE. UU.) y conseguir la película** | Antes de la 4c |
 | P7 | ~~`.gitattributes` para normalizar los finales de línea~~ → resuelto: todo LF y `llm_sdk/` intacto (commit `5a1cc4b`) | Hecho |
 | P8 | ~~¿`bge-m3` por defecto aunque indexar en CPU lleve ~2 h?~~ → resuelto: `bge-m3` en la base y perfil `cpu-light` (`e5-small`) | Hecho |
 | P9 | ~~`bge-reranker-v2-m3`~~ → resuelto: perfil opcional `gpu-quality` | Hecho |
-| P3 | Qué datasets o dominios nuevos se añaden (D6) | Antes de la Fase 4 |
+| P3 | ~~Dominios nuevos~~ → resuelto: XQuAD (cultura general, en/es) y después MLQA | Hecho |
 | P4 | Modularización: qué opciones se exponen en la web y cómo se navega | Antes de la Fase 6 |
 | P5 | GPU de los ordenadores de 42 (para fijar los valores por defecto) | Durante la Fase 2 |
 | P6 | Proveedor de la key gratuita para el juez LLM | Antes de la Fase 3 |
@@ -287,5 +308,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-19**: el caso estrella de B15 ("capital of France") estaba en la documentación de vLLM como ejemplo de la API; no era una alucinación.
 - **2026-10-19**: Fase 3 completada. Ver `changelog/FASE_3.md`.
 - **2026-10-19**: checkpoint "Pruebas 42" superado; etiqueta `v2.0-core` (un marcador, no una rama: el proyecto sigue en `main`). Ver `changelog/CHECKPOINT_42.md`.
+- **2026-10-19**: Fase 4 planificada: 4a cultura general (XQuAD; después MLQA), 4b modo CV y 4c multimedia (*Nosferatu*/*Drácula*). *El Señor de los Anillos*, descartado por derechos de autor. Innovatiana revisado: catálogo orientado a entrenar modelos de visión, sin datasets útiles para evaluar el RAG.
+- **2026-10-19**: la carpeta del CV se movió de la raíz a `data/raw/cv/` (ignorada por git) y se añadió `cv/` al `.gitignore`, para que nunca se suban datos personales.
 - **2026-10-18**: las cifras del README (docs 0.89 / code 0.75 en R@10) eran de los datasets **públicos**, aunque estuvieran etiquetadas como privadas, y salían de configuraciones anteriores que no se reproducen con `v1.0-42`. Se acepta como línea base oficial `04-fase0-final / smart`. La etiqueta del README se corrige en la reescritura final.
 - **2026-10-18**: finales de línea normalizados a LF con `.gitattributes`, con `llm_sdk/` excluido (P7).
