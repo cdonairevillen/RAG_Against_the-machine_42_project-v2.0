@@ -190,6 +190,12 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - Comprobar que el formato de salida sigue siendo compatible con la moulinette (`search_dataset`, `answer_dataset`, `evaluate`).
 - Etiqueta `v2.0-core` si se supera. A partir de aquí se **añaden** funcionalidades; el núcleo medido no se toca sin volver a pasar este checkpoint.
 
+> ✅ **Superado (2026-10-19).** Detalle en `changelog/CHECKPOINT_42.md`.
+> - **Recall frente a la v1:** docs R@5 +0.07 (0.92) y code R@5 +0.17 (0.80).
+> - **Comandos de 42:** compatibles.
+> - **Sin GPU:** mismas métricas.
+> - Se añade al prompt la regla de "dónde".
+
 ## Fase 4 — Inserción de modos
 
 **Objetivo:** el RAG deja de ser "solo vLLM".
@@ -280,5 +286,6 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-19**: perfiles: base estable (`bge-m3` + `mmarco` + Qwen3-0.6B) y modelos extra como opciones explícitas (`gpu-quality`, `cpu-light`, `llm-*`). Base para los selectores de la web (Fase 6).
 - **2026-10-19**: el caso estrella de B15 ("capital of France") estaba en la documentación de vLLM como ejemplo de la API; no era una alucinación.
 - **2026-10-19**: Fase 3 completada. Ver `changelog/FASE_3.md`.
+- **2026-10-19**: checkpoint "Pruebas 42" superado; etiqueta `v2.0-core` (un marcador, no una rama: el proyecto sigue en `main`). Ver `changelog/CHECKPOINT_42.md`.
 - **2026-10-18**: las cifras del README (docs 0.89 / code 0.75 en R@10) eran de los datasets **públicos**, aunque estuvieran etiquetadas como privadas, y salían de configuraciones anteriores que no se reproducen con `v1.0-42`. Se acepta como línea base oficial `04-fase0-final / smart`. La etiqueta del README se corrige en la reescritura final.
 - **2026-10-18**: finales de línea normalizados a LF con `.gitattributes`, con `llm_sdk/` excluido (P7).

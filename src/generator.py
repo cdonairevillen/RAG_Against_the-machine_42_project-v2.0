@@ -33,7 +33,9 @@ SYSTEM_PROMPT = (
     "values directly from it.\n"
     f"4. If the SOURCES do not answer the question, reply exactly: "
     f"{NOT_FOUND_MESSAGE}\n"
-    "5. Be direct and concise: a few sentences, no preamble."
+    "5. If the question asks where to find something, give the file path "
+    "shown in that source's header.\n"
+    "6. Be direct and concise: a few sentences, no preamble."
 )
 
 THINK_BLOCK = re.compile(r"<think>.*?</think>", flags=re.DOTALL)

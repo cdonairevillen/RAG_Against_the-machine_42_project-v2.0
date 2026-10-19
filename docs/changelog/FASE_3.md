@@ -139,6 +139,10 @@ Tras las reestructuraciones (ingesta a `src/ingestion/`, flujo único en `src/ra
   - Lee `JUDGE_BASE_URL`, `JUDGE_MODEL` y `GROQ_API_KEY` del `.env` (ignorado por git); la clave nunca se imprime. Sin dependencias nuevas (`urllib`).
   - **Resuelve el problema del F1 en español:** el juez evalúa el significado, no el idioma.
 
+### 2.8 bis Regla de "dónde" (añadida en el checkpoint)
+
+**Regla 5 del prompt:** *"If the question asks where to find something, give the file path shown in that source's header."* La razón y la medición están en `CHECKPOINT_42.md` §3: el juez de docs EN sube de 1.00 a 1.30.
+
 ### 2.9 Evaluadores agrupados en `src/evaluation/`
 
 - `evaluator.py` (recall de 42), `bench.py`, `gen_bench.py` y `judge.py` pasan de `src/` a **`src/evaluation/`**: se distingue a simple vista qué es el RAG y qué son las herramientas para medirlo. Movidos con `git mv` para conservar el historial; `judge.py` era nuevo y se movió normalmente.

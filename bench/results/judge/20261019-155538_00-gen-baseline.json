@@ -1,0 +1,29 @@
+{
+  "label": "00-gen-baseline",
+  "judge_model": "openai/gpt-oss-120b",
+  "limit": 10,
+  "api_calls": 37,
+  "timestamp": "2026-10-19T15:55:38",
+  "sets": {
+    "public/docs": {
+      "judged": 10,
+      "mean_score": 1.4,
+      "correct": 0.5
+    },
+    "public/code": {
+      "judged": 10,
+      "mean_score": 0.9,
+      "correct": 0.4
+    },
+    "es/docs": {
+      "judged": 10,
+      "mean_score": 1.3,
+      "correct": 0.6
+    },
+    "es/code": {
+      "judged": 10,
+      "mean_score": 1.2,
+      "correct": 0.4
+    }
+  }
+}
