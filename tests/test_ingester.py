@@ -1,10 +1,10 @@
 from src.config import ChunkingConfig, SourceConfig
-from src.ingestion.chunk import PARENT, chunk_uuid
-from src.ingestion.chunkers import (
+from src.rag.ingestion.chunk import PARENT, chunk_uuid
+from src.rag.ingestion.chunkers import (
     chunk_markdown_packed, chunk_python_file,
     markdown_sections, split_by_size,
 )
-from src.ingestion.pipeline import Ingester, assign_ids
+from src.rag.ingestion.pipeline import Ingester, assign_ids
 
 PYTHON_SOURCE = '''import os
 

@@ -1,15 +1,15 @@
 import time
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
-from src.generator import (
+from src.rag.generator import (
     NOT_FOUND_MESSAGE, Generator, clean_output, is_not_found,
 )
 from src.config import get_config
-from src.domain_rules import DomainRules
+from src.rag.domain_rules import DomainRules
 from src.models import MinimalSource
-from src.retriever import Retriever
-from src.router import DomainRouter
+from src.rag.retriever import Retriever
+from src.rag.router import DomainRouter
 
 
 @dataclass
@@ -93,7 +93,7 @@ class RagPipeline:
 
     def answer(self, question: str, k: int = 5,
                on_piece: Optional[Callable[[str], None]] = None,
-               domains: Optional[str | list[str]] = None) -> RagAnswer:
+               domains: Optional[str | Sequence[str]] = None) -> RagAnswer:
         """Answer a question from the indexed knowledge base.
 
         Args:

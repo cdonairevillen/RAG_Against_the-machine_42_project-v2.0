@@ -64,9 +64,10 @@ dense_k = 50
 dense_in_doc_branch = true
 
 # One block per knowledge source. `chunkers` maps a file extension to a
-# chunker name (see src/ingestion/chunkers.py); unknown extensions fall
+# chunker name (see src/rag/ingestion/chunkers.py); unknown extensions fall
 # back to `default_chunker`.
 [sources.vllm]
+description = "vLLM 0.10.1 documentation and source code: serving LLMs, configuration, APIs, models, hardware and internals."
 root = "data/raw/vllm-0.10.1"
 include = [".py", ".pyi", ".md", ".rst", ".txt"]
 exclude_dirs = [
@@ -86,8 +87,9 @@ default_chunker = "size"
 
 # XQuAD (Phase 4a): general knowledge, English and Spanish in one
 # domain. Built by `make data-xquad` (one Markdown file per Wikipedia
-# article, see src/sources/xquad.py). CC-BY-SA 4.0: cite the source.
+# article, see src/rag/sources/xquad.py). CC-BY-SA 4.0: cite the source.
 [sources.xquad]
+description = "General knowledge from 48 Wikipedia articles (English and Spanish): history, science, geography, sports, companies and more."
 root = "data/raw/xquad"
 include = [".md"]
 default_chunker = "markdown_headers_packed"
@@ -100,8 +102,9 @@ relevance_threshold = -2.0
 # CV mode (Phase 4b): Chrystian's CV (.docx), LinkedIn profile (.pdf)
 # and biography (.md, Spanish original + English version), indexed as
 # they are, each in its own language.
-# Word/PDF go through Docling (src/ingestion/loaders.py). Git-ignored.
+# Word/PDF go through Docling (src/rag/ingestion/loaders.py). Git-ignored.
 [sources.cv]
+description = "Chrystian Donaire Villén, the author of this project: CV, LinkedIn profile and biography (education, jobs, projects, skills, hobbies, contact)."
 root = "data/raw/cv"
 include = [".md", ".docx", ".pdf"]
 default_chunker = "markdown_headers_packed"

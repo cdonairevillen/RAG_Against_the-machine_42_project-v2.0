@@ -8,7 +8,7 @@ import re
 from typing import Optional
 
 from src.config import RagConfig, SourceConfig
-from src.language import detect_language
+from src.rag.language import detect_language
 
 # Spanish phone numbers: 9 digits starting with 6-9, optionally with the
 # +34 prefix and spaces, dots or dashes ("(+34) 654705242",

@@ -64,7 +64,7 @@ class RetrievalConfig(BaseModel):
     # Rerank the doc branch too (v1 removed it: ms-marco hurt docs).
     rerank_doc_branch: bool = False
     # Identifier splitting for BM25: "none", "query", "both" or "code".
-    # Changing it needs a re-index (see src/ingestion/tokens.py).
+    # Changing it needs a re-index (see src/rag/ingestion/tokens.py).
     code_aware_tokens: Literal["none", "query", "both", "code", "doc"] = (
         "code"
     )
@@ -126,6 +126,9 @@ class SourceConfig(BaseModel):
 
     root: str
     include: list[str]
+    # What the domain contains, for the agent and MCP clients choosing
+    # where to search (list_domains).
+    description: str = ""
     exclude_dirs: list[str] = Field(default_factory=list)
     code_extensions: list[str] = Field(default_factory=list)
     chunkers: dict[str, str] = Field(default_factory=dict)

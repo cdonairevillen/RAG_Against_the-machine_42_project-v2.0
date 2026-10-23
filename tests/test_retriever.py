@@ -1,6 +1,6 @@
 from src.config import RetrievalConfig
-from src.ingestion.chunk import Chunk
-from src.retriever import Retriever, expand_query
+from src.rag.ingestion.chunk import Chunk
+from src.rag.retriever import Retriever, expand_query
 
 
 def make_retriever(chunks: list[Chunk],

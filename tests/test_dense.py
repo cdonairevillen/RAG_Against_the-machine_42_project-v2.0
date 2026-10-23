@@ -2,11 +2,11 @@ import numpy as np
 from qdrant_client import QdrantClient
 
 from src.config import QdrantConfig
-from src.embeddings import PRESETS, document_text, vector_name
-from src.ingestion.chunk import CHILD, PARENT, Chunk
+from src.rag.embeddings import PRESETS, document_text, vector_name
+from src.rag.ingestion.chunk import CHILD, PARENT, Chunk
 from src.models import MinimalSource
-from src.retriever import Retriever, rrf_merge
-from src.storage.qdrant_store import QdrantChunkStore
+from src.rag.retriever import Retriever, rrf_merge
+from src.rag.storage.qdrant_store import QdrantChunkStore
 
 
 def source(name: str) -> MinimalSource:

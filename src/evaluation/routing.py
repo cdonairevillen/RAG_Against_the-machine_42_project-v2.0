@@ -18,7 +18,7 @@ from src.config import RagConfig, get_config
 from src.evaluation.bench import SUITES, git_revision
 from src.evaluation.evaluator import Evaluator
 from src.models import MinimalSearchResults, RagDataset, StudentSearchResults
-from src.router import DomainRouter
+from src.rag.router import DomainRouter
 
 RESULTS_DIR = "bench/results/route"
 OUTPUT_DIR = "data/output/route_bench"

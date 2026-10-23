@@ -23,7 +23,7 @@ Tus respuestas a las dudas de `RESPUESTA.md` §7, con lo que implica cada una pa
 | **D4** Evaluación | Los recalls se hacen **solo** sobre los datasets de 42. Cualquier test extra es bienvenido. Se puede usar una key gratuita para tests de respuesta. | El evaluador de 42 es la referencia y no se toca. Las métricas extra (MRR, nDCG, set manual, juez LLM por API gratuita) son complementarias. |
 | **D5** Frontend | FastAPI + React, pero **la estética debe quedarse igual que la actual**. | Fase 6: React reproduce el diseño de `src/web.py` (colores, tipografías, tarjetas). |
 | **D6** Idioma y dominios | Multilenguaje. Además, más datasets, no solo vLLM. Este repo es sobre todo para tener las marcas de recall claras. | Embeddings y reranker **multilingües** desde la Fase 2. La ingesta multi-dominio se prepara en la Fase 1 y se usa en la Fase 4. vLLM sigue siendo el **benchmark**. |
-| **D7** Agente | Dicotomía: agente propio como intermediario, pero también acceso directo al RAG. **A discutir.** | La arquitectura soporta **ambos** caminos desde el diseño. La decisión de qué es lo por defecto se toma antes de la Fase 5. |
+| **D7** Agente | Dicotomía: agente propio como intermediario, pero también acceso directo al RAG. **A discutir.** | La arquitectura soporta **ambos** caminos desde el diseño. La decisión de qué es lo por defecto se toma antes de la Fase 5.<br>**Decidido (2026-10-23): agente por defecto**, como en un RAG real, y con memoria de sesión. El acceso directo sigue disponible como opción. |
 | **D8** Permiso Fase 0 | Sí, permiso para arreglar el código. Curiosidad por ver cómo evolucionan los recalls. | Se mide antes y después de cada fix, y se documenta en `changelog/FASE_0.md`. |
 | **D9** Multimedia | Quiero que acepte todo lo posible. Videos y audios sobre todo. La idea es que funcione igual que algo destinado a produccion de alto standing. | La Fase 4b **deja de ser opcional**, con prioridad para **vídeo y audio**:<br>• Transcripción con marcas de tiempo.<br>• Imágenes con OCR + captions.<br>• Búsqueda de imágenes por texto (CLIP/SigLIP, nivel B).<br>El VLM generativo (nivel C) solo en local.<br>⚠️ "Producción de alto standing" choca con el despliegue gratuito en CPU: la ingesta se hace offline en la 3080 Ti y en producción solo se sirve lo ya indexado. |
 
@@ -245,6 +245,8 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 
 ### 4c — Multimedia: *Los viajes de Gulliver* (1939) frente a la novela de Swift (1726)
 
+> ⏸️ **Aplazada (2026-10-23, decisión tuya):** queda como posible fase al final del proyecto. El plan de abajo se conserva tal cual. Ya están descargados el libro y la película en `data/raw/gulliver/`, con URL y SHA256 en la checklist. Propuesta pendiente de aprobar cuando se retome: transcripción en Markdown con una cabecera por ventana de tiempo (`## 00:12:30`) en lugar del mapa de offsets a segundos.
+
 - **Objetivo:** ingestar una misma historia en dos formatos, novela y película, y comparar qué recupera de cada uno. Un recruiter debe poder ver el código y todos los archivos usados en la ingesta.
 - **Requisitos:**
   - La película debe tener **sonido**, para que la transcripción con Whisper aporte texto real.
@@ -300,7 +302,14 @@ No deben empeorar los resultados obtenidos durante la evaluación.
   - **Memoria** (petición tuya): historial de la conversación más memoria semántica recuperable. Se puede guardar en Qdrant (una colección `memory_*` con vectores) o, si hace falta algo relacional, motivar el paso a Postgres que se dejó abierto en la Fase 1.
 - **Acceso directo al RAG** siempre disponible: se elige con un flag de config o de la petición.
 - **Benchmark agente frente a acceso directo** (recall, calidad, latencia) en `BENCHMARK_REPORT.md`.
-- ⚠️ **D7 se discute antes de empezar esta fase.**
+- ✅ **D7 decidido (2026-10-23):**
+  - **Agente por defecto**, con acceso directo como opción.
+  - **Todos los modelos pueden ser agente**, incluido Qwen3-0.6B, sin restringirlo. Los benchmarks dirán cuál se despliega.
+  - **Memoria solo de sesión.**
+- **Diseño:**
+  - `src/server/tools.py` (herramientas del RAG).
+  - Servidor MCP (`src/server/mcp_server.py`; FastMCP se llama `MCPServer` en `mcp` 2.x) sobre esas herramientas. ✅ Hecho: `make mcp`.
+  - Agente en `src/agent/`: reescribe la pregunta con el historial, decide las búsquedas con el formato nativo de llamadas a herramientas del modelo (máximo 3 pasos) y da la respuesta final con el generador y las reglas de dominio actuales. Si falla, usa el flujo directo. ✅ Hecho: `answer` (agente por defecto), `chat` (con `/agent` para alternar) y `make agent-bench`.
 
 ## Fase 6 — Web deploy
 
@@ -312,6 +321,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
   - Tipografías JetBrains Mono + Inter.
   - Tarjetas de fuentes y barras de recall.
 - **Navegación y selectores** (modelo, agente sí/no), según lo que se decida de la modularización.
+  - **Interruptor "Con agente / Sin agente"** (petición tuya, 2026-10-23): un switch en la interfaz de chat que alterna entre el agente (por defecto: memoria de sesión, reescritura y herramientas) y la conversación directa con el RAG (el flujo actual, pregunta a pregunta). La API lo recibe como parámetro de la petición (`agent: true|false`); la Fase 5 deja los dos caminos listos detrás de ese mismo parámetro.
   - **Base ya preparada (Fase 2):** los perfiles de `rag.toml` (`available_profiles`) son las opciones que podría ofrecer un selector de ingesta, reranker o embeddings. La base estable sigue siendo la del benchmark. *A plantear en esta fase.*
 - **Despliegue sin coste**:
   - Backend en un Hugging Face Space (Docker, CPU gratuito).
@@ -329,7 +339,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 
 | # | Tema | Cuándo hay que decidirlo |
 |---|---|---|
-| P1 | D7: agente frente a acceso directo, y qué es lo por defecto | Antes de la Fase 5 |
+| P1 | ~~D7: agente frente a acceso directo~~ → resuelto: agente por defecto, todos los modelos, memoria de sesión | Hecho |
 | P2 | ~~Material multimedia~~ → resuelto: *Los viajes de Gulliver* (1939) frente a la novela de Swift (Gutenberg #829), con *The Little Princess* y *Scrooge* como reservas. Sustituye a *Nosferatu*/*Drácula*, que era muda. Copias descargadas el 2026-10-23 (URL y SHA256 en la checklist de la 4c) | Hecho |
 | P7 | ~~`.gitattributes` para normalizar los finales de línea~~ → resuelto: todo LF y `llm_sdk/` intacto (commit `5a1cc4b`) | Hecho |
 | P8 | ~~¿`bge-m3` por defecto aunque indexar en CPU lleve ~2 h?~~ → resuelto: `bge-m3` en la base y perfil `cpu-light` (`e5-small`) | Hecho |
@@ -337,7 +347,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 | P3 | ~~Dominios nuevos~~ → resuelto: XQuAD (cultura general, en/es) y después MLQA | Hecho |
 | P4 | Modularización: qué opciones se exponen en la web y cómo se navega | Antes de la Fase 6 |
 | P5 | ~~GPU de los ordenadores de 42~~ → resuelto: no aceptan CUDA (vLLM tarda ~10 h en indexarse). Se descarta indexar en 42 y el proyecto se sirve en línea | Hecho |
-| P10 | Hugging Face Datasets: usarlos como fuente de la ingesta y alojar allí los nuestros (los de 42, los derivados multimedia y quizá el índice). Falta revisar si la licencia de los datasets de 42 permite publicarlos | A desarrollar; antes de la 4c como muy tarde |
+| P10 | Hugging Face Datasets: usarlos como fuente de la ingesta y alojar allí los nuestros (los de 42, los derivados multimedia y quizá el índice). Falta revisar si la licencia de los datasets de 42 permite publicarlos | A desarrollar; antes de la Fase 6 (despliegue) o de la 4c si se retoma |
 | P6 | Proveedor de la key gratuita para el juez LLM | Antes de la Fase 3 |
 
 ---
@@ -374,4 +384,8 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-23**: router decidido: sin filtro busca en todos los dominios y responde desde el mejor; con filtro, solo en los elegidos. `make index` pasa a indexar todas las fuentes (`SOURCE=` para una sola). Los comandos y el benchmark de 42 siguen fijados a `vllm`.
 - **2026-10-23**: umbral del filtro fuera de dominio **por dominio** (`relevance_threshold` en cada fuente). El reranker puntúa cada corpus en su propia escala, así que cada dominio nuevo se calibra con `gate_scores` antes de fijar su umbral.
 - **2026-10-23**: el `gen-bench` de XQuAD usa un subconjunto fijo de 300 preguntas por idioma; la ejecución completa (`FULL=1`) queda para pruebas completas. Fase 4a completada.
+- **2026-10-23**: descarga unificada: `make data` = vLLM (desde el repo de GitHub) + XQuAD. Se elimina `data-42`, que era redundante (mismo vLLM, datasets ya versionados, 403 fuera de 42). Ver `changelog/FASE_5.md` §5.
+- **2026-10-23**: `src/` reorganizado en `rag/` (el RAG), `server/` (herramientas y MCP) y `agent/` (el agente), sin cambios de lógica. Ver `changelog/FASE_5.md`.
+- **2026-10-23**: **D7 decidido** y Fase 5 iniciada: agente por defecto (como un RAG real), todos los modelos pueden ser agente, memoria solo de sesión y acceso directo como opción. El campo `lang` sale del plan: las respuestas ya siguen el idioma de la pregunta (90–100 %).
+- **2026-10-23**: **4c (multimedia, Gulliver) aplazada** como posible fase final. La Fase 4 se cierra con 4a y 4b. MLQA, también opcional, se queda para el final.
 - **2026-10-23**: biografía del modo CV, borrador v1 en `data/raw/cv/autobiography.md` (ignorado por git), con los datos pendientes marcados. Notas originales en `data/private_notes/`.

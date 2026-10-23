@@ -24,6 +24,7 @@ dependencies = [
     # Docling's layout model needs it; declared to take the CUDA build
     # matching torch (the PyPI wheel breaks torchvision::nms).
     "torchvision",
+    "mcp>=2.3.0",
 ]
 
 [tool.uv.sources]

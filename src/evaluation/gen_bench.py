@@ -10,11 +10,11 @@ from tqdm import tqdm
 from src.evaluation.bench import SUITES, git_revision
 from src.config import RagConfig, get_config
 from src.evaluation.evaluator import Evaluator
-from src.generator import Generator
-from src.language import ARTICLES, detect_language, words
+from src.rag.generator import Generator
+from src.rag.language import ARTICLES, detect_language, words
 from src.models import MinimalSource
-from src.rag import RagPipeline
-from src.retriever import Retriever
+from src.rag.pipeline import RagPipeline
+from src.rag.retriever import Retriever
 
 RESULTS_DIR = "bench/results/gen"
 OUTPUT_DIR = "data/output/gen_bench"
@@ -280,7 +280,7 @@ def run_cv_ood(pipeline: RagPipeline, k: int,
     it is the CV's own message (with the contact e-mail) and how many
     answers show private data.
     """
-    from src.sources.cv import ood_questions
+    from src.rag.sources.cv import ood_questions
 
     rows = []
     for q in tqdm(ood_questions(), desc="cv out-of-data"):

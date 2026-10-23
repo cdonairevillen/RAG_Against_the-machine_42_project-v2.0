@@ -2,7 +2,7 @@ from typing import Optional, Protocol
 
 import numpy as np
 
-from src.ingestion.chunk import Chunk
+from src.rag.ingestion.chunk import Chunk
 
 
 class ChunkStore(Protocol):

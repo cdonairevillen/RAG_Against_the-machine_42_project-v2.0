@@ -1,7 +1,7 @@
 import ast
 from typing import Callable
 
-from src.ingestion.chunk import Chunk
+from src.rag.ingestion.chunk import Chunk
 
 OVERLAP_RATIO = 0.20
 DEFAULT_CODE_CHUNK_SIZE = 2000

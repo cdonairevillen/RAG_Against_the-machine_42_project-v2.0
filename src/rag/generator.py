@@ -1,12 +1,12 @@
 import re
 from threading import Thread
-from typing import Any, Iterator
+from typing import Any, Iterator, Optional
 
 import torch
 from llm_sdk import Small_LLM_Model
 
 from src.config import GenerationConfig
-from src.language import LANGUAGE_NAMES, detect_language
+from src.rag.language import LANGUAGE_NAMES, detect_language
 
 NOT_FOUND_PATTERNS = (
     r"not found in the provided sources",
@@ -178,7 +178,8 @@ class Generator:
 
     def answer_with_text(self, question: str,
                          context_blocks: list[str],
-                         extra_rules: str = "") -> str:
+                         extra_rules: str = "",
+                         language: Optional[str] = None) -> str:
         """Generate a grounded answer from pre-built context blocks.
 
         Args:
@@ -186,6 +187,8 @@ class Generator:
             context_blocks: Context strings, one per source, in the
                 order they are numbered and shown to the user.
             extra_rules: Domain rules added to the system prompt.
+            language: Answer language ('es', 'en'); detected from the
+                question when None.
 
         Returns:
             A concise answer citing its sources as [n], or
@@ -197,13 +200,14 @@ class Generator:
             return "No relevant sources found."
         return clean_output(
             self.greedy_decode(self.build_prompt(
-                question, context_blocks, extra_rules
+                question, context_blocks, extra_rules, language
             ))
         )
 
     def stream_answer(self, question: str,
                       context_blocks: list[str],
-                      extra_rules: str = "") -> Iterator[str]:
+                      extra_rules: str = "",
+                      language: Optional[str] = None) -> Iterator[str]:
         """Like answer_with_text(), but yields the text as it is
         generated (same prompt and decoding).
 
@@ -214,13 +218,14 @@ class Generator:
             question: The natural-language question.
             context_blocks: Context strings, one per source.
             extra_rules: Domain rules added to the system prompt.
+            language: Answer language; detected when None.
 
         Yields:
             Successive pieces of the answer.
         """
         if not question or not question.strip() or not context_blocks:
             yield self.answer_with_text(question, context_blocks,
-                                        extra_rules)
+                                        extra_rules, language)
             return
 
         from transformers import TextIteratorStreamer
@@ -229,7 +234,8 @@ class Generator:
             self.tokenizer, skip_prompt=True, skip_special_tokens=True
         )
         kwargs = self.generate_kwargs(
-            self.build_prompt(question, context_blocks, extra_rules)
+            self.build_prompt(question, context_blocks, extra_rules,
+                              language)
         )
         worker = Thread(target=self.generate, kwargs={
             **kwargs, "streamer": streamer,
@@ -241,11 +247,12 @@ class Generator:
         worker.join()
 
     def build_prompt(self, question: str, context_blocks: list[str],
-                     extra_rules: str = "") -> str:
+                     extra_rules: str = "",
+                     language: Optional[str] = None) -> str:
         """Chat-formatted prompt: numbered sources trimmed to the token
         budget, answer language taken from the question, plus the
         domain's own rules when given."""
-        language = detect_language(question)
+        language = language or detect_language(question)
         sources = self.fit_sources(question, context_blocks, language,
                                    extra_rules)
         return str(self.tokenizer.apply_chat_template(
@@ -303,6 +310,22 @@ class Generator:
         output_ids = self.generate(**kwargs)
         new_ids = output_ids[0][kwargs["input_ids"].shape[1]:]
         return str(self.model.decode(new_ids)).strip()
+
+    def complete(self, prompt: str, max_new_tokens: int) -> str:
+        """Raw greedy continuation of a prompt, special tokens kept.
+
+        For the agent: tool calls come wrapped in markers such as
+        <tool_call> or <|tool_call|>, which decode() would drop. Only
+        the end-of-turn tokens are removed.
+        """
+        kwargs = self.generate_kwargs(prompt)
+        kwargs["max_new_tokens"] = max_new_tokens
+        output_ids = self.generate(**kwargs)
+        new_ids = [int(i) for i in output_ids[0][
+            kwargs["input_ids"].shape[1]:
+        ] if int(i) not in self.eos_token_ids]
+        text = self.tokenizer.decode(new_ids, skip_special_tokens=False)
+        return str(THINK_BLOCK.sub("", text)).strip()
 
     def generate_kwargs(self, prompt: str) -> dict[str, Any]:
         """Arguments for greedy generation of `prompt`."""

@@ -9,10 +9,10 @@ import bm25s
 from tqdm import tqdm
 
 from src.config import ChunkingConfig, SourceConfig
-from src.ingestion.chunk import CHILD, PARENT, Chunk, chunk_uuid
-from src.ingestion.chunkers import get_chunker, split_by_size
-from src.ingestion.loaders import read_text
-from src.ingestion.tokens import tokenize, with_identifier_parts
+from src.rag.ingestion.chunk import CHILD, PARENT, Chunk, chunk_uuid
+from src.rag.ingestion.chunkers import get_chunker, split_by_size
+from src.rag.ingestion.loaders import read_text
+from src.rag.ingestion.tokens import tokenize, with_identifier_parts
 
 INDEX_DIR = "bm25_index"
 INDEX_CODE_DIR = "bm25_code_index"

@@ -2,10 +2,10 @@ import os
 from typing import Any, Optional, Sequence
 
 from src.config import RagConfig, get_config
-from src.ingestion.chunk import Chunk
-from src.ingestion.pipeline import MANIFEST_FILE
+from src.rag.ingestion.chunk import Chunk
+from src.rag.ingestion.pipeline import MANIFEST_FILE
 from src.models import MinimalSource
-from src.retriever import Retriever
+from src.rag.retriever import Retriever
 
 # Sources of each domain scored with the cross-encoder to route a query
 # (its best one decides). The same signal as the out-of-domain gate.

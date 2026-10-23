@@ -6,7 +6,7 @@ from qdrant_client import QdrantClient, models
 from tqdm import tqdm
 
 from src.config import QdrantConfig
-from src.ingestion.chunk import Chunk
+from src.rag.ingestion.chunk import Chunk
 
 # Payload fields that filters run on (domain-wide scans, parent lookups).
 INDEXED_FIELDS = ("level", "chunk_type", "file_path", "parent_id")

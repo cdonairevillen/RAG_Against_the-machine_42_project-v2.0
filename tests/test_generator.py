@@ -1,7 +1,7 @@
-from src.generator import (
+from src.rag.generator import (
     NOT_FOUND_MESSAGE, build_messages, clean_output, is_not_found,
 )
-from src.language import detect_language
+from src.rag.language import detect_language
 
 
 def test_messages_number_sources_and_set_language() -> None:

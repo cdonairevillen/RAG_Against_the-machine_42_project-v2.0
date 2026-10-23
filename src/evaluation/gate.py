@@ -19,8 +19,8 @@ from src.config import RagConfig, get_config
 from src.evaluation.bench import SUITES
 from src.evaluation.gen_bench import OOD_PATH
 from src.evaluation.routing import SETS
-from src.retriever import Retriever
-from src.sources.cv import ood_questions
+from src.rag.retriever import Retriever
+from src.rag.sources.cv import ood_questions
 
 RESULTS_DIR = "bench/results/gate"
 CANDIDATES = (-6.0, -5.0, -4.0, -3.0, -2.0, -1.0, 0.0, 1.0)

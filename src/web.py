@@ -259,7 +259,7 @@ def load_retriever() -> object:
     Returns:
         Loaded DomainRouter instance cached in session state.
     """
-    from src.router import DomainRouter
+    from src.rag.router import DomainRouter
     return DomainRouter.from_store()
 
 
@@ -269,7 +269,7 @@ def load_generator() -> object:
     Returns:
         Loaded Generator instance cached in session state.
     """
-    from src.generator import Generator
+    from src.rag.generator import Generator
     from src.config import get_config
 
     return Generator(get_config().generation)
@@ -457,7 +457,7 @@ def main() -> None:
         run = st.button("Search & Answer", use_container_width=False)
 
         if run and query and query.strip():
-            from src.rag import RagPipeline
+            from src.rag.pipeline import RagPipeline
 
             pipeline = RagPipeline(retriever, generator)
             st.markdown(
@@ -480,7 +480,7 @@ def main() -> None:
 
             with st.spinner("Retrieving relevant chunks..."):
                 result = pipeline.answer(query, k=k_val, on_piece=on_piece)
-            from src.generator import NOT_FOUND_MESSAGE as GENERIC
+            from src.rag.generator import NOT_FOUND_MESSAGE as GENERIC
             # Domains with their own "not found" (e.g. the CV, which
             # offers contact) keep it; the rest show the web's message.
             show(NOT_FOUND_MESSAGE

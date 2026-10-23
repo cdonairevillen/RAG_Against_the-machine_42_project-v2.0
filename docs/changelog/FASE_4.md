@@ -1,7 +1,9 @@
 # CHANGELOG — Fase 4: Inserción de modos
 
 **Fecha de inicio:** 2026-10-23
-**Estado:** 🟡 en curso. **4a (XQuAD) completada (2026-10-23):**
+**Estado:** ✅ completada (2026-10-23) con 4a y 4b. La **4c (multimedia, Gulliver) queda aplazada** como posible fase final, por decisión tuya; MLQA, también.
+
+**4a (XQuAD) completada (2026-10-23):**
 - Datos, ingesta y benchmark de recuperación.
 - `make index` de todas las fuentes.
 - Router con filtro y atribución en la web.
@@ -10,7 +12,7 @@
 
 **4b (modo CV) completada (2026-10-23):** CV, LinkedIn y biografía (ES + EN) indexados tal cual, sin fugas de datos de contacto, con tu mensaje cuando falta un dato. Contiene la respuesta correcta en el 73 % (EN) y el 80 % (ES) de los casos.
 
-Pendiente: 4c (Gulliver).
+Aplazada: 4c (Gulliver).
 
 ---
 

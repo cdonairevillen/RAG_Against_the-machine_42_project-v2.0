@@ -5,12 +5,12 @@ from pydantic import BaseModel
 from tqdm import tqdm
 
 from src.config import CONFIG_FILE, RagConfig, load_config
-from src.rag import RagPipeline
-from src.retriever import Retriever
-from src.router import DomainRouter
-from src.generator import Generator
-from src.embeddings import vector_name
-from src.ingestion.chunk import Chunk
+from src.rag.pipeline import RagPipeline
+from src.rag.retriever import Retriever
+from src.rag.router import DomainRouter
+from src.rag.generator import Generator
+from src.rag.embeddings import vector_name
+from src.rag.ingestion.chunk import Chunk
 from src.models import (
     MinimalAnswer,
     MinimalSearchResults,
@@ -21,7 +21,8 @@ from src.models import (
 )
 
 if TYPE_CHECKING:
-    from src.ingestion.pipeline import Ingester
+    from src.agent.agent import Agent
+    from src.rag.ingestion.pipeline import Ingester
 
 DEFAULT_DOMAIN = "vllm"
 
@@ -75,6 +76,7 @@ class CLI:
         self.config: RagConfig = load_config(config, profile=profile)
         self.retriever: Retriever | None = None
         self.router: DomainRouter | None = None
+        self.agent: "Agent | None" = None
         self.index_embedder: Any = None
         self.generator: Generator | None = None
 
@@ -158,9 +160,9 @@ class CLI:
                      doc_chunk_size: Optional[int] = None,
                      repo_root: Optional[str] = None) -> None:
         """Index one source (see index())."""
-        from src.ingestion.pipeline import Ingester
-        from src.ingestion.tokens import corpus_part_types
-        from src.storage.qdrant_store import QdrantChunkStore
+        from src.rag.ingestion.pipeline import Ingester
+        from src.rag.ingestion.tokens import corpus_part_types
+        from src.rag.storage.qdrant_store import QdrantChunkStore
 
         try:
             source_cfg = self.config.source(domain)
@@ -219,9 +221,9 @@ class CLI:
         """Download XQuAD (en, es) and build its corpus and datasets.
 
         Writes the article files to data/raw/xquad/ and the benchmark
-        datasets to bench/datasets/xquad/ (see src/sources/xquad.py).
+        datasets to bench/datasets/xquad/ (see src/rag/sources/xquad.py).
         """
-        from src.sources.xquad import prepare
+        from src.rag.sources.xquad import prepare
 
         try:
             prepare()
@@ -234,7 +236,7 @@ class CLI:
         Locates every answer's evidence in the biography (re-run after
         editing it; fails if an evidence is missing or ambiguous).
         """
-        from src.sources.cv import build
+        from src.rag.sources.cv import build
 
         try:
             print(f"CV benchmark: {build()} questions per language "
@@ -253,7 +255,7 @@ class CLI:
         """
         import time
 
-        from src.embeddings import Embedder, document_text
+        from src.rag.embeddings import Embedder, document_text
 
         emb = self.config.embeddings
         device = self.config.models.resolved_device()
@@ -364,13 +366,25 @@ class CLI:
         """The shared answer flow (router with reranker + generator)."""
         return RagPipeline(self.get_router(), self.get_generator())
 
-    def answer(self, query: str, k: int = 10, stream: bool = True,
-               domains: Optional[str] = None) -> None:
-        """Answer a single question using retrieved and reranked
-        context.
+    def get_agent(self, k: int = 5) -> "Agent":
+        """Load and cache the agent (router + generator + session)."""
+        from src.agent.agent import Agent
+        from src.server.tools import RagTools
 
-        Searches every indexed domain and answers from the best one,
-        unless `domains` restricts the search.
+        if self.agent is None:
+            tools = RagTools(self.get_router(), self.config,
+                             self.get_generator())
+            self.agent = Agent(tools, k=k)
+        return self.agent
+
+    def answer(self, query: str, k: int = 5, stream: bool = True,
+               domains: Optional[str] = None, agent: bool = True) -> None:
+        """Answer a single question.
+
+        By default through the agent (D7): it rewrites the question,
+        decides the searches and answers from the best domain. With
+        --agent False, the direct flow (search every domain, answer
+        from the best one). `domains` restricts the search either way.
 
         Args:
             query: Natural-language question.
@@ -378,54 +392,106 @@ class CLI:
             stream: Print the answer as it is generated.
             domains: Optional filter, e.g. "xquad" or "vllm,xquad"
                 (default: all indexed domains).
+            agent: Use the agent (True) or the direct flow (False).
         """
         if not query or not query.strip():
             print("Empty query — nothing to answer.")
             return
+        print(f"\nPrompt: \"{query}\"\n")
         try:
-            pipeline = self.get_pipeline()
-            print(f"\nPrompt: \"{query}\"\n")
-            print("=== Answer ===")
-            if stream:
-                result = pipeline.answer(
-                    query, k=k,
-                    on_piece=lambda p: print(p, end="", flush=True),
-                    domains=domains,
-                )
-                print()
-                if result.not_found and result.sources:
-                    # The LLM's own "not found" was streamed; show the
-                    # domain's message instead.
-                    print(result.text)
-            else:
-                result = pipeline.answer(query, k=k, domains=domains)
-                print(result.text)
+            self.reply(query, k, stream, domains, agent)
         except Exception as exc:
             print(f"Error while answering: {exc}")
-            return
 
-        route = self.get_router().last_route
-        if route:
-            print("\n=== Route ===")
-            print(", ".join(f"{d} ({s:.2f})" for d, s in route))
-        if not result.not_found:
-            print("\n=== Sources ===")
-            parents = pipeline.retriever.get_parent_chunk_map()
-            for i, src in enumerate(result.sources):
-                chunk = parents.get(
-                    (src.file_path, src.first_character_index)
-                )
-                print(f"[{i + 1}] filepath: {src.file_path}")
-                print(f"    chunk:    {i}")
-                print(
-                    f"    range:    {src.first_character_index}:"
-                    f"{src.last_character_index}"
-                )
-                if chunk:
-                    text = pipeline.rules.redact(chunk.text, chunk.domain)
-                    preview = text[:200].replace("\n", " ")
-                    print(f"    text:     {preview}...")
-                print()
+    def chat(self, agent: bool = True, k: int = 5,
+             domains: Optional[str] = None) -> None:
+        """Interactive conversation (session memory with the agent).
+
+        Commands: /agent (toggle agent / direct), /reset (forget the
+        conversation), /exit (or an empty line) to quit.
+
+        Args:
+            agent: Start with the agent (True) or in direct mode.
+            k: Number of chunks to retrieve as context.
+            domains: Optional domain filter for the whole session.
+        """
+        print("Chat with the RAG. /agent toggles agent/direct, /reset "
+              "forgets the conversation, /exit quits.")
+        use_agent = agent
+        while True:
+            try:
+                question = input(
+                    f"\n[{'agent' if use_agent else 'direct'}] > "
+                ).strip()
+            except (EOFError, KeyboardInterrupt):
+                break
+            if not question or question == "/exit":
+                break
+            if question == "/agent":
+                use_agent = not use_agent
+                print(f"Mode: {'agent' if use_agent else 'direct'}")
+                continue
+            if question == "/reset":
+                if self.agent is not None:
+                    self.agent.session.clear()
+                print("Conversation forgotten.")
+                continue
+            try:
+                self.reply(question, k, True, domains, use_agent)
+            except Exception as exc:
+                print(f"Error while answering: {exc}")
+
+    def reply(self, question: str, k: int, stream: bool,
+              domains: Optional[str], use_agent: bool) -> None:
+        """Answer one question (agent or direct) and print it."""
+        def show(piece: str) -> None:
+            print(piece, end="", flush=True)
+
+        print("=== Answer ===")
+        if use_agent:
+            agent = self.get_agent(k)
+            result = agent.ask(question, domains,
+                               on_piece=show if stream else None)
+            text, sources, not_found = (result.text, result.sources,
+                                        result.not_found)
+            trace = f"agent {agent.trace(result)}"
+        else:
+            pipeline = self.get_pipeline()
+            answer = pipeline.answer(question, k=k, domains=domains,
+                                     on_piece=show if stream else None)
+            text, sources, not_found = (answer.text, answer.sources,
+                                        answer.not_found)
+            trace = "direct, route " + ", ".join(
+                f"{d} ({s:.2f})" for d, s in self.get_router().last_route
+            )
+        if not stream:
+            print(text)
+        elif not_found and sources:
+            # The LLM's own "not found" was streamed; show the domain's
+            # message instead.
+            print("\n" + text)
+        else:
+            print()
+        print(f"\n=== Trace ===\n{trace}")
+        if not not_found:
+            self.print_sources(sources)
+
+    def print_sources(self, sources: list[MinimalSource]) -> None:
+        """Print sources with their (masked) text preview."""
+        from src.rag.domain_rules import DomainRules
+
+        rules = DomainRules(self.config)
+        parents = self.get_router().get_parent_chunk_map()
+        print("\n=== Sources ===")
+        for i, src in enumerate(sources):
+            chunk = parents.get((src.file_path, src.first_character_index))
+            print(f"[{i + 1}] filepath: {src.file_path}")
+            print(f"    range:    {src.first_character_index}:"
+                  f"{src.last_character_index}")
+            if chunk:
+                text = rules.redact(chunk.text, chunk.domain)
+                print(f"    text:     {text[:200].replace(chr(10), ' ')}...")
+            print()
 
     def answer_dataset(self, dataset_path: str, k: int = 10,
                        save_directory: str = "data/output/answers",
@@ -649,6 +715,41 @@ class CLI:
                             limit=limit, config=self.config)
         except Exception as exc:
             print(f"Error during gate_scores: {exc}")
+
+    def agent_bench(self, label: str = "run", k: int = 5,
+                    sets: str = "all") -> None:
+        """Agent vs direct access on conversations and single questions.
+
+        Results go to bench/results/agent/. The LLM (and so the agent)
+        is the one of the active profile (--profile / PROFILE=).
+
+        Args:
+            label: Short name for this run.
+            k: Sources per search / answer.
+            sets: "conversations", "single" or "all".
+        """
+        from src.evaluation.agent_bench import run_agent_bench
+
+        try:
+            run_agent_bench(label=label, k=k, sets=sets,
+                            config=self.config)
+        except Exception as exc:
+            print(f"Error during agent_bench: {exc}")
+
+    def mcp(self, transport: str = "stdio", port: int = 8765) -> None:
+        """Serve the RAG over MCP (tools: list_domains, search, answer).
+
+        Args:
+            transport: "stdio" (launched by an MCP client) or
+                "streamable-http" (http://127.0.0.1:<port>/mcp).
+            port: HTTP port for streamable-http.
+        """
+        from src.server.mcp_server import run
+
+        if transport not in ("stdio", "streamable-http"):
+            print("Error: transport must be 'stdio' or 'streamable-http'")
+            return
+        run("stdio" if transport == "stdio" else "streamable-http", port)
 
     @staticmethod
     def find_chunk(retriever: Retriever,

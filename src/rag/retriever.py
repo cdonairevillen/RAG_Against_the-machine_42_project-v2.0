@@ -5,13 +5,13 @@ import numpy as np
 from src.config import (
     EmbeddingsConfig, ModelsConfig, RagConfig, RetrievalConfig, get_config,
 )
-from src.ingestion.chunk import CHILD, PARENT, Chunk
-from src.ingestion.pipeline import load_bm25
-from src.ingestion.tokens import (
+from src.rag.ingestion.chunk import CHILD, PARENT, Chunk
+from src.rag.ingestion.pipeline import load_bm25
+from src.rag.ingestion.tokens import (
     corpus_part_types, query_uses_parts, tokenize,
 )
 from src.models import MinimalSource
-from src.storage.base import ChunkStore
+from src.rag.storage.base import ChunkStore
 
 IDENTIFIER_PATTERN = re.compile(r"_|[a-z0-9][A-Z]|[A-Z]{2,}[a-z]{2,}")
 TOKEN_PUNCTUATION = ".,;:?!¿¡()[]{}'\"`"
@@ -248,7 +248,7 @@ class Retriever:
             RuntimeError: If the index was built with another model (or
                 without embeddings).
         """
-        from src.embeddings import Embedder, vector_name
+        from src.rag.embeddings import Embedder, vector_name
 
         model = self.embeddings.model
         if indexed_model != model:
@@ -289,7 +289,7 @@ class Retriever:
         """
         config = config or get_config()
         if store is None:
-            from src.storage.qdrant_store import QdrantChunkStore
+            from src.rag.storage.qdrant_store import QdrantChunkStore
             store = QdrantChunkStore.from_config(config.qdrant)
 
         bm25, bm25_code, bm25_doc, manifest = load_bm25(

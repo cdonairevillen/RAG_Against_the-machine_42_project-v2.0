@@ -1,4 +1,4 @@
-from src.ingestion.tokens import (
+from src.rag.ingestion.tokens import (
     corpus_part_types, query_uses_parts, split_identifier,
     with_identifier_parts,
 )

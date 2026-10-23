@@ -1,5 +1,5 @@
 from src.config import RagConfig, SourceConfig
-from src.domain_rules import DomainRules, redact
+from src.rag.domain_rules import DomainRules, redact
 
 CV = SourceConfig(
     root="data/raw/cv", include=[".md"],

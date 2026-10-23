@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from src.sources import xquad
+from src.rag.sources import xquad
 
 ROWS = [
     {"id": "q1", "title": "Apollo_program", "context": "First paragraph.",

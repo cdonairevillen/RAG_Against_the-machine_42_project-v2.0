@@ -14,6 +14,12 @@ class Evaluator:
     For questions with multiple correct sources, each is scored independently
     and the question score is found / total (partial credit).
 
+    The 42 reference metric (D4: not to be changed). Every recall in the
+    project goes through it: the `evaluate` command, `make bench` (42,
+    XQuAD and CV suites), `route_bench`, and gen_bench's check that the
+    right source reached the context (overlap_ratio). That keeps all the
+    numbers comparable with the Phase 0 baseline and other 42 RAGs.
+
     Usage:
         evaluator = Evaluator()
         metrics = evaluator.compute_recall(

@@ -5,11 +5,11 @@ from qdrant_client import QdrantClient
 
 from src.config import ChunkingConfig, PathsConfig, QdrantConfig, \
     RagConfig, SourceConfig
-from src.ingestion.chunk import CHILD, PARENT, Chunk
-from src.ingestion.pipeline import Ingester
-from src.ingestion.tokens import corpus_part_types
-from src.retriever import Retriever
-from src.storage.qdrant_store import QdrantChunkStore
+from src.rag.ingestion.chunk import CHILD, PARENT, Chunk
+from src.rag.ingestion.pipeline import Ingester
+from src.rag.ingestion.tokens import corpus_part_types
+from src.rag.retriever import Retriever
+from src.rag.storage.qdrant_store import QdrantChunkStore
 
 PY_FILE = '''def load_lora_adapter(name, path):
     """Load a LoRA adapter at runtime."""

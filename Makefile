@@ -6,7 +6,6 @@ LABEL     ?= run
 
 VLLM_DIR  := data/raw/vllm-0.10.1
 VLLM_URL  := https://github.com/vllm-project/vllm/archive/refs/tags/v0.10.1.zip
-URL_42    := https://cdn.intra.42.fr/document/document
 DATASETS  := data/datasets
 SEARCH    := data/output/search_results
 
@@ -33,7 +32,9 @@ endif
 PROFILE   ?=
 RUN       := $(ENV) $(if $(PROFILE),RAG_PROFILE=$(PROFILE)) $(UV) run --project . $(PY) -m src
 
-install: data
+# Virtual environment, dependencies and every public data source (data
+# runs after the venv: XQuAD is prepared with Python).
+install:
 	@echo "Creating Virtual Environment and installing dependencies"
 ifneq ($(BASE),)
 	@mkdir -p $(BASE) $(CACHE) $(TMP) $(HF)
@@ -42,10 +43,17 @@ endif
 	@printf '[server]\nfileWatcherType = "none"\n\n[browser]\ngatherUsageStats = false\n' > .streamlit/config.toml
 	$(ENV) $(UV) venv $(VENV)
 	$(ENV) $(UV) sync
+	@$(MAKE) --no-print-directory data
 
-# vLLM 0.10.1 from the official GitHub tag (same files and offsets as the
-# 42 attachment). The public datasets are versioned in data/datasets.
-data:
+# Every public source in one go: vLLM (the 42 benchmark corpus) and XQuAD.
+# Not included: the CV (private material, data/raw/cv/) and Gulliver
+# (Phase 4c, postponed).
+data: data-vllm data-xquad
+
+# vLLM 0.10.1 from the official GitHub tag: the only vLLM download (the
+# 42 attachment had the same files and offsets, checked in Phase 0). The
+# public 42 datasets are versioned in data/datasets.
+data-vllm:
 	@mkdir -p data/raw data/processed data/output
 	@if [ ! -d "$(VLLM_DIR)" ]; then \
 		echo "Downloading vLLM 0.10.1 from GitHub..."; \
@@ -60,20 +68,6 @@ data:
 # turned into data/raw/xquad/ and bench/datasets/xquad/.
 data-xquad:
 	$(RUN) fetch_xquad
-
-# Original 42 download. Needs access to the intra CDN and replaces the
-# versioned datasets with the ones from the attachment.
-data-42:
-	@mkdir -p data/raw data/processed data/output $(DATASETS)
-	curl -fL -o datasets_public.zip $(URL_42)/54681/datasets_public.zip
-	curl -fL -o vllm-0.10.1.zip $(URL_42)/54683/vllm-0.10.1.zip
-	@unzip -q -o datasets_public.zip
-	@rm -rf $(VLLM_DIR)
-	@unzip -q vllm-0.10.1.zip -d data/raw
-	@rm -rf $(DATASETS)/AnsweredQuestions $(DATASETS)/UnansweredQuestions
-	@mv datasets_public/public/AnsweredQuestions $(DATASETS)
-	@mv datasets_public/public/UnansweredQuestions $(DATASETS)
-	@rm -rf datasets_public datasets_public.zip vllm-0.10.1.zip
 
 # Qdrant server (docker-compose.yml). Data lives in a named Docker volume.
 db-up:
@@ -129,6 +123,16 @@ SUITE     ?=
 bench: db-up
 	$(RUN) bench --label $(LABEL) $(if $(SUITE),--suite $(SUITE))
 
+# The RAG as an MCP server (Phase 5): stdio for MCP clients that launch
+# it, or MCP_TRANSPORT=streamable-http on http://127.0.0.1:$(MCP_PORT)/mcp.
+MCP_TRANSPORT ?= stdio
+MCP_PORT  ?= 8765
+mcp: db-up
+	$(RUN) mcp --transport $(MCP_TRANSPORT) --port $(MCP_PORT)
+
+agent-bench: db-up
+	$(RUN) agent_bench --label $(LABEL) $(if $(SETS),--sets $(SETS))
+
 route-bench: db-up
 	$(RUN) route_bench --label $(LABEL)
 
@@ -168,5 +172,5 @@ meme:
 	$(ENV) $(UV) run --project . $(PY) -m streamlit run src/web.py &
 	@echo "Web running at http://localhost:8501"
 
-.PHONY: install data data-xquad data-42 db-up db-down db-reset run web web-stop index search-docs search-code \
-        eval-docs eval-code bench route-bench gen-bench judge test lint clean meme
+.PHONY: install data data-vllm data-xquad db-up db-down db-reset run web web-stop index search-docs search-code \
+        eval-docs eval-code bench route-bench agent-bench gen-bench judge mcp test lint clean meme

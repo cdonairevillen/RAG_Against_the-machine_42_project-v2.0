@@ -4,7 +4,7 @@ import pytest
 
 from src.config import RetrievalConfig
 from src.models import MinimalSource
-from src.router import DomainRouter, parse_domains
+from src.rag.router import DomainRouter, parse_domains
 
 
 class FakeRetriever:

@@ -10,7 +10,7 @@ from tqdm import tqdm
 from src.config import RagConfig, get_config
 from src.evaluation.evaluator import Evaluator
 from src.models import MinimalSearchResults, RagDataset, StudentSearchResults
-from src.retriever import Retriever
+from src.rag.retriever import Retriever
 
 # Dataset suites: (directory, filename suffix). "public" is the official
 # 42 benchmark; "es" is the Spanish complement (same ground truth,

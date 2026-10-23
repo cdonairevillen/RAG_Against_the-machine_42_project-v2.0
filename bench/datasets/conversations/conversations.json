@@ -1,0 +1,59 @@
+{
+  "description": "Multi-turn conversations (Phase 5) to compare the agent (session memory, question rewriting) with direct access (each question on its own). Follow-up turns refer to earlier ones (pronouns, 'there', 'that club'...), so they need the conversation to be understood. 'answer' is a short span looked for in the generated answer (normalised, like contains_answer). Facts come from the indexed corpora (CV biography, XQuAD, vLLM docs).",
+  "conversations": [
+    {"id": "c01", "lang": "es", "domain": "cv", "turns": [
+      {"question": "¿En qué estudio trabaja Chrystian como character artist?", "answer": "De La Luna Luna"},
+      {"question": "¿Y cómo se llama el videojuego en el que trabaja allí?", "answer": "Lorca"},
+      {"question": "¿Qué framework de backend usó en la aplicación de horas que hizo para ese estudio?", "answer": "FastAPI"}
+    ]},
+    {"id": "c02", "lang": "en", "domain": "cv", "turns": [
+      {"question": "Where did Chrystian do his Erasmus internship?", "answer": "Moonraker"},
+      {"question": "Which documentary did he work on there?", "answer": "Lost Pyramid"},
+      {"question": "In which city is that studio?", "answer": "Bristol"}
+    ]},
+    {"id": "c03", "lang": "es", "domain": "cv", "turns": [
+      {"question": "¿Qué instrumento toca Chrystian?", "answer": "guitarra"},
+      {"question": "¿Y qué otro instrumento está aprendiendo?", "answer": "piano"}
+    ]},
+    {"id": "c04", "lang": "en", "domain": "cv", "turns": [
+      {"question": "Which of Chrystian's projects is a multiplayer game written in C++?", "answer": "TAP"},
+      {"question": "Was it a solo project or a team project?", "answer": "team"}
+    ]},
+    {"id": "c05", "lang": "en", "domain": "xquad", "turns": [
+      {"question": "Who led the Carolina Panthers in sacks in 2015?", "answer": "Kawann Short"},
+      {"question": "How many points did their defense give up that season?", "answer": "308"},
+      {"question": "And how many interceptions did they make?", "answer": "24"}
+    ]},
+    {"id": "c06", "lang": "es", "domain": "xquad", "turns": [
+      {"question": "¿En qué año murió Nikola Tesla?", "answer": "1943"},
+      {"question": "¿Cómo financiaba su trabajo?", "answer": "patentes"},
+      {"question": "¿Y dónde vivió la mayor parte de su vida?", "answer": "hoteles"}
+    ]},
+    {"id": "c07", "lang": "en", "domain": "xquad", "turns": [
+      {"question": "Who won the Ekstraklasa Championship in 2000?", "answer": "Polonia"},
+      {"question": "When had that club won the national championship before?", "answer": "1946"}
+    ]},
+    {"id": "c08", "lang": "es", "domain": "xquad", "turns": [
+      {"question": "¿A qué se atribuyó originalmente la peste negra?", "answer": "cielos"},
+      {"question": "¿Y cómo se llama la teoría posterior que la explicaba por el aire viciado?", "answer": "Miasma"}
+    ]},
+    {"id": "c09", "lang": "en", "domain": "vllm", "turns": [
+      {"question": "Which endpoint loads a LoRA adapter dynamically in vLLM?", "answer": "/v1/load_lora_adapter"},
+      {"question": "And which one unloads it?", "answer": "/v1/unload_lora_adapter"},
+      {"question": "Which environment variable must be set to allow that?", "answer": "VLLM_ALLOW_RUNTIME_LORA_UPDATING"}
+    ]},
+    {"id": "c10", "lang": "es", "domain": "vllm", "turns": [
+      {"question": "¿Qué endpoint carga dinámicamente un adaptador LoRA en vLLM?", "answer": "/v1/load_lora_adapter"},
+      {"question": "¿Y qué variable de entorno hay que activar para poder hacerlo?", "answer": "VLLM_ALLOW_RUNTIME_LORA_UPDATING"}
+    ]},
+    {"id": "c11", "lang": "en", "domain": "mixed", "turns": [
+      {"question": "What is Chrystian's contact e-mail?", "answer": "cdonairevillen@gmail.com"},
+      {"question": "Who led the Carolina Panthers in sacks in 2015?", "answer": "Kawann Short"}
+    ]},
+    {"id": "c12", "lang": "es", "domain": "cv", "turns": [
+      {"question": "¿Dónde nació Chrystian?", "answer": "Madrid"},
+      {"question": "¿Y en qué año?", "answer": "1996"},
+      {"question": "¿En qué barrio creció?", "answer": "Villaverde"}
+    ]}
+  ]
+}
