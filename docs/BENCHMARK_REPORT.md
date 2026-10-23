@@ -207,3 +207,74 @@ El clasificador léxico decide la rama (docs o code) comparando las puntuaciones
 - **SmolLM3-3B descartado:** el F1 más bajo y el doble de falsos rechazos en code que la base.
 - **Qué modelo se recomienda en la web:** se decide en la Fase 6.
 - **Velocidad en CPU de los opcionales: no medida.** Por tamaño, los de 3–4B serán bastante más lentos sin GPU.
+
+---
+
+## 6. Cultura general: XQuAD en/es (Fase 4a)
+
+Las mismas 1 190 preguntas, en inglés y en español, sobre un dominio mixto (`xquad`: 48 artículos de Wikipedia × 2 idiomas, indexados juntos). La fuente correcta es el fragmento exacto de la respuesta en el fichero del idioma de la pregunta. `search_smart`, k = 10.
+
+| Configuración | EN @1/@3/@5/@10 | ES @1/@3/@5/@10 | Tiempo EN/ES (s) |
+|---|---|---|---|
+| BM25 solo | 0.92 / 0.97 / 0.98 / 0.99 | 0.88 / 0.97 / 0.98 / 0.99 | 0 / 0 |
+| **Base (BM25 + `bge-m3`)** | **0.95 / 0.99 / 0.99 / 1.00** | **0.92 / 0.99 / 0.99 / 1.00** | 42 / 49 |
+| Base + reranker en la rama doc | 0.95 / 0.99 / 1.00 / 1.00 | 0.94 / 0.99 / 1.00 / 1.00 | 189 / 194 |
+
+**Lectura:**
+- **Corpus casi saturado:** a partir de R@3 todas las configuraciones superan 0.97. XQuAD sirve para medir el multilingüismo, no para elegir entre configuraciones (para eso, MLQA).
+- **Diferencia EN–ES de ~3 puntos en R@1:** en 32 preguntas en español el primer resultado es el mismo artículo en inglés (en 14 en el caso contrario). Es una respuesta correcta en el idioma equivocado.
+- **El reranker en la rama doc no se adopta:** +0.02 en R@1 en español a cambio de 4× más tiempo, y en vLLM empeoraba los docs.
+
+### 6.1 Router sin filtro (`44-router-base`)
+
+Cada pregunta se busca en **todos** los dominios indexados (`vllm`, `xquad`). Gana el dominio cuya mejor fuente (entre sus 5 primeras) tiene la puntuación más alta del cross-encoder, que es la misma señal que el filtro fuera de dominio (B15).
+
+| Set | Preguntas | Al dominio correcto | Recall @1/@3/@5/@10 con el router |
+|---|---|---|---|
+| 42 docs | 100 | **1.000** | 0.76 / 0.91 / 0.92 / 0.94 (igual que con el dominio fijado) |
+| 42 code | 100 | **1.000** | 0.51 / 0.72 / 0.80 / 0.88 (igual) |
+| Complemento ES docs / code | 10 / 10 | 1.000 / 1.000 | 0.60 / 0.80 / 0.80 / 0.90 · 0.50 / 0.70 / 0.80 / 0.90 |
+| XQuAD EN | 1 190 | **0.982** | 0.94 / 0.97 / 0.98 / 0.98 (frente a 0.95 / 0.99 / 0.99 / 1.00) |
+| XQuAD ES | 1 190 | **0.978** | 0.91 / 0.97 / 0.97 / 0.98 (frente a 0.92 / 0.99 / 0.99 / 1.00) |
+
+**Lectura:**
+- **Ninguna pregunta de 42 se desvía.** El benchmark oficial sigue fijando `vllm`, así que sus cifras no dependen del router.
+- **El 2 % de XQuAD que acaba en vLLM** son preguntas que, fuera de contexto, son ambiguas o suenan técnicas. Por ejemplo, *"In the article's title, what did the machine hope to end?"*, *"What is one way in which graphs can be encoded?"* o *"What are stators attached to?"*. Es el coste de no filtrar; con el filtro del dominio, el recall vuelve al de §6.
+- **Coste:** cada pregunta se busca en los dos dominios y se puntúan 10 pares con el cross-encoder.
+
+### 6.2 Generación sobre XQuAD (Qwen3-0.6B, k = 5, 1 190 preguntas por idioma)
+
+Las respuestas de referencia de XQuAD son fragmentos cortos (por ejemplo, "308") y el modelo contesta con frases completas, así que el F1 penaliza cada palabra de más. La métrica principal es **"contiene la respuesta"**: si la referencia normalizada aparece dentro de la respuesta.
+
+| Configuración | Contiene EN / ES | "No encontrado" EN / ES | Descartadas por el filtro EN / ES | F1 EN / ES |
+|---|---|---|---|---|
+| Umbral global 0.0 (`20-xquad-base`) | 0.59 / 0.51 | 0.22 / 0.19 | 0.17 / 0.19 | 0.152 / 0.149 |
+| **Umbral propio −2.0 (`22-xquad-gate-2`)** | **0.65 / 0.57** | **0.13 / 0.08** | **0.07 / 0.07** | 0.167 / 0.169 |
+
+- **El filtro fuera de dominio estaba calibrado solo para vLLM.** Con el umbral propio de XQuAD (calibrado con `gate_scores`; caso completo en `changelog/FASE_4.md` §1.2) se recuperan 6 puntos sin dejar pasar ninguna pregunta ajena.
+- **Citas e idioma:** cita la fuente correcta en el 99 % de las respuestas y contesta en el idioma de la pregunta en el 98–99 %.
+- **Lo que falta es de generación:**
+  - En inglés, un 6 % de rechazos con la respuesta en el contexto.
+  - En español, la respuesta se recoge peor (0.62 frente a 0.74 entre las que contesta).
+- **Tiempo:** 1.4–2.5 s por respuesta, el 96 % en generación. Las iteraciones usan un subconjunto fijo de 300 preguntas por idioma (~20 min, ±2 puntos frente al completo).
+
+---
+
+## 7. Modo CV (Fase 4b)
+
+Corpus: CV (`.docx`, inglés), perfil de LinkedIn (`.pdf`, español) y biografía (español + versión en inglés). Benchmark propio: 30 preguntas iguales en inglés y en español, más 10 sobre ti sin respuesta en los datos (contacto privado, mundo literario secreto, datos que faltan). Qwen3-0.6B.
+
+| Ejecución | Cambio | Contiene EN / ES | Cita la correcta EN / ES | Sin dato bien resuelto EN / ES | Fugas |
+|---|---|---|---|---|---|
+| `30-cv-base` | primera versión | 0.50 / 0.57 | 0.57 / 0.88 | 9/10 · 7/10 | 0 |
+| `31`–`31b` | prompt del CV + patrones de "no encontrado" | 0.40 / 0.67 | 0.30 / 0.77 | — | 0 |
+| `32-cv-k8` | 8 fuentes | 0.53 / 0.57 | 0.38 / 0.77 | 10/10 · 9/10 | 0 |
+| `33-cv-chunks800` | chunks de 800 / 400 | 0.50 / 0.67 | 0.64 / 0.96 | 9/10 · 9/10 | 0 |
+| `34` | umbral −3.0 | 0.57 / 0.70 | 0.62 / 0.92 | 9/10 · 9/10 | 0 |
+| **`35-cv-bio-en`** | **biografía en inglés + regla de contacto** | **0.73 / 0.80** | 0.73 / 0.89 | **10/10 · 9/10** | **0** |
+| `36` (descartado) | regla "no respondas sí/no" | 0.60 / 0.73 | 0.74 / 0.89 | 10/10 · 9/10 | 0 |
+
+- **Recuperación EN con la biografía en inglés:** de 0.13 / 0.43 / 0.57 / 0.70 a **0.47 / 0.80 / 0.93 / 0.97**. ES: 0.70 / 0.83 / 0.97 / 1.00.
+- **Umbral del filtro fuera de dominio:** −3.0. Pasa el 93 % de las válidas (EN/ES) y ninguna pregunta fuera de dominio.
+- **Router con 3 dominios** (`46-router-cv`): el 100 % de las preguntas de 42 y del CV llegan a su dominio; XQuAD, el 98 %.
+- **Las mayores ganancias vienen de los datos** (la versión en inglés) y del **tamaño del chunk** (menos mezcla de trabajos). Las reglas de prompt arreglan casos concretos (el mundo secreto, el contacto), pero con un modelo de 0.6B cada regla de más puede costar aciertos (`36`).

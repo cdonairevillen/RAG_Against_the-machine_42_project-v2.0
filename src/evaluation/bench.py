@@ -20,7 +20,14 @@ SUITES = {
     "public": ("data/datasets", "public"),
     "es": ("bench/datasets/es", "es"),
     "en": ("bench/datasets/en", "en"),
+    "xquad": ("bench/datasets/xquad", "xquad"),
+    "cv": ("bench/datasets/cv", "cv"),
 }
+# Datasets of each suite (default: the 42 docs/code pair) and the corpus
+# its ground truth points into (default: the --domain argument). XQuAD:
+# the same questions in English and Spanish over its own domain.
+SUITE_DATASETS = {"xquad": ("en", "es"), "cv": ("en", "es")}
+SUITE_DOMAINS = {"xquad": "xquad", "cv": "cv"}
 RESULTS_DIR = "bench/results"
 # Retrieval path measured (the official 42 one). Kept in result names
 # and records so they stay comparable with the earlier runs.
@@ -124,10 +131,12 @@ def print_table(runs: list[dict[str, Any]], suite: str = "public") -> None:
     Args:
         runs: Bench run dicts as returned by load_history().
     """
+    names = SUITE_DATASETS.get(suite, DATASET_NAMES)
     header = (
         f"{'label':<28} {'mode':<10} "
-        f"{'docs @1/@3/@5/@10':<24} {'code @1/@3/@5/@10':<24} "
-        f"{'time d/c (s)':<12}"
+        f"{names[0] + ' @1/@3/@5/@10':<24} "
+        f"{names[1] + ' @1/@3/@5/@10':<24} "
+        f"{'time (s)' if names != DATASET_NAMES else 'time d/c (s)':<12}"
     )
     print("\n" + header)
     print("-" * len(header))
@@ -135,14 +144,14 @@ def print_table(runs: list[dict[str, Any]], suite: str = "public") -> None:
         if run.get("suite", "public") != suite:
             continue
         cells = []
-        for name in DATASET_NAMES:
+        for name in names:
             recall = run["datasets"][name]["recall_at_k"]
             cells.append("/".join(
                 f"{recall[kv]:.2f}" for kv in ("1", "3", "5", "10")
                 if kv in recall
             ))
         times = "/".join(
-            f"{run['datasets'][n]['seconds']:.0f}" for n in DATASET_NAMES
+            f"{run['datasets'][n]['seconds']:.0f}" for n in names
         )
         print(
             f"{run['label']:<28} {run['mode']:<10} "
@@ -173,6 +182,7 @@ def run_bench(label: str, k: int = 10,
         raise ValueError(f"suite must be one of {list(SUITES)}")
 
     config = config or get_config()
+    domain = SUITE_DOMAINS.get(suite, domain)
     retriever = Retriever.from_store(domain, config=config)
     retriever.load_reranker()
 
@@ -192,7 +202,7 @@ def run_bench(label: str, k: int = 10,
         "datasets": {},
     }
     output_dir = os.path.join(OUTPUT_DIR, f"{label}_{MODE}_{suite}")
-    for name in DATASET_NAMES:
+    for name in SUITE_DATASETS.get(suite, DATASET_NAMES):
         run["datasets"][name] = run_dataset(
             retriever, name, k, output_dir, suite
         )

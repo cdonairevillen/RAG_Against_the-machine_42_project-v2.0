@@ -32,3 +32,27 @@ def test_cited_files_by_name_and_index() -> None:
     }
     assert cited_files("It does X [2].", sources) == {"x.py"}
     assert cited_files("No citation here [9].", sources) == set()
+
+
+def test_contains_answer_matches_normalised_spans() -> None:
+    from src.evaluation.gen_bench import contains_answer
+
+    assert contains_answer("The Panthers defense gave up 308 points [1].",
+                           "308")
+    assert contains_answer("Fue en el año 1961, según [2].", "1961")
+    assert contains_answer("It was Nicholas E. Golovin.",
+                           "Nicholas E. Golovin")
+    assert not contains_answer("They allowed 300 points.", "308")
+    assert not contains_answer("Anything.", "")
+
+
+def test_even_sample_is_deterministic_and_spread() -> None:
+    from src.evaluation.gen_bench import even_sample
+
+    items = list(range(1190))
+    sample = even_sample(items, 300)
+    assert len(sample) == 300
+    assert sample == even_sample(items, 300)
+    assert sample[0] == 0 and sample[-1] >= 1180
+    assert even_sample(items, None) == items
+    assert even_sample([1, 2], 300) == [1, 2]

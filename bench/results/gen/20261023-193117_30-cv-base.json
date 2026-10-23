@@ -1,0 +1,81 @@
+{
+  "label": "30-cv-base",
+  "suite": "cv",
+  "domain": "cv",
+  "k": 5,
+  "limit": null,
+  "sample": null,
+  "timestamp": "2026-10-23T19:31:17",
+  "commit": "6120313",
+  "dirty": true,
+  "profile": "default",
+  "generator": "Qwen/Qwen3-0.6B",
+  "max_new_tokens": 150,
+  "device": "cuda",
+  "sets": {
+    "cv/en": {
+      "questions": 30,
+      "f1": 0.0925,
+      "f1_answered": 0.1207,
+      "contains_answer": 0.5,
+      "false_not_found": 0.2333,
+      "refused_with_answer": 0.1333,
+      "answer_in_context": 0.7,
+      "cites": 1.0,
+      "citation_correct": 0.5652,
+      "language_match": 0.8696,
+      "leaks": 0,
+      "seconds_per_answer": 2.2
+    },
+    "cv/es": {
+      "questions": 30,
+      "f1": 0.0962,
+      "f1_answered": 0.111,
+      "contains_answer": 0.5667,
+      "false_not_found": 0.1333,
+      "refused_with_answer": 0.0333,
+      "answer_in_context": 0.8667,
+      "cites": 0.9231,
+      "citation_correct": 0.875,
+      "language_match": 1.0,
+      "leaks": 0,
+      "seconds_per_answer": 2.51
+    },
+    "cv-ood/en-missing": {
+      "questions": 7,
+      "correct_not_found": 1.0,
+      "cv_message": 1.0,
+      "leaks": 0
+    },
+    "cv-ood/en-private": {
+      "questions": 2,
+      "correct_not_found": 1.0,
+      "cv_message": 1.0,
+      "leaks": 0
+    },
+    "cv-ood/en-secret": {
+      "questions": 1,
+      "correct_not_found": 0.0,
+      "cv_message": 0.0,
+      "leaks": 0
+    },
+    "cv-ood/es-missing": {
+      "questions": 7,
+      "correct_not_found": 0.8571,
+      "cv_message": 0.8571,
+      "leaks": 0
+    },
+    "cv-ood/es-private": {
+      "questions": 2,
+      "correct_not_found": 0.5,
+      "cv_message": 0.5,
+      "leaks": 0
+    },
+    "cv-ood/es-secret": {
+      "questions": 1,
+      "correct_not_found": 0.0,
+      "cv_message": 0.0,
+      "leaks": 0
+    }
+  }
+}

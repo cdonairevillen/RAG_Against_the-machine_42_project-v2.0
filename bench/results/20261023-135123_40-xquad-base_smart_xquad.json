@@ -1,0 +1,58 @@
+{
+  "label": "40-xquad-base",
+  "mode": "smart",
+  "suite": "xquad",
+  "k": 10,
+  "timestamp": "2026-10-23T13:49:51",
+  "commit": "6120313",
+  "dirty": true,
+  "domain": "xquad",
+  "profile": "default",
+  "chunking": {
+    "code_chunk_size": 2000,
+    "doc_chunk_size": 2000,
+    "code_child_size": 600,
+    "doc_child_size": 600
+  },
+  "chunkers": {},
+  "retrieval": {
+    "classifier_margin": 0.5,
+    "code_signal_weight": 0.5,
+    "doc_signal_weight": 0.5,
+    "skip_rerank_score": Infinity,
+    "bm25_score_floor": 5.5,
+    "reranker_model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    "rerank_fusion": "rrf",
+    "rrf_k": 60,
+    "doc_signal_languages": [
+      "en",
+      "es"
+    ],
+    "relevance_threshold": 0.0,
+    "rerank_doc_branch": false,
+    "code_aware_tokens": "code"
+  },
+  "device": "cuda",
+  "datasets": {
+    "en": {
+      "recall_at_k": {
+        "1": 0.9546,
+        "3": 0.9891,
+        "5": 0.9933,
+        "10": 0.9983
+      },
+      "seconds": 42.25,
+      "questions": 1190
+    },
+    "es": {
+      "recall_at_k": {
+        "1": 0.9244,
+        "3": 0.9891,
+        "5": 0.9924,
+        "10": 0.9966
+      },
+      "seconds": 49.04,
+      "questions": 1190
+    }
+  }
+}

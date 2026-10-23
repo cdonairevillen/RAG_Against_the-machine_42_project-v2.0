@@ -130,6 +130,31 @@ class SourceConfig(BaseModel):
     code_extensions: list[str] = Field(default_factory=list)
     chunkers: dict[str, str] = Field(default_factory=dict)
     default_chunker: str = "size"
+    # Out-of-domain gate for this source (cross-encoder logit). None uses
+    # retrieval.relevance_threshold. Calibrated with `gate_scores`: the
+    # reranker scores each corpus on its own scale (see FASE_4.md).
+    relevance_threshold: Optional[float] = None
+    # Data hidden at answer time ("phone", "email"): masked in the
+    # context given to the LLM, in the answer and in the sources shown.
+    # The indexed material is not modified. public_emails stay visible.
+    private_data: list[Literal["phone", "email"]] = Field(
+        default_factory=list
+    )
+    public_emails: list[str] = Field(default_factory=list)
+    private_replacement: str = "[private]"
+    # "Not found" answer of this domain, per language ("es", "en"...);
+    # empty uses the generic message.
+    not_found_message: dict[str, str] = Field(default_factory=dict)
+    # Extra rules appended to the system prompt when answering from this
+    # domain (e.g. the CV mode's persona and secrecy rules).
+    prompt_rules: str = ""
+    # Sources given to the LLM when answering from this domain (None:
+    # the caller's k). Retrieval benchmarks are not affected.
+    answer_k: Optional[int] = None
+    # Parent/child chunk sizes for this source (None: [chunking]).
+    # Changing them needs `make index SOURCE=<name>`.
+    chunk_size: Optional[int] = None
+    child_size: Optional[int] = None
 
     def chunker_for(self, extension: str) -> str:
         """Return the chunker name configured for a file extension."""

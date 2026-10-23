@@ -60,7 +60,11 @@ Reranker Qwen3-Reranker-0.6B (no medido en Fase 2). Necesita un adaptador propio
 
 ------------------------------------
 
-Indice preconstruido. Indexar con bge-m3 en CPU lleva ~2 h. Se podria construir el indice en una maquina con GPU y llevarlo hecho (snapshot de Qdrant + ficheros BM25) a los ordenadores de 42 o al despliegue.
+Indice preconstruido. Indexar con bge-m3 en CPU lleva ~2 h. Se podria construir el indice en una maquina con GPU y llevarlo hecho (snapshot de Qdrant + ficheros BM25) al despliegue. Actualizado 2026-10-23: indexar en 42 queda descartado (sus GPU no aceptan CUDA y vLLM tarda ~10 h), asi que el indice se construye en la 3080 Ti y solo va al despliegue en linea. Se podria alojar en Hugging Face (ver P10 en ROADMAP.md).
+
+------------------------------------
+
+Datasets de Hugging Face. Explorar usar datasets de Hugging Face como fuente de la ingesta y, si se puede, alojar alli los nuestros (datasets de 42, derivados multimedia). Se desarrollara mas adelante (P10 en ROADMAP.md).
 
 ------------------------------------
 

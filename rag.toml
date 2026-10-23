@@ -84,6 +84,59 @@ default_chunker = "size"
 ".rst" = "markdown_headers_packed"
 ".txt" = "markdown_headers_packed"
 
+# XQuAD (Phase 4a): general knowledge, English and Spanish in one
+# domain. Built by `make data-xquad` (one Markdown file per Wikipedia
+# article, see src/sources/xquad.py). CC-BY-SA 4.0: cite the source.
+[sources.xquad]
+root = "data/raw/xquad"
+include = [".md"]
+default_chunker = "markdown_headers_packed"
+# Own out-of-domain gate: the reranker scores Wikipedia lower than the
+# vLLM docs, and the global 0.0 rejected ~18% of valid questions. -2.0
+# accepts 93% (en/es) and still rejects every out-of-domain and vLLM
+# question measured (`gate_scores`, docs/changelog/FASE_4.md).
+relevance_threshold = -2.0
+
+# CV mode (Phase 4b): Chrystian's CV (.docx), LinkedIn profile (.pdf)
+# and biography (.md, Spanish original + English version), indexed as
+# they are, each in its own language.
+# Word/PDF go through Docling (src/ingestion/loaders.py). Git-ignored.
+[sources.cv]
+root = "data/raw/cv"
+include = [".md", ".docx", ".pdf"]
+default_chunker = "markdown_headers_packed"
+# The phone number and the old e-mail stay in the files but are never
+# shown: masked in the LLM context, the answer and the sources.
+private_data = ["phone", "email"]
+public_emails = ["cdonairevillen@gmail.com"]
+private_replacement = "[dato privado]"
+# Appended to the system prompt when answering from the CV (FASE_4.md,
+# 4b): the 0.6B model mixed jobs and invented the secret literary world.
+prompt_rules = """
+The SOURCES describe one person, Chrystian Donaire Villén: his CV, his LinkedIn profile and his biography. Also follow these rules:
+7. Answer about Chrystian in the third person.
+8. Each job, project and date belongs to the company or project named next to it in the same source. Never mix details of different jobs.
+9. Books, films and music in the SOURCES are his tastes, not works he created.
+10. His literary world is a secret project: if asked about it, say only that it is secret and that more will be known soon.
+11. His only public contact is the e-mail cdonairevillen@gmail.com. Never present it as another address. If asked for a phone number or any other contact detail, say that it is private and give that e-mail.
+"""
+# Calibrated with `gate_scores` for the 800-char chunks below (FASE_4.md,
+# 4b): the global 0.0 rejected over 40% of valid English questions;
+# -3.0 accepts 83% (en) / 90% (es) and no out-of-domain question.
+# Rejections still end in the CV message below.
+relevance_threshold = -3.0
+# The English CV comes first for English questions and lacks the
+# biography-only facts: more sources bring the biography in too.
+answer_k = 8
+# Smaller chunks (one job or section each) so the model does not mix
+# facts of neighbouring jobs, and 8 of them fit the token budget.
+chunk_size = 800
+child_size = 400
+
+[sources.cv.not_found_message]
+es = "No dispongo de esa información, ¡pero puedes preguntárselo tú! cdonairevillen@gmail.com"
+en = "I don't have that information, but you can ask him yourself! cdonairevillen@gmail.com"
+
 # Optional profiles: extra models as explicit options on top of the
 # stable base above (which is what the official benchmark uses and gives
 # the same results on any machine). Select with --profile <name>,

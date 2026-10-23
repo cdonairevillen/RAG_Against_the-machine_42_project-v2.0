@@ -1,0 +1,58 @@
+{
+  "label": "51-cv-chunks800",
+  "mode": "smart",
+  "suite": "cv",
+  "k": 10,
+  "timestamp": "2026-10-23T19:56:02",
+  "commit": "6120313",
+  "dirty": true,
+  "domain": "cv",
+  "profile": "default",
+  "chunking": {
+    "code_chunk_size": 2000,
+    "doc_chunk_size": 2000,
+    "code_child_size": 600,
+    "doc_child_size": 600
+  },
+  "chunkers": {},
+  "retrieval": {
+    "classifier_margin": 0.5,
+    "code_signal_weight": 0.5,
+    "doc_signal_weight": 0.5,
+    "skip_rerank_score": Infinity,
+    "bm25_score_floor": 5.5,
+    "reranker_model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    "rerank_fusion": "rrf",
+    "rrf_k": 60,
+    "doc_signal_languages": [
+      "en",
+      "es"
+    ],
+    "relevance_threshold": 0.0,
+    "rerank_doc_branch": false,
+    "code_aware_tokens": "code"
+  },
+  "device": "cuda",
+  "datasets": {
+    "en": {
+      "recall_at_k": {
+        "1": 0.1333,
+        "3": 0.4333,
+        "5": 0.5667,
+        "10": 0.7
+      },
+      "seconds": 1.56,
+      "questions": 30
+    },
+    "es": {
+      "recall_at_k": {
+        "1": 0.7333,
+        "3": 0.8667,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "seconds": 1.29,
+      "questions": 30
+    }
+  }
+}

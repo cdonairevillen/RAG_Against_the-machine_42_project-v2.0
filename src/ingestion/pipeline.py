@@ -11,6 +11,7 @@ from tqdm import tqdm
 from src.config import ChunkingConfig, SourceConfig
 from src.ingestion.chunk import CHILD, PARENT, Chunk, chunk_uuid
 from src.ingestion.chunkers import get_chunker, split_by_size
+from src.ingestion.loaders import read_text
 from src.ingestion.tokens import tokenize, with_identifier_parts
 
 INDEX_DIR = "bm25_index"
@@ -166,11 +167,9 @@ class Ingester:
         for abs_path in tqdm(files, desc=f"Chunking {self.domain}"):
             rel_path = os.path.relpath(abs_path).replace("\\", "/")
             try:
-                with open(
-                    abs_path, "r", encoding="utf-8", errors="ignore"
-                ) as fh:
-                    content = fh.read()
-            except OSError:
+                content = read_text(abs_path)
+            except OSError as exc:
+                print(f"Skipping {rel_path}: {exc}")
                 continue
 
             if not content.strip():

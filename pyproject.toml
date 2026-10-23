@@ -18,6 +18,12 @@ dependencies = [
     # Declared here (llm_sdk already needs it) only to pick the CUDA build.
     "torch>=2.0.0",
     "accelerate>=1.15.0",
+    "pyarrow>=15",
+    # Converts the CV (.docx) and the LinkedIn PDF (Phase 4b).
+    "docling>=2.142.1",
+    # Docling's layout model needs it; declared to take the CUDA build
+    # matching torch (the PyPI wheel breaks torchvision::nms).
+    "torchvision",
 ]
 
 [tool.uv.sources]
@@ -25,6 +31,9 @@ llm-sdk = { path = "./llm_sdk", editable = true }
 # CUDA 12.6 build: runs on old drivers (42 machines) and falls back to CPU
 # when there is no GPU. macOS keeps the default PyPI wheel.
 torch = [
+    { index = "pytorch-cu126", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
     { index = "pytorch-cu126", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 
@@ -58,6 +67,11 @@ check_untyped_defs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# With Docling's optional dependencies, importing transformers pulls in
+# sklearn -> pandas -> pyarrow, and loading pyarrow while faulthandler is
+# active crashes Python on Windows (segfault before any test runs).
+# Normal runs do not enable faulthandler; only pytest does.
+addopts = "-p no:faulthandler"
 pythonpath = ["."]
 filterwarnings = [
     "ignore:Payload indexes have no effect in the local Qdrant:UserWarning",

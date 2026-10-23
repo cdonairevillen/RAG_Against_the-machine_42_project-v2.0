@@ -157,6 +157,9 @@ class Retriever:
         self.embedder: Optional[Any] = None
         self.dense_name = ""
         self._query_cache: tuple[str, list[float]] = ("", [])
+        # Sources for the LLM when answering from this domain (rag.toml
+        # answer_k); None keeps the caller's k.
+        self.answer_k: Optional[int] = None
 
         self.chunk_map: dict = {}
         self.parent_chunk_map: dict = {}
@@ -232,11 +235,14 @@ class Retriever:
             i for i, c in enumerate(children) if c.chunk_type == "doc"
         ]
 
-    def load_embedder(self, indexed_model: Optional[str]) -> None:
+    def load_embedder(self, indexed_model: Optional[str],
+                      embedder: Optional[Any] = None) -> None:
         """Load the query embedder, checking it matches the index.
 
         Args:
             indexed_model: Embedding model recorded in the manifest.
+            embedder: An already loaded Embedder of the same model to
+                reuse (several domains share one model in memory).
 
         Raises:
             RuntimeError: If the index was built with another model (or
@@ -251,13 +257,16 @@ class Retriever:
                 f"'{self.domain}' was built with {indexed_model!r}. "
                 f"Run 'make index' again."
             )
-        self.embedder = Embedder(model, device=self.models.resolved_device())
+        self.embedder = embedder or Embedder(
+            model, device=self.models.resolved_device()
+        )
         self.dense_name = vector_name(model)
 
     @classmethod
     def from_store(cls, domain: str = "vllm",
                    config: Optional[RagConfig] = None,
-                   store: Optional[ChunkStore] = None) -> "Retriever":
+                   store: Optional[ChunkStore] = None,
+                   embedder: Optional[Any] = None) -> "Retriever":
         """Load a Retriever for one domain.
 
         Chunk records come from the ChunkStore (Qdrant) and the BM25
@@ -269,6 +278,7 @@ class Retriever:
             config: Pipeline configuration (defaults to rag.toml).
             store: ChunkStore to read from (defaults to Qdrant from the
                 configuration).
+            embedder: Query Embedder to reuse instead of loading one.
 
         Returns:
             A ready-to-use Retriever instance.
@@ -306,17 +316,25 @@ class Retriever:
                 f"Run 'make index' again."
             )
 
+        settings = config.retrieval
+        source = config.sources.get(domain)
+        if source is not None and source.relevance_threshold is not None:
+            settings = settings.model_copy(update={
+                "relevance_threshold": source.relevance_threshold,
+            })
         retriever = cls(chunks=children, bm25=bm25,
-                        settings=config.retrieval, models=config.models)
+                        settings=settings, models=config.models)
         retriever.set_children(children)
         retriever.set_parents(parents)
         retriever.bm25_code = bm25_code
         retriever.bm25_doc = bm25_doc
         retriever.store = store
         retriever.domain = domain
+        retriever.answer_k = source.answer_k if source else None
         retriever.embeddings = config.embeddings
         if config.embeddings.enabled:
-            retriever.load_embedder(manifest.get("embedding_model"))
+            retriever.load_embedder(manifest.get("embedding_model"),
+                                    embedder)
         print(
             f"Loaded {len(children)} chunks for '{domain}' "
             f"({len(retriever.doc_chunk_indices)} doc, "
@@ -711,6 +729,7 @@ class Retriever:
         if not query or not query.strip() or k <= 0:
             return []
 
+        k = self.answer_k or k
         threshold = self.settings.relevance_threshold
         if self.reranker is None or threshold is None:
             if self.get_top_bm25_score(query) < self.settings.bm25_score_floor:

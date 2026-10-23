@@ -1,0 +1,364 @@
+{
+  "rag_questions": [
+    {
+      "question_id": "cv-01",
+      "question": "¿Cuándo nació Chrystian?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 607,
+          "last_character_index": 646
+        }
+      ],
+      "answer": "1996"
+    },
+    {
+      "question_id": "cv-02",
+      "question": "¿En qué barrio de Madrid creció Chrystian?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 647,
+          "last_character_index": 691
+        }
+      ],
+      "answer": "Villaverde"
+    },
+    {
+      "question_id": "cv-03",
+      "question": "¿En qué instituto estudió Chrystian?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 783,
+          "last_character_index": 837
+        }
+      ],
+      "answer": "Celestino Mutis"
+    },
+    {
+      "question_id": "cv-04",
+      "question": "¿Qué carrera empezó Chrystian en la Universidad Carlos III?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 935,
+          "last_character_index": 1033
+        }
+      ],
+      "answer": "Telemática"
+    },
+    {
+      "question_id": "cv-05",
+      "question": "¿En qué estudio hizo Chrystian su Erasmus de prácticas?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 2582,
+          "last_character_index": 2709
+        }
+      ],
+      "answer": "Moonraker"
+    },
+    {
+      "question_id": "cv-06",
+      "question": "¿En qué documental trabajó Chrystian en Moonraker VFX?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 2863,
+          "last_character_index": 2966
+        }
+      ],
+      "answer": "Lost Pyramid"
+    },
+    {
+      "question_id": "cv-07",
+      "question": "¿Para qué organismo impartió Chrystian un curso de animación 3D?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 3410,
+          "last_character_index": 3463
+        }
+      ],
+      "answer": "Guardia Civil"
+    },
+    {
+      "question_id": "cv-08",
+      "question": "¿En qué videojuego móvil trabajó Chrystian en Lion's Roar Games?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 3850,
+          "last_character_index": 3925
+        }
+      ],
+      "answer": "Guild Adventures"
+    },
+    {
+      "question_id": "cv-09",
+      "question": "¿En qué videojuego trabaja Chrystian en De La Luna Luna Studio?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 4120,
+          "last_character_index": 4178
+        }
+      ],
+      "answer": "Lorca"
+    },
+    {
+      "question_id": "cv-10",
+      "question": "¿Qué framework de backend usó Chrystian para la aplicación de registro de horas del estudio?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 4744,
+          "last_character_index": 4801
+        }
+      ],
+      "answer": "FastAPI"
+    },
+    {
+      "question_id": "cv-11",
+      "question": "¿Dónde está desplegada la aplicación de registro de horas?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 4803,
+          "last_character_index": 4843
+        }
+      ],
+      "answer": "Google Cloud Run"
+    },
+    {
+      "question_id": "cv-12",
+      "question": "¿Para qué empresa alemana creó Chrystian props 3D modulares?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 5070,
+          "last_character_index": 5139
+        }
+      ],
+      "answer": "Demoup"
+    },
+    {
+      "question_id": "cv-13",
+      "question": "¿Qué puesto tiene Chrystian en Voxel School?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 5462,
+          "last_character_index": 5553
+        }
+      ],
+      "answer": "technical artist"
+    },
+    {
+      "question_id": "cv-14",
+      "question": "¿Cuánto aceleraron las herramientas de Chrystian en Voxel School la preparación de escenas para render?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 5899,
+          "last_character_index": 5944
+        }
+      ],
+      "answer": "60"
+    },
+    {
+      "question_id": "cv-15",
+      "question": "¿Qué aprendió Chrystian trabajando de camarero?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 6062,
+          "last_character_index": 6133
+        }
+      ],
+      "answer": "presión"
+    },
+    {
+      "question_id": "cv-16",
+      "question": "¿Qué ejecuta de forma segura el sandbox de Agent Smith?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 6775,
+          "last_character_index": 6854
+        }
+      ],
+      "answer": "código"
+    },
+    {
+      "question_id": "cv-17",
+      "question": "¿En qué lenguaje está escrito el videojuego multijugador TAP?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 7189,
+          "last_character_index": 7236
+        }
+      ],
+      "answer": "C++"
+    },
+    {
+      "question_id": "cv-18",
+      "question": "¿Qué certificado acredita el nivel de inglés de Chrystian?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 8404,
+          "last_character_index": 8464
+        }
+      ],
+      "answer": "LanguageCert"
+    },
+    {
+      "question_id": "cv-19",
+      "question": "¿De qué empresa son las certificaciones de IA de Chrystian?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 8196,
+          "last_character_index": 8302
+        }
+      ],
+      "answer": "MongoDB"
+    },
+    {
+      "question_id": "cv-20",
+      "question": "¿En qué ciudad hizo Chrystian un intercambio escolar?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 8902,
+          "last_character_index": 8971
+        }
+      ],
+      "answer": "Estambul"
+    },
+    {
+      "question_id": "cv-21",
+      "question": "¿Adónde fue Chrystian de viaje de estudios con quince años para mejorar su inglés?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 8776,
+          "last_character_index": 8899
+        }
+      ],
+      "answer": "Eastbourne"
+    },
+    {
+      "question_id": "cv-22",
+      "question": "¿Qué instrumento toca Chrystian?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 9716,
+          "last_character_index": 9732
+        }
+      ],
+      "answer": "guitarra"
+    },
+    {
+      "question_id": "cv-23",
+      "question": "¿Chrystian prefiere el esquí o el snowboard?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 9565,
+          "last_character_index": 9618
+        }
+      ],
+      "answer": "esquí"
+    },
+    {
+      "question_id": "cv-24",
+      "question": "Nombra una de las sagas de fantasía o ciencia ficción favoritas de Chrystian.",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 10326,
+          "last_character_index": 10394
+        }
+      ],
+      "answer": "Dune"
+    },
+    {
+      "question_id": "cv-25",
+      "question": "¿Qué grupo aparece primero en la lista de gustos musicales de Chrystian?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 9828,
+          "last_character_index": 9882
+        }
+      ],
+      "answer": "Linkin Park"
+    },
+    {
+      "question_id": "cv-26",
+      "question": "¿En qué cortometraje de animación participó Chrystian durante el Bachelor?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 1795,
+          "last_character_index": 1872
+        }
+      ],
+      "answer": "Clean Hit"
+    },
+    {
+      "question_id": "cv-27",
+      "question": "¿Qué tipo de puestos de desarrollo de software busca Chrystian?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 11210,
+          "last_character_index": 11302
+        }
+      ],
+      "answer": "backend"
+    },
+    {
+      "question_id": "cv-28",
+      "question": "¿A dónde estaría dispuesto a reubicarse Chrystian?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 11388,
+          "last_character_index": 11453
+        }
+      ],
+      "answer": "Europa"
+    },
+    {
+      "question_id": "cv-29",
+      "question": "¿Cuál es el correo de contacto de Chrystian?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 11470,
+          "last_character_index": 11506
+        }
+      ],
+      "answer": "cdonairevillen@gmail.com"
+    },
+    {
+      "question_id": "cv-30",
+      "question": "¿Qué películas de Star Wars considera Chrystian la verdadera saga?",
+      "sources": [
+        {
+          "file_path": "data/raw/cv/autobiography.md",
+          "first_character_index": 10871,
+          "last_character_index": 10919
+        }
+      ],
+      "answer": "seis"
+    }
+  ]
+}

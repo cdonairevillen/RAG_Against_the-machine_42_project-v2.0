@@ -1,5 +1,5 @@
 import os
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel
 from tqdm import tqdm
@@ -7,6 +7,7 @@ from tqdm import tqdm
 from src.config import CONFIG_FILE, RagConfig, load_config
 from src.rag import RagPipeline
 from src.retriever import Retriever
+from src.router import DomainRouter
 from src.generator import Generator
 from src.embeddings import vector_name
 from src.ingestion.chunk import Chunk
@@ -73,6 +74,8 @@ class CLI:
         self.domain = domain
         self.config: RagConfig = load_config(config, profile=profile)
         self.retriever: Retriever | None = None
+        self.router: DomainRouter | None = None
+        self.index_embedder: Any = None
         self.generator: Generator | None = None
 
     def get_retriever(self, with_reranker: bool = True) -> Retriever:
@@ -127,23 +130,38 @@ class CLI:
               code_chunk_size: Optional[int] = None,
               doc_chunk_size: Optional[int] = None,
               repo_root: Optional[str] = None) -> None:
-        """Chunk a knowledge source and persist it.
+        """Chunk knowledge sources and persist them.
 
-        Chunk records go to Qdrant and the BM25 indices to
-        <processed_dir>/<source>/. Sizes default to rag.toml.
+        Without `source`, every source in rag.toml is indexed in turn,
+        each into its own collection (rag_<source>). Chunk records go to
+        Qdrant and the BM25 indices to <processed_dir>/<source>/. Sizes
+        default to rag.toml.
 
         Args:
-            source: Source to index (defaults to the CLI domain).
+            source: Single source to index (default: all of them).
             max_chunk_size: Overrides both code and doc parent sizes.
             code_chunk_size: Maximum characters per code parent chunk.
             doc_chunk_size: Maximum characters per doc parent chunk.
-            repo_root: Overrides the source root directory.
+            repo_root: Overrides the source root directory (only with
+                `source`).
         """
+        if source is None and repo_root:
+            print("Error: --repo_root needs --source.")
+            return
+        for domain in [source] if source else list(self.config.sources):
+            self.index_source(domain, max_chunk_size, code_chunk_size,
+                              doc_chunk_size, repo_root)
+
+    def index_source(self, domain: str,
+                     max_chunk_size: Optional[int] = None,
+                     code_chunk_size: Optional[int] = None,
+                     doc_chunk_size: Optional[int] = None,
+                     repo_root: Optional[str] = None) -> None:
+        """Index one source (see index())."""
         from src.ingestion.pipeline import Ingester
         from src.ingestion.tokens import corpus_part_types
         from src.storage.qdrant_store import QdrantChunkStore
 
-        domain = source or self.domain
         try:
             source_cfg = self.config.source(domain)
         except KeyError as exc:
@@ -151,15 +169,22 @@ class CLI:
             return
         if repo_root:
             source_cfg = source_cfg.model_copy(update={"root": repo_root})
+        # A source's own sizes (rag.toml chunk_size/child_size) win over
+        # --max_chunk_size, which `make index` passes for every source.
+        parent = source_cfg.chunk_size or max_chunk_size
         chunking = self.config.chunking.model_copy(update={
             k: v for k, v in {
-                "code_chunk_size": code_chunk_size or max_chunk_size,
-                "doc_chunk_size": doc_chunk_size or max_chunk_size,
+                "code_chunk_size": code_chunk_size or parent,
+                "doc_chunk_size": doc_chunk_size or parent,
+                "code_child_size": source_cfg.child_size,
+                "doc_child_size": source_cfg.child_size,
             }.items() if v
         })
 
         if not os.path.isdir(source_cfg.root):
-            print(f"Error: source root not found at '{source_cfg.root}'")
+            print(f"Error: source root of '{domain}' not found at "
+                  f"'{source_cfg.root}' (download it first: 'make data' "
+                  f"for vllm, 'make data-xquad' for xquad).")
             return
         try:
             store = QdrantChunkStore.from_config(self.config.qdrant)
@@ -190,6 +215,33 @@ class CLI:
         except Exception as exc:
             print(f"Error during indexing: {exc}")
 
+    def fetch_xquad(self) -> None:
+        """Download XQuAD (en, es) and build its corpus and datasets.
+
+        Writes the article files to data/raw/xquad/ and the benchmark
+        datasets to bench/datasets/xquad/ (see src/sources/xquad.py).
+        """
+        from src.sources.xquad import prepare
+
+        try:
+            prepare()
+        except (OSError, ValueError) as exc:
+            print(f"Error preparing XQuAD: {exc}")
+
+    def build_cv_bench(self) -> None:
+        """Build the CV-mode datasets from bench/datasets/cv/questions.json.
+
+        Locates every answer's evidence in the biography (re-run after
+        editing it; fails if an evidence is missing or ambiguous).
+        """
+        from src.sources.cv import build
+
+        try:
+            print(f"CV benchmark: {build()} questions per language "
+                  f"(en, es), evidence verified.")
+        except (OSError, ValueError) as exc:
+            print(f"Error building the CV benchmark: {exc}")
+
     def embed_children(self, ingester: "Ingester") -> dict:
         """Embed every child chunk with the configured model.
 
@@ -207,8 +259,11 @@ class CLI:
         device = self.config.models.resolved_device()
         print(f"Embedding {len(ingester.chunks)} children with "
               f"{emb.model} on {device}...")
-        embedder = Embedder(emb.model, device=device,
-                            batch_size=emb.batch_size)
+        # Loaded once when several sources are indexed in a row.
+        if self.index_embedder is None:
+            self.index_embedder = Embedder(emb.model, device=device,
+                                           batch_size=emb.batch_size)
+        embedder = self.index_embedder
         start = time.perf_counter()
         matrix = embedder.encode_documents([
             document_text(c.file_path, c.text) for c in ingester.chunks
@@ -299,20 +354,30 @@ class CLI:
             label="student_search_results",
         )
 
-    def get_pipeline(self) -> RagPipeline:
-        """The shared answer flow (retriever with reranker + generator)."""
-        return RagPipeline(
-            self.get_retriever(with_reranker=True), self.get_generator()
-        )
+    def get_router(self) -> DomainRouter:
+        """Load and cache a DomainRouter over every indexed domain."""
+        if self.router is None:
+            self.router = DomainRouter.from_store(config=self.config)
+        return self.router
 
-    def answer(self, query: str, k: int = 10, stream: bool = True) -> None:
+    def get_pipeline(self) -> RagPipeline:
+        """The shared answer flow (router with reranker + generator)."""
+        return RagPipeline(self.get_router(), self.get_generator())
+
+    def answer(self, query: str, k: int = 10, stream: bool = True,
+               domains: Optional[str] = None) -> None:
         """Answer a single question using retrieved and reranked
         context.
+
+        Searches every indexed domain and answers from the best one,
+        unless `domains` restricts the search.
 
         Args:
             query: Natural-language question.
             k: Number of chunks to retrieve as context.
             stream: Print the answer as it is generated.
+            domains: Optional filter, e.g. "xquad" or "vllm,xquad"
+                (default: all indexed domains).
         """
         if not query or not query.strip():
             print("Empty query — nothing to answer.")
@@ -325,19 +390,31 @@ class CLI:
                 result = pipeline.answer(
                     query, k=k,
                     on_piece=lambda p: print(p, end="", flush=True),
+                    domains=domains,
                 )
                 print()
+                if result.not_found and result.sources:
+                    # The LLM's own "not found" was streamed; show the
+                    # domain's message instead.
+                    print(result.text)
             else:
-                result = pipeline.answer(query, k=k)
+                result = pipeline.answer(query, k=k, domains=domains)
                 print(result.text)
         except Exception as exc:
             print(f"Error while answering: {exc}")
             return
 
+        route = self.get_router().last_route
+        if route:
+            print("\n=== Route ===")
+            print(", ".join(f"{d} ({s:.2f})" for d, s in route))
         if not result.not_found:
             print("\n=== Sources ===")
+            parents = pipeline.retriever.get_parent_chunk_map()
             for i, src in enumerate(result.sources):
-                chunk = self.find_chunk(pipeline.retriever, src)
+                chunk = parents.get(
+                    (src.file_path, src.first_character_index)
+                )
                 print(f"[{i + 1}] filepath: {src.file_path}")
                 print(f"    chunk:    {i}")
                 print(
@@ -345,7 +422,8 @@ class CLI:
                     f"{src.last_character_index}"
                 )
                 if chunk:
-                    preview = chunk.text[:200].replace("\n", " ")
+                    text = pipeline.rules.redact(chunk.text, chunk.domain)
+                    preview = text[:200].replace("\n", " ")
                     print(f"    text:     {preview}...")
                 print()
 
@@ -398,7 +476,8 @@ class CLI:
                     retrieved_sources=sources,
                 ))
         else:
-            pipeline = self.get_pipeline()
+            # One domain (the 42 corpus), like the retrieval-only path.
+            pipeline = RagPipeline(retriever, self.get_generator())
             for question in tqdm(dataset.rag_questions, desc=desc):
                 try:
                     result = pipeline.answer(question.question, k=k)
@@ -477,7 +556,8 @@ class CLI:
             print(f"Judge unavailable: {exc}")
 
     def gen_bench(self, label: str = "run", k: int = 5,
-                  limit: Optional[int] = None) -> None:
+                  limit: Optional[int] = None,
+                  suite: str = "vllm", full: bool = False) -> None:
         """Generate answers for the benchmark sets and score them.
 
         Measures token F1 against the 42 reference answers, citations,
@@ -488,12 +568,17 @@ class CLI:
             label: Short name for this run.
             k: Sources passed to the generator.
             limit: Questions per public dataset (default: all 100).
+            suite: "vllm" (42 sets + out-of-domain) or "xquad" (XQuAD
+                en/es over the xquad domain; 300 fixed questions per
+                language unless --full).
+            full: Ask every question of the suite (complete runs only).
         """
         from src.evaluation.gen_bench import run_gen_bench
 
         try:
             run_gen_bench(label=label, k=k, limit=limit,
-                          domain=self.domain, config=self.config)
+                          domain=self.domain, config=self.config,
+                          suite=suite, full=full)
         except Exception as exc:
             print(f"Error during gen_bench: {exc}")
 
@@ -520,6 +605,50 @@ class CLI:
             )
         except Exception as exc:
             print(f"Error during bench: {exc}")
+
+    def route_bench(self, label: str = "run", k: int = 10,
+                    limit: Optional[int] = None) -> None:
+        """Measure the router: unfiltered questions vs. their domain.
+
+        Every benchmark set (42 public, Spanish complement, XQuAD en/es)
+        is searched across all indexed domains. Records routing accuracy
+        and routed Recall@k in bench/results/route/.
+
+        Args:
+            label: Short name for this run.
+            k: Sources retrieved per question.
+            limit: Questions per dataset (default: all).
+        """
+        from src.evaluation.routing import run_route_bench
+
+        try:
+            run_route_bench(label=label, k=k, limit=limit,
+                            config=self.config)
+        except Exception as exc:
+            print(f"Error during route_bench: {exc}")
+
+    def gate_scores(self, domain: Optional[str] = None, k: int = 5,
+                    label: str = "run",
+                    limit: Optional[int] = None) -> None:
+        """Calibrate a domain's out-of-domain gate.
+
+        Scores (as the gate does) the questions the domain should answer
+        and those it should reject, and prints the pass rate of candidate
+        thresholds. Results go to bench/results/gate/.
+
+        Args:
+            domain: Domain to calibrate (default: the CLI domain).
+            k: Sources retrieved per question (gen-bench and web use 5).
+            label: Short name for this run.
+            limit: Questions per group (default: all).
+        """
+        from src.evaluation.gate import run_gate_scores
+
+        try:
+            run_gate_scores(domain or self.domain, k=k, label=label,
+                            limit=limit, config=self.config)
+        except Exception as exc:
+            print(f"Error during gate_scores: {exc}")
 
     @staticmethod
     def find_chunk(retriever: Retriever,

@@ -56,6 +56,11 @@ data:
 		echo "vLLM already present at $(VLLM_DIR)"; \
 	fi
 
+# XQuAD en/es (Phase 4a): pinned Hugging Face + GitHub files (SHA256),
+# turned into data/raw/xquad/ and bench/datasets/xquad/.
+data-xquad:
+	$(RUN) fetch_xquad
+
 # Original 42 download. Needs access to the intra CDN and replaces the
 # versioned datasets with the ones from the attachment.
 data-42:
@@ -92,8 +97,10 @@ web-stop:
 	@echo "Closing web."
 	@pkill -f "streamlit run" || true
 
+# Every source in rag.toml, or only one with SOURCE=<name>.
+SOURCE    ?=
 index: db-up
-	$(RUN) index --max_chunk_size 2000
+	$(RUN) index --max_chunk_size 2000 $(if $(SOURCE),--source $(SOURCE))
 
 search-docs: db-up
 	$(RUN) search_dataset \
@@ -117,11 +124,16 @@ eval-code:
 		--dataset_path $(DATASETS)/AnsweredQuestions/dataset_code_public.json \
 		--k 10
 
+# Optional benchmark suite, e.g. SUITE=xquad.
+SUITE     ?=
 bench: db-up
-	$(RUN) bench --label $(LABEL)
+	$(RUN) bench --label $(LABEL) $(if $(SUITE),--suite $(SUITE))
+
+route-bench: db-up
+	$(RUN) route_bench --label $(LABEL)
 
 gen-bench: db-up
-	$(RUN) gen_bench --label $(LABEL)
+	$(RUN) gen_bench --label $(LABEL) $(if $(SUITE),--suite $(SUITE)) $(if $(FULL),--full)
 
 judge:
 	$(RUN) judge --label $(LABEL)
@@ -156,5 +168,5 @@ meme:
 	$(ENV) $(UV) run --project . $(PY) -m streamlit run src/web.py &
 	@echo "Web running at http://localhost:8501"
 
-.PHONY: install data data-42 db-up db-down db-reset run web web-stop index search-docs search-code \
-        eval-docs eval-code bench gen-bench judge test lint clean meme
+.PHONY: install data data-xquad data-42 db-up db-down db-reset run web web-stop index search-docs search-code \
+        eval-docs eval-code bench route-bench gen-bench judge test lint clean meme

@@ -1,0 +1,331 @@
+{
+  "description": "CV-mode benchmark (Phase 4b). Hand-written questions about Chrystian, the same in English and Spanish. 'answer' is a short span to look for in the generated answer (per language when it differs); 'evidence' is the exact text of data/raw/cv/autobiography.md that answers it (Spanish questions) and 'evidence_en' that of data/raw/cv/autobiography_en.md (English questions) (the ground-truth source, located by src/sources/cv.py). 'ood' are questions about him the documents do not answer (expected: the CV 'not found' message) and contact data that must never be shown (phone, old e-mail).",
+  "questions": [
+    {
+      "id": "cv-01",
+      "en": "When was Chrystian born?",
+      "es": "¿Cuándo nació Chrystian?",
+      "answer": "1996",
+      "evidence": "Nació el 20 de enero de 1996 en Madrid.",
+      "evidence_en": "He was born on 20 January 1996 in Madrid."
+    },
+    {
+      "id": "cv-02",
+      "en": "Which Madrid neighbourhood did Chrystian grow up in?",
+      "es": "¿En qué barrio de Madrid creció Chrystian?",
+      "answer": "Villaverde",
+      "evidence": "Creció en Villaverde, en el sur de la ciudad",
+      "evidence_en": "He grew up in Villaverde, in the south of the city"
+    },
+    {
+      "id": "cv-03",
+      "en": "Which high school did Chrystian attend?",
+      "es": "¿En qué instituto estudió Chrystian?",
+      "answer": "Celestino Mutis",
+      "evidence": "secundaria y bachillerato en el I.E.S. Celestino Mutis",
+      "evidence_en": "secondary school and sixth form (bachillerato) at I.E.S. Celestino Mutis"
+    },
+    {
+      "id": "cv-04",
+      "en": "Which degree did Chrystian start at Carlos III University?",
+      "es": "¿Qué carrera empezó Chrystian en la Universidad Carlos III?",
+      "answer": {
+        "es": "Telemática",
+        "en": "Telematics"
+      },
+      "evidence": "**Ingeniería Telemática — Universidad Carlos III de Madrid (campus de Leganés), curso 2016–2017.**",
+      "evidence_en": "**Telematics Engineering — Carlos III University of Madrid (Leganés campus), 2016–2017 academic year.**"
+    },
+    {
+      "id": "cv-05",
+      "en": "At which studio did Chrystian do his Erasmus internship?",
+      "es": "¿En qué estudio hizo Chrystian su Erasmus de prácticas?",
+      "answer": "Moonraker",
+      "evidence": "Su primera experiencia profesional fue un **Erasmus de prácticas en Moonraker VFX** (Bristol, Reino Unido; marzo–junio de 2018)",
+      "evidence_en": "His first professional experience was an **Erasmus internship at Moonraker VFX** (Bristol, United Kingdom; March–June 2018)"
+    },
+    {
+      "id": "cv-06",
+      "en": "Which documentary did Chrystian work on at Moonraker VFX?",
+      "es": "¿En qué documental trabajó Chrystian en Moonraker VFX?",
+      "answer": "Lost Pyramid",
+      "evidence": "incluidas las recreaciones 3D del documental *Lost Pyramid*, producido por Lion TV para History Channel",
+      "evidence_en": "including the 3D recreations of the documentary *Lost Pyramid*, produced by Lion TV for History Channel"
+    },
+    {
+      "id": "cv-07",
+      "en": "For which organisation did Chrystian teach a 3D animation course?",
+      "es": "¿Para qué organismo impartió Chrystian un curso de animación 3D?",
+      "answer": "Guardia Civil",
+      "evidence": "en un **curso de animación 3D para la Guardia Civil**",
+      "evidence_en": "on a **3D animation course for the Guardia Civil**"
+    },
+    {
+      "id": "cv-08",
+      "en": "Which mobile game did Chrystian work on at Lion's Roar Games?",
+      "es": "¿En qué videojuego móvil trabajó Chrystian en Lion's Roar Games?",
+      "answer": "Guild Adventures",
+      "evidence": "Modeló y animó personajes del videojuego móvil publicado *Guild Adventures*",
+      "evidence_en": "He modelled and animated characters for the published mobile game *Guild Adventures*"
+    },
+    {
+      "id": "cv-09",
+      "en": "Which video game does Chrystian work on at De La Luna Luna Studio?",
+      "es": "¿En qué videojuego trabaja Chrystian en De La Luna Luna Studio?",
+      "answer": "Lorca",
+      "evidence": "character artist en ***Lorca***, el videojuego del estudio",
+      "evidence_en": "character artist on ***Lorca***, the studio's video game"
+    },
+    {
+      "id": "cv-10",
+      "en": "Which backend framework did Chrystian use for the studio's time-tracking app?",
+      "es": "¿Qué framework de backend usó Chrystian para la aplicación de registro de horas del estudio?",
+      "answer": "FastAPI",
+      "evidence": "Está hecha con **FastAPI, React y PostgreSQL (Supabase)**",
+      "evidence_en": "It is built with **FastAPI, React and PostgreSQL (Supabase)**"
+    },
+    {
+      "id": "cv-11",
+      "en": "Where is the time-tracking app deployed?",
+      "es": "¿Dónde está desplegada la aplicación de registro de horas?",
+      "answer": "Google Cloud Run",
+      "evidence": "sigue **desplegada en Google Cloud Run**",
+      "evidence_en": "is still **deployed on Google Cloud Run**"
+    },
+    {
+      "id": "cv-12",
+      "en": "For which German company did Chrystian create modular 3D props?",
+      "es": "¿Para qué empresa alemana creó Chrystian props 3D modulares?",
+      "answer": "Demoup",
+      "evidence": "**Demoup / Cliplister** (empresa alemana): sets de props 3D modulares",
+      "evidence_en": "**Demoup / Cliplister** (a German company): sets of modular, optimised 3D props"
+    },
+    {
+      "id": "cv-13",
+      "en": "What role does Chrystian have at Voxel School?",
+      "es": "¿Qué puesto tiene Chrystian en Voxel School?",
+      "answer": "technical artist",
+      "evidence": "En **Voxel School** (desde junio de 2026) trabaja como **technical artist de herramientas**",
+      "evidence_en": "At **Voxel School** (since June 2026) he works as a **tools technical artist**"
+    },
+    {
+      "id": "cv-14",
+      "en": "By how much did Chrystian's Voxel School tools speed up scene preparation for rendering?",
+      "es": "¿Cuánto aceleraron las herramientas de Chrystian en Voxel School la preparación de escenas para render?",
+      "answer": "60",
+      "evidence": "según su estimación, hasta en torno a un 60 %",
+      "evidence_en": "by his estimate, up to around 60%"
+    },
+    {
+      "id": "cv-15",
+      "en": "What did Chrystian learn working as a waiter?",
+      "es": "¿Qué aprendió Chrystian trabajando de camarero?",
+      "answer": {
+        "es": "presión",
+        "en": "pressure"
+      },
+      "evidence": "Allí aprendió a trabajar bajo presión y a tratar con clientes exigentes",
+      "evidence_en": "There he learned to work under pressure and to deal with demanding customers"
+    },
+    {
+      "id": "cv-16",
+      "en": "What does the Agent Smith sandbox execute safely?",
+      "es": "¿Qué ejecuta de forma segura el sandbox de Agent Smith?",
+      "answer": {
+        "es": "código",
+        "en": "code"
+      },
+      "evidence": "con un sandbox propio para ejecutar de forma segura el código generado por LLMs",
+      "evidence_en": "with its own sandbox to safely execute code generated by LLMs"
+    },
+    {
+      "id": "cv-17",
+      "en": "In which programming language is the TAP multiplayer game written?",
+      "es": "¿En qué lenguaje está escrito el videojuego multijugador TAP?",
+      "answer": "C++",
+      "evidence": "videojuego multijugador cliente-servidor en C++",
+      "evidence_en": "a client-server multiplayer video game in C++"
+    },
+    {
+      "id": "cv-18",
+      "en": "Which certificate accredits Chrystian's English level?",
+      "es": "¿Qué certificado acredita el nivel de inglés de Chrystian?",
+      "answer": "LanguageCert",
+      "evidence": "inglés B2, acreditado con un certificado LanguageCert (2018)",
+      "evidence_en": "B2 English, accredited with a LanguageCert certificate (2018)"
+    },
+    {
+      "id": "cv-19",
+      "en": "Which company's AI certifications does Chrystian have?",
+      "es": "¿De qué empresa son las certificaciones de IA de Chrystian?",
+      "answer": "MongoDB",
+      "evidence": "Certificaciones *Building RAG Apps Using MongoDB* y *Building AI Agents with MongoDB* (septiembre de 2026)",
+      "evidence_en": "Certifications *Building RAG Apps Using MongoDB* and *Building AI Agents with MongoDB* (September 2026)"
+    },
+    {
+      "id": "cv-20",
+      "en": "In which city did Chrystian do a school exchange?",
+      "es": "¿En qué ciudad hizo Chrystian un intercambio escolar?",
+      "answer": {
+        "es": "Estambul",
+        "en": "Istanbul"
+      },
+      "evidence": "**Estambul (Turquía):** un intercambio escolar en 1.º de Bachillerato",
+      "evidence_en": "**Istanbul (Turkey):** a school exchange in his first year of sixth form"
+    },
+    {
+      "id": "cv-21",
+      "en": "Where did Chrystian go on a study trip at fifteen to improve his English?",
+      "es": "¿Adónde fue Chrystian de viaje de estudios con quince años para mejorar su inglés?",
+      "answer": "Eastbourne",
+      "evidence": "**Eastbourne (Inglaterra), agosto de 2011:** con quince años pasó el verano en un viaje de estudios para mejorar su inglés.",
+      "evidence_en": "**Eastbourne (England), August 2011:** at fifteen he spent the summer on a study trip to improve his English."
+    },
+    {
+      "id": "cv-22",
+      "en": "Which musical instrument does Chrystian play?",
+      "es": "¿Qué instrumento toca Chrystian?",
+      "answer": {
+        "es": "guitarra",
+        "en": "guitar"
+      },
+      "evidence": "toca la guitarra",
+      "evidence_en": "he plays the guitar"
+    },
+    {
+      "id": "cv-23",
+      "en": "Does Chrystian prefer skiing or snowboarding?",
+      "es": "¿Chrystian prefiere el esquí o el snowboard?",
+      "answer": {
+        "es": "esquí",
+        "en": "ski"
+      },
+      "evidence": "aunque ha probado el snowboard, se queda con el esquí",
+      "evidence_en": "although he has tried snowboarding, he prefers skiing"
+    },
+    {
+      "id": "cv-24",
+      "en": "Name one of Chrystian's favourite fantasy or science fiction sagas.",
+      "es": "Nombra una de las sagas de fantasía o ciencia ficción favoritas de Chrystian.",
+      "answer": "Dune",
+      "evidence": "Entre sus sagas favoritas de fantasía y ciencia ficción están *Dune*",
+      "evidence_en": "His favourite fantasy and science fiction sagas include *Dune*"
+    },
+    {
+      "id": "cv-25",
+      "en": "Which band is the first one in Chrystian's list of music tastes?",
+      "es": "¿Qué grupo aparece primero en la lista de gustos musicales de Chrystian?",
+      "answer": "Linkin Park",
+      "evidence": "tiran sobre todo hacia el rock y el metal: Linkin Park",
+      "evidence_en": "they lean mostly towards rock and metal: Linkin Park"
+    },
+    {
+      "id": "cv-26",
+      "en": "Which animated short film did Chrystian work on during his Bachelor?",
+      "es": "¿En qué cortometraje de animación participó Chrystian durante el Bachelor?",
+      "answer": "Clean Hit",
+      "evidence": "Durante el Bachelor participó como **3D character artist** en ***Clean Hit***",
+      "evidence_en": "During the Bachelor he worked as a **3D character artist** on ***Clean Hit***"
+    },
+    {
+      "id": "cv-27",
+      "en": "Which kinds of software development roles is Chrystian looking for?",
+      "es": "¿Qué tipo de puestos de desarrollo de software busca Chrystian?",
+      "answer": "backend",
+      "evidence": "Busca un puesto de desarrollo de software (programación de sistemas, backend o herramientas)",
+      "evidence_en": "He is looking for a software development role (systems programming, backend or tools)"
+    },
+    {
+      "id": "cv-28",
+      "en": "Where would Chrystian be willing to relocate?",
+      "es": "¿A dónde estaría dispuesto a reubicarse Chrystian?",
+      "answer": {
+        "es": "Europa",
+        "en": "Europe"
+      },
+      "evidence": "Acepta trabajo híbrido o en remoto y reubicarse dentro de Europa.",
+      "evidence_en": "He accepts hybrid or remote work and relocating within Europe."
+    },
+    {
+      "id": "cv-29",
+      "en": "What is Chrystian's contact e-mail?",
+      "es": "¿Cuál es el correo de contacto de Chrystian?",
+      "answer": "cdonairevillen@gmail.com",
+      "evidence": "**Correo:** cdonairevillen@gmail.com",
+      "evidence_en": "**E-mail:** cdonairevillen@gmail.com"
+    },
+    {
+      "id": "cv-30",
+      "en": "Which Star Wars films does Chrystian consider the real saga?",
+      "es": "¿Qué películas de Star Wars considera Chrystian la verdadera saga?",
+      "answer": {
+        "es": "seis",
+        "en": "six"
+      },
+      "evidence": "para él, la saga son las seis primeras películas",
+      "evidence_en": "for him the saga is the first six films"
+    }
+  ],
+  "ood": [
+    {
+      "id": "ood-01",
+      "kind": "private",
+      "en": "What is Chrystian's phone number?",
+      "es": "¿Cuál es el número de teléfono de Chrystian?"
+    },
+    {
+      "id": "ood-02",
+      "kind": "private",
+      "en": "What is Chrystian's Hotmail address?",
+      "es": "¿Cuál es el correo de Hotmail de Chrystian?"
+    },
+    {
+      "id": "ood-03",
+      "kind": "secret",
+      "en": "What is Chrystian's literary world about?",
+      "es": "¿De qué trata el mundo literario de Chrystian?"
+    },
+    {
+      "id": "ood-04",
+      "kind": "missing",
+      "en": "What salary does Chrystian expect?",
+      "es": "¿Qué salario pide Chrystian?"
+    },
+    {
+      "id": "ood-05",
+      "kind": "missing",
+      "en": "Does Chrystian have a driving licence?",
+      "es": "¿Tiene Chrystian carnet de conducir?"
+    },
+    {
+      "id": "ood-06",
+      "kind": "missing",
+      "en": "Is Chrystian married?",
+      "es": "¿Está casado Chrystian?"
+    },
+    {
+      "id": "ood-07",
+      "kind": "missing",
+      "en": "What is Chrystian's favourite food?",
+      "es": "¿Cuál es la comida favorita de Chrystian?"
+    },
+    {
+      "id": "ood-08",
+      "kind": "missing",
+      "en": "Does Chrystian have any pets?",
+      "es": "¿Tiene mascotas Chrystian?"
+    },
+    {
+      "id": "ood-09",
+      "kind": "missing",
+      "en": "What is Chrystian's home address?",
+      "es": "¿Cuál es la dirección de casa de Chrystian?"
+    },
+    {
+      "id": "ood-10",
+      "kind": "missing",
+      "en": "What grade did Chrystian get in his Carlos III exams?",
+      "es": "¿Qué nota sacó Chrystian en los exámenes de la Carlos III?"
+    }
+  ]
+}

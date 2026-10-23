@@ -1,0 +1,42 @@
+{
+  "label": "20-xquad-base",
+  "suite": "xquad",
+  "domain": "xquad",
+  "k": 5,
+  "limit": null,
+  "timestamp": "2026-10-23T16:48:05",
+  "commit": "6120313",
+  "dirty": true,
+  "profile": "default",
+  "generator": "Qwen/Qwen3-0.6B",
+  "max_new_tokens": 150,
+  "device": "cuda",
+  "sets": {
+    "xquad/en": {
+      "questions": 1190,
+      "f1": 0.1518,
+      "f1_answered": 0.1929,
+      "contains_answer": 0.5933,
+      "false_not_found": 0.2202,
+      "refused_with_answer": 0.0462,
+      "answer_in_context": 0.8252,
+      "cites": 0.9968,
+      "citation_correct": 0.9935,
+      "language_match": 0.9903,
+      "seconds_per_answer": 1.37
+    },
+    "xquad/es": {
+      "questions": 1190,
+      "f1": 0.1487,
+      "f1_answered": 0.1841,
+      "contains_answer": 0.5126,
+      "false_not_found": 0.1924,
+      "refused_with_answer": 0.0034,
+      "answer_in_context": 0.8109,
+      "cites": 0.9875,
+      "citation_correct": 0.9958,
+      "language_match": 0.9813,
+      "seconds_per_answer": 2.12
+    }
+  }
+}

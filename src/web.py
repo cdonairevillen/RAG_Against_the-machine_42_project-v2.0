@@ -8,7 +8,7 @@ sys.path.insert(
     0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
 
-DOMAIN = "vllm"
+XQUAD_PREFIX = "data/raw/xquad/"
 EVAL_DOCS = "data/output/search_results/dataset_docs_public.json"
 EVAL_CODE = "data/output/search_results/dataset_code_public.json"
 GT_DOCS = "data/datasets/AnsweredQuestions/dataset_docs_public.json"
@@ -254,15 +254,13 @@ st.markdown("""
 
 
 def load_retriever() -> object:
-    """Load Retriever with reranker from disk.
+    """Load a DomainRouter (every indexed domain, with reranker).
 
     Returns:
-        Loaded Retriever instance cached in session state.
+        Loaded DomainRouter instance cached in session state.
     """
-    from src.retriever import Retriever
-    retriever = Retriever.from_store(DOMAIN)
-    retriever.load_reranker()
-    return retriever
+    from src.router import DomainRouter
+    return DomainRouter.from_store()
 
 
 def load_generator() -> object:
@@ -355,11 +353,16 @@ def render_source_card(index: int, file_path: str, first_char: int,
     """
     short_path = file_path.replace("data/raw/vllm-0.10.1/", "")
     preview = text_preview.replace("<", "&lt;").replace(">", "&gt;")
+    # CC-BY-SA: XQuAD sources must credit their origin visibly.
+    credit = (
+        " · XQuAD (Google), CC-BY-SA 4.0 · Wikipedia"
+        if file_path.startswith(XQUAD_PREFIX) else ""
+    )
 
     st.markdown(f"""
 <div class="source-card">
     <div class="source-path">[{index}] {short_path}</div>
-    <div class="source-meta">chars {first_char}–{last_char}</div>
+    <div class="source-meta">chars {first_char}–{last_char}{credit}</div>
     <div class="source-text">{preview}...</div>
 </div>""", unsafe_allow_html=True)
 
@@ -477,7 +480,12 @@ def main() -> None:
 
             with st.spinner("Retrieving relevant chunks..."):
                 result = pipeline.answer(query, k=k_val, on_piece=on_piece)
-            show(NOT_FOUND_MESSAGE if result.not_found else result.text)
+            from src.generator import NOT_FOUND_MESSAGE as GENERIC
+            # Domains with their own "not found" (e.g. the CV, which
+            # offers contact) keep it; the rest show the web's message.
+            show(NOT_FOUND_MESSAGE
+                 if result.not_found and result.text == GENERIC
+                 else result.text)
 
             if not result.not_found:
                 parent_map = retriever.get_parent_chunk_map()
@@ -494,7 +502,9 @@ def main() -> None:
                         file_path=source.file_path,
                         first_char=source.first_character_index,
                         last_char=source.last_character_index,
-                        text_preview=parent.text if parent else "",
+                        text_preview=pipeline.rules.redact(
+                            parent.text, parent.domain
+                        ) if parent else "",
                     )
 
         elif run and (not query or not query.strip()):

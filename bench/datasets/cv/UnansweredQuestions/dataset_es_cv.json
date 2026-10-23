@@ -1,0 +1,124 @@
+{
+  "rag_questions": [
+    {
+      "question_id": "cv-01",
+      "question": "¿Cuándo nació Chrystian?"
+    },
+    {
+      "question_id": "cv-02",
+      "question": "¿En qué barrio de Madrid creció Chrystian?"
+    },
+    {
+      "question_id": "cv-03",
+      "question": "¿En qué instituto estudió Chrystian?"
+    },
+    {
+      "question_id": "cv-04",
+      "question": "¿Qué carrera empezó Chrystian en la Universidad Carlos III?"
+    },
+    {
+      "question_id": "cv-05",
+      "question": "¿En qué estudio hizo Chrystian su Erasmus de prácticas?"
+    },
+    {
+      "question_id": "cv-06",
+      "question": "¿En qué documental trabajó Chrystian en Moonraker VFX?"
+    },
+    {
+      "question_id": "cv-07",
+      "question": "¿Para qué organismo impartió Chrystian un curso de animación 3D?"
+    },
+    {
+      "question_id": "cv-08",
+      "question": "¿En qué videojuego móvil trabajó Chrystian en Lion's Roar Games?"
+    },
+    {
+      "question_id": "cv-09",
+      "question": "¿En qué videojuego trabaja Chrystian en De La Luna Luna Studio?"
+    },
+    {
+      "question_id": "cv-10",
+      "question": "¿Qué framework de backend usó Chrystian para la aplicación de registro de horas del estudio?"
+    },
+    {
+      "question_id": "cv-11",
+      "question": "¿Dónde está desplegada la aplicación de registro de horas?"
+    },
+    {
+      "question_id": "cv-12",
+      "question": "¿Para qué empresa alemana creó Chrystian props 3D modulares?"
+    },
+    {
+      "question_id": "cv-13",
+      "question": "¿Qué puesto tiene Chrystian en Voxel School?"
+    },
+    {
+      "question_id": "cv-14",
+      "question": "¿Cuánto aceleraron las herramientas de Chrystian en Voxel School la preparación de escenas para render?"
+    },
+    {
+      "question_id": "cv-15",
+      "question": "¿Qué aprendió Chrystian trabajando de camarero?"
+    },
+    {
+      "question_id": "cv-16",
+      "question": "¿Qué ejecuta de forma segura el sandbox de Agent Smith?"
+    },
+    {
+      "question_id": "cv-17",
+      "question": "¿En qué lenguaje está escrito el videojuego multijugador TAP?"
+    },
+    {
+      "question_id": "cv-18",
+      "question": "¿Qué certificado acredita el nivel de inglés de Chrystian?"
+    },
+    {
+      "question_id": "cv-19",
+      "question": "¿De qué empresa son las certificaciones de IA de Chrystian?"
+    },
+    {
+      "question_id": "cv-20",
+      "question": "¿En qué ciudad hizo Chrystian un intercambio escolar?"
+    },
+    {
+      "question_id": "cv-21",
+      "question": "¿Adónde fue Chrystian de viaje de estudios con quince años para mejorar su inglés?"
+    },
+    {
+      "question_id": "cv-22",
+      "question": "¿Qué instrumento toca Chrystian?"
+    },
+    {
+      "question_id": "cv-23",
+      "question": "¿Chrystian prefiere el esquí o el snowboard?"
+    },
+    {
+      "question_id": "cv-24",
+      "question": "Nombra una de las sagas de fantasía o ciencia ficción favoritas de Chrystian."
+    },
+    {
+      "question_id": "cv-25",
+      "question": "¿Qué grupo aparece primero en la lista de gustos musicales de Chrystian?"
+    },
+    {
+      "question_id": "cv-26",
+      "question": "¿En qué cortometraje de animación participó Chrystian durante el Bachelor?"
+    },
+    {
+      "question_id": "cv-27",
+      "question": "¿Qué tipo de puestos de desarrollo de software busca Chrystian?"
+    },
+    {
+      "question_id": "cv-28",
+      "question": "¿A dónde estaría dispuesto a reubicarse Chrystian?"
+    },
+    {
+      "question_id": "cv-29",
+      "question": "¿Cuál es el correo de contacto de Chrystian?"
+    },
+    {
+      "question_id": "cv-30",
+      "question": "¿Qué películas de Star Wars considera Chrystian la verdadera saga?"
+    }
+  ]
+}

@@ -19,7 +19,7 @@ Tus respuestas a las dudas de `RESPUESTA.md` §7, con lo que implica cada una pa
 |---|---|---|
 | **D1** Datasets privados | Eran propios de la corrección. Con los públicos basta para tener una idea del rendimiento. | Los targets `test-*` del Makefile se eliminan en la Fase 0. La línea base se mide **solo** con los datasets públicos. |
 | **D2** URLs del Makefile | Cambiaron en su momento. Actualizadas aquí; se cambiarán en el repo real más adelante. | El cambio del Makefile entra en el primer commit de la Fase 0. |
-| **D3** Hardware | NVIDIA RTX 3080 Ti en local. La idea es que funcione en los ordenadores de 42 (tienen gráfica, poco potente, modelo desconocido). | **Valores por defecto ligeros** (deben correr en 42 y en CPU). Los modelos grandes son opcionales y se prueban en la 3080 Ti. Está pendiente averiguar la GPU de 42. |
+| **D3** Hardware | NVIDIA RTX 3080 Ti en local. La idea es que funcione en los ordenadores de 42 (tienen gráfica, poco potente, modelo desconocido). | **Valores por defecto ligeros** (deben correr en 42 y en CPU). Los modelos grandes son opcionales y se prueban en la 3080 Ti. Está pendiente averiguar la GPU de 42.<br>**Actualizado 2026-10-23:** las GPU de 42 no aceptan CUDA (indexar vLLM ahí lleva ~10 h), así que **se descarta indexar en 42**. Toda la ingesta se hace en la 3080 Ti y el proyecto se sirve **en línea**. En las presentaciones a empresas en 42 se enseña la web desplegada o se da el enlace. Los valores por defecto siguen siendo ligeros porque el despliegue gratuito es en CPU. |
 | **D4** Evaluación | Los recalls se hacen **solo** sobre los datasets de 42. Cualquier test extra es bienvenido. Se puede usar una key gratuita para tests de respuesta. | El evaluador de 42 es la referencia y no se toca. Las métricas extra (MRR, nDCG, set manual, juez LLM por API gratuita) son complementarias. |
 | **D5** Frontend | FastAPI + React, pero **la estética debe quedarse igual que la actual**. | Fase 6: React reproduce el diseño de `src/web.py` (colores, tipografías, tarjetas). |
 | **D6** Idioma y dominios | Multilenguaje. Además, más datasets, no solo vLLM. Este repo es sobre todo para tener las marcas de recall claras. | Embeddings y reranker **multilingües** desde la Fase 2. La ingesta multi-dominio se prepara en la Fase 1 y se usa en la Fase 4. vLLM sigue siendo el **benchmark**. |
@@ -213,6 +213,16 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **Licencia:** CC-BY-SA exige **citar la fuente** de forma visible en la web y publicar los derivados con la misma licencia.
 - **Después:** MLQA (Meta, CC-BY-SA 3.0, miles de preguntas por idioma) como corpus más grande y exigente.
 
+> ✅ **Completada (2026-10-23).** Detalle en `changelog/FASE_4.md` y `BENCHMARK_REPORT.md` §6.
+> - **Hecho:** datos (HF + títulos de GitHub, con SHA256), un fichero por artículo, ground truth con el fragmento de la respuesta, dominio mixto `xquad` y `bench --suite xquad`.
+> - **Hecho:** `make index` indexa todas las fuentes, router sin filtro o con `--domains` y atribución CC-BY-SA en la web.
+> - **Recall:** EN 0.95 / 0.99 / 0.99 / 1.00, ES 0.92 / 0.99 / 0.99 / 1.00. vLLM sin cambios.
+> - **Router:** el 100 % de las preguntas de 42 y ~98 % de las de XQuAD llegan a su dominio.
+> - **Generación:** contiene la respuesta correcta en el 65 % (EN) y el 57 % (ES); cita la fuente correcta en el 99 %.
+> - **Umbral del filtro fuera de dominio por dominio:** XQuAD usa −2.0, calibrado con `gate_scores`; vLLM sigue con 0.0. Sin ese umbral se descartaba el 18 % de las preguntas válidas.
+> - **`gen-bench` de XQuAD:** subconjunto fijo de 300 preguntas por idioma; `FULL=1` para pruebas completas.
+> - **Pendiente para más adelante:** MLQA.
+
 ### 4b — Modo CV
 
 - **Material** (en `data/raw/cv/`, **ignorado por git**; se movió desde la raíz, donde se habría subido con `git add .`):
@@ -223,20 +233,61 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **Revisión de privacidad antes de indexar:** qué datos personales entran y cuáles no. Lo decides tú.
 - **El juez externo (Groq) no se usa con datos personales** salvo que lo decidas expresamente.
 
-### 4c — Multimedia: *Nosferatu* (1922) frente a *Drácula* (1897)
 
-- **Por qué este par:** conserva tu idea de comparar libro y película, con material de **dominio público**. *Nosferatu* es una adaptación no autorizada de *Drácula*, con cambios de nombres y de trama, lo que da preguntas comparativas interesantes.
-- **Descartado:** *El Señor de los Anillos* (libros y películas con derechos de autor). La alternativa legal, wikis bajo CC-BY-SA, no tendría multimedia.
+> ✅ **Completada (2026-10-23).** Detalle en `changelog/FASE_4.md` (4b) y `BENCHMARK_REPORT.md` §7.
+> - **Indexado:** CV (`.docx`, EN), LinkedIn (`.pdf`, ES) y biografía (ES + versión EN), con Docling.
+> - **Privacidad:** el teléfono y el Hotmail se enmascaran al responder, sin tocar los ficheros. 0 fugas en todas las pruebas.
+> - **Sin dato**, responde: *"No dispongo de esa información, ¡pero puedes preguntárselo tú! cdonairevillen@gmail.com"*.
+> - **Prompt del modo CV** con tercera persona, sin mezclar trabajos, mundo literario secreto y contacto. Chunks de 800, 8 fuentes y umbral −3.0.
+> - **Resultado:** contiene la respuesta correcta en el 73 % (EN) y el 80 % (ES); el router manda el 100 % de las preguntas del CV a su dominio.
+
+- **Futuro, módulo de textos propios:** algunos relatos tuyos podrán ingestarse como parte del modo CV (o como dominio aparte). El mundo literario que estás creando es secreto por ahora: la biografía solo dice que existe, y el RAG no debe inventar detalles sobre él.
+
+### 4c — Multimedia: *Los viajes de Gulliver* (1939) frente a la novela de Swift (1726)
+
+- **Objetivo:** ingestar una misma historia en dos formatos, novela y película, y comparar qué recupera de cada uno. Un recruiter debe poder ver el código y todos los archivos usados en la ingesta.
+- **Requisitos:**
+  - La película debe tener **sonido**, para que la transcripción con Whisper aporte texto real.
+  - Libro y película deben poder descargarse y publicarse sin problemas de derechos.
+  - Todo **reproducible**: quien clone el repo obtiene los mismos datos.
+- **Por qué Gulliver:** película de Fleischer, animada, en color, con diálogo y canciones, que **solo adapta la parte de Liliput**. Así se pueden probar tres tipos de preguntas:
+  - **Solo libro:** Brobdingnag, Laputa, los Houyhnhnms. Sirven para comprobar que el RAG no inventa la respuesta a partir del vídeo.
+  - **Solo película:** lo que la película añade, como la boda de la princesa Glory con el príncipe David o el personaje de Gabby.
+  - **Ambos:** Liliput, Blefuscu, la guerra.
+- **Descartados:**
+  - *El Señor de los Anillos*: libros y películas con derechos de autor.
+  - *Drácula* frente a *Nosferatu* (1922): las dos son de dominio público, pero *Nosferatu* es **muda**. Whisper no sacaría nada y habría que recurrir al OCR de los intertítulos.
+  - *Drácula* de Universal (1931): tiene sonido, pero no es de dominio público.
+- **Reservas** (si Gulliver falla por calidad de la copia o del audio):
+  - *The Little Princess* (1939) + Burnett, Gutenberg #146.
+  - *Scrooge* (1935) + Dickens, *A Christmas Carol*. Falta verificar la copia en archive.org y el número de Gutenberg.
 - **Material:**
-  - *Drácula* en texto (Project Gutenberg).
-  - *Nosferatu*, la película o sus clips (Internet Archive).
-  - **Pendiente:** verificar el dominio público en España y en EE. UU. para las dos obras antes de usarlas.
-- **Ingesta multimedia (nivel A del análisis):**
-  - Al ser **muda**, no hay audio que transcribir: **OCR de los intertítulos** y **descripción de escenas** (PySceneDetect + captions con un modelo de visión pequeño), con marcas de tiempo.
-  - Las fuentes enlazan al minuto exacto de la película.
+  - Novela: Gutenberg **#829**, en Plain Text UTF-8, quitando la cabecera y el pie de licencia antes de trocear.
+  - Película: Internet Archive. Se elige la copia más ligera con buen audio y se anotan su URL y su SHA256.
+- **Ingesta multimedia (nivel A del análisis), offline en la 3080 Ti:**
+  - **Transcripción con Whisper** (`faster-whisper` con filtro VAD) y marcas de tiempo. La película tiene muchas canciones, y Whisper tiende a inventarse texto en los tramos de música; se comprueba con una prueba de 5 minutos.
+  - **Descripción de escenas:** keyframes (PySceneDetect) + captions con un modelo de visión pequeño. La frecuencia de keyframes y el modelo se deciden en la prueba.
+  - Cada chunk guarda su **modalidad** (libro, transcripción, caption) y su **posición** (capítulo o timestamp). Las fuentes enlazan al minuto exacto de la película.
+  - **Propuesta a validar:** la transcripción se guarda como texto derivado más un mapa de offsets → segundos. Así `Chunk` y el evaluador siguen trabajando con offsets de caracteres, y la web convierte el offset al minuto.
   - Búsqueda de imágenes por texto con CLIP/SigLIP (nivel B) como opcional.
-- **Evaluación:** el benchmark de 42 no cubre multimedia, así que hace falta un set propio de preguntas (sobre la película, sobre el libro y comparativas).
-- **Almacenamiento:** el vídeo no se sube al Space; se aloja fuera y se enlaza con la marca de tiempo. En el índice solo van el texto extraído y miniaturas.
+- **Evaluación:** el benchmark de 42 no cubre multimedia. Hace falta un set propio de 10–15 preguntas: solo libro, solo película y ambos. Las preguntas en español sobre el audio en inglés miden el multilingüismo.
+- **Publicación:**
+  - **Código** en GitHub: pipeline, `scripts/fetch_data.py` (URLs fijas + SHA256) y un GIF o keyframes del resultado en el README.
+  - **Datos** en un **Hugging Face Dataset**: vídeo, `.txt` del libro y artefactos derivados (transcripción, captions, chunks en JSONL). Una dataset card con la fuente y la licencia de cada archivo. GitHub no acepta ficheros de más de 100 MB sin LFS, y el vídeo los supera.
+  - **Demo:** la web de la Fase 6 (FastAPI + React), no una app aparte en Gradio o Streamlit.
+- **Nota legal:** las películas candidatas son de dominio público en **EE. UU.**, no necesariamente en España, donde una película se protege 70–80 años desde la muerte del director, el guionista y el compositor. Publicarlas en plataformas estadounidenses (Hugging Face, Internet Archive) es la práctica habitual en proyectos de portfolio, pero **no es una garantía legal**. Las tres novelas son de dominio público en todo el mundo.
+- **Plan B**, sin dudas legales en ningún país: películas abiertas de Blender con diálogo y licencia CC-BY (*Sprite Fright*, *Tears of Steel*) o audiolibros de LibriVox con el texto de Gutenberg. A cambio, se pierde la comparativa libro frente a película de la misma historia.
+- **Checklist:**
+  - [x] Localizar en archive.org la copia y anotar la URL y el SHA256 (2026-10-23, en `data/raw/gulliver/`, ignorado por git):
+    - **Película:** `GulliversTravels720p_652` (CC0 según la ficha), `https://archive.org/download/GulliversTravels720p_652/GulliversTravels.mp4`. 720p h.264, 76:22, 475 808 316 bytes. SHA256 `a5c8ba9f5d6e57b307ea5398c5c4fefa8424da42fb6ea1d455fad0fc59dfdccd`; el SHA1 coincide con el que publica archive.org. Se descartó la copia más descargada (`gullivers_travels1939`) porque dura 72:39 y le faltan ~4 min.
+    - **Novela:** `https://www.gutenberg.org/ebooks/829.txt.utf-8`, 613 946 bytes. SHA256 `fca36de3de0d8b831b7588cf1df84639ccf4c503172d6444ee61d1c1b2036edd`. Las marcas `*** START/END OF THE PROJECT GUTENBERG EBOOK ***` están en las líneas 27 y 9573. **Ojo:** Gutenberg puede revisar el fichero y cambiar el hash, así que la copia fija para reproducir será la del HF Dataset.
+    - archive.org incluye además una transcripción automática (`GulliversTravels.asr.srt`) que puede servir de referencia para comparar con Whisper.
+  - [ ] Comprobar qué hay que añadir al loader para el `.txt` y el vídeo.
+  - [ ] Probar Whisper con 5 minutos: calidad de la transcripción y tiempo en la 3080 Ti.
+  - [ ] Decidir la frecuencia de keyframes y el modelo de captioning.
+  - [ ] Definir los metadatos de cada chunk: fuente, capítulo o timestamp, modalidad.
+  - [ ] Escribir las 10–15 preguntas de evaluación.
+  - [ ] Crear el dataset en Hugging Face con su dataset card.
 
 ## Fase 5 — Agentes y RAG como servidor MCP
 
@@ -267,6 +318,9 @@ No deben empeorar los resultados obtenidos durante la evaluación.
   - Frontend estático en GitHub Pages.
   - **Google Cloud no se toca.**
   - En el despliegue gratuito probablemente solo quepa un modelo cargado; el resto, en local.
+  - **Índice preconstruido:** como no se indexa en 42 ni en el Space, el índice (snapshot de Qdrant + ficheros BM25) se construye en la 3080 Ti y el despliegue solo lo carga.
+  - **Presentaciones en 42:** se enseña esta web desplegada o se da el enlace a los recruiters. No se instala nada en los ordenadores de 42.
+  - **Datos en Hugging Face (a explorar, P10):** usar datasets de Hugging Face como fuente de la ingesta (por ejemplo, XQuAD) y, si se puede, alojar allí los nuestros: los de 42, los derivados de Gulliver y quizá el índice preconstruido.
 - **README final**: se reescribe al terminar la mejora completa del proyecto.
 
 ---
@@ -276,13 +330,14 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 | # | Tema | Cuándo hay que decidirlo |
 |---|---|---|
 | P1 | D7: agente frente a acceso directo, y qué es lo por defecto | Antes de la Fase 5 |
-| P2 | ~~Material multimedia~~ → resuelto: *Nosferatu* (1922) frente a *Drácula* (1897), de dominio público. **Pendiente: verificar el dominio público (ES/EE. UU.) y conseguir la película** | Antes de la 4c |
+| P2 | ~~Material multimedia~~ → resuelto: *Los viajes de Gulliver* (1939) frente a la novela de Swift (Gutenberg #829), con *The Little Princess* y *Scrooge* como reservas. Sustituye a *Nosferatu*/*Drácula*, que era muda. Copias descargadas el 2026-10-23 (URL y SHA256 en la checklist de la 4c) | Hecho |
 | P7 | ~~`.gitattributes` para normalizar los finales de línea~~ → resuelto: todo LF y `llm_sdk/` intacto (commit `5a1cc4b`) | Hecho |
 | P8 | ~~¿`bge-m3` por defecto aunque indexar en CPU lleve ~2 h?~~ → resuelto: `bge-m3` en la base y perfil `cpu-light` (`e5-small`) | Hecho |
 | P9 | ~~`bge-reranker-v2-m3`~~ → resuelto: perfil opcional `gpu-quality` | Hecho |
 | P3 | ~~Dominios nuevos~~ → resuelto: XQuAD (cultura general, en/es) y después MLQA | Hecho |
 | P4 | Modularización: qué opciones se exponen en la web y cómo se navega | Antes de la Fase 6 |
-| P5 | GPU de los ordenadores de 42 (para fijar los valores por defecto) | Durante la Fase 2 |
+| P5 | ~~GPU de los ordenadores de 42~~ → resuelto: no aceptan CUDA (vLLM tarda ~10 h en indexarse). Se descarta indexar en 42 y el proyecto se sirve en línea | Hecho |
+| P10 | Hugging Face Datasets: usarlos como fuente de la ingesta y alojar allí los nuestros (los de 42, los derivados multimedia y quizá el índice). Falta revisar si la licencia de los datasets de 42 permite publicarlos | A desarrollar; antes de la 4c como muy tarde |
 | P6 | Proveedor de la key gratuita para el juez LLM | Antes de la Fase 3 |
 
 ---
@@ -312,3 +367,11 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-19**: la carpeta del CV se movió de la raíz a `data/raw/cv/` (ignorada por git) y se añadió `cv/` al `.gitignore`, para que nunca se suban datos personales.
 - **2026-10-18**: las cifras del README (docs 0.89 / code 0.75 en R@10) eran de los datasets **públicos**, aunque estuvieran etiquetadas como privadas, y salían de configuraciones anteriores que no se reproducen con `v1.0-42`. Se acepta como línea base oficial `04-fase0-final / smart`. La etiqueta del README se corrige en la reescritura final.
 - **2026-10-18**: finales de línea normalizados a LF con `.gitattributes`, con `llm_sdk/` excluido (P7).
+- **2026-10-23**: se **descarta indexar en el cluster de 42**: sus GPU no aceptan CUDA y vLLM tarda ~10 h. Toda la ingesta se hace en la 3080 Ti y el proyecto se aloja en línea. En las presentaciones a empresas se enseña la web desplegada o se da el enlace (P5).
+- **2026-10-23**: 4c cambia de *Nosferatu*/*Drácula* a *Los viajes de Gulliver* (1939) frente a la novela de Swift. Al tener sonido se puede usar Whisper, y como solo adapta Liliput permite preguntas que solo responde el libro. Contenido tomado del documento "RAG 2 — Selección de fuentes multimedia", que se ha borrado tras integrarlo aquí. La demo sigue el roadmap (FastAPI + React), no Gradio ni Streamlit.
+- **2026-10-23**: abierta la exploración de Hugging Face Datasets, como fuente de la ingesta y para alojar los nuestros (P10).
+- **2026-10-23**: Fase 4a iniciada. XQuAD con un fichero por artículo, dominio mixto en+es, ground truth con el fragmento exacto de la respuesta y datos de HF con los títulos de GitHub (decisiones tuyas). Ver `changelog/FASE_4.md`.
+- **2026-10-23**: router decidido: sin filtro busca en todos los dominios y responde desde el mejor; con filtro, solo en los elegidos. `make index` pasa a indexar todas las fuentes (`SOURCE=` para una sola). Los comandos y el benchmark de 42 siguen fijados a `vllm`.
+- **2026-10-23**: umbral del filtro fuera de dominio **por dominio** (`relevance_threshold` en cada fuente). El reranker puntúa cada corpus en su propia escala, así que cada dominio nuevo se calibra con `gate_scores` antes de fijar su umbral.
+- **2026-10-23**: el `gen-bench` de XQuAD usa un subconjunto fijo de 300 preguntas por idioma; la ejecución completa (`FULL=1`) queda para pruebas completas. Fase 4a completada.
+- **2026-10-23**: biografía del modo CV, borrador v1 en `data/raw/cv/autobiography.md` (ignorado por git), con los datos pendientes marcados. Notas originales en `data/private_notes/`.

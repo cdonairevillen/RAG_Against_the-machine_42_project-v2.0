@@ -116,3 +116,16 @@ def test_missing_file_gives_defaults(tmp_path: Path) -> None:
 
     assert config.qdrant.url == "http://localhost:6333"
     assert config.sources == {}
+
+
+def test_source_gate_threshold_defaults_to_global(tmp_path: Path) -> None:
+    config = load_config(write_config(tmp_path), environ={})
+    assert config.source("demo").relevance_threshold is None
+
+    path = tmp_path / "rag.toml"
+    path.write_text(CONFIG.replace(
+        'default_chunker = "size"',
+        'default_chunker = "size"\nrelevance_threshold = -3.5',
+    ), encoding="utf-8")
+    assert load_config(str(path), environ={}).source(
+        "demo").relevance_threshold == -3.5

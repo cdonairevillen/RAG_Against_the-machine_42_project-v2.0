@@ -40,3 +40,12 @@ def test_not_found_is_normalised_in_both_languages() -> None:
 def test_question_language_detection() -> None:
     assert detect_language("¿Cómo instalo vLLM en una GPU?") == "es"
     assert detect_language("How do I install vLLM on a GPU?") == "en"
+
+
+def test_domain_rules_extend_the_system_prompt() -> None:
+    plain = build_messages("q", ["--- file: a.md ---\nx"], "en")
+    ruled = build_messages("q", ["--- file: a.md ---\nx"], "en",
+                           "7. Answer in the third person.")
+    assert ruled[0]["content"].startswith(plain[0]["content"])
+    assert ruled[0]["content"].endswith("7. Answer in the third person.")
+    assert build_messages("q", [], "en", "  ")[0] == plain[0]

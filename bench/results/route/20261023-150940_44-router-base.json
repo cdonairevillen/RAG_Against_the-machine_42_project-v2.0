@@ -1,0 +1,125 @@
+{
+  "label": "44-router-base",
+  "k": 10,
+  "limit": null,
+  "timestamp": "2026-10-23T15:00:28",
+  "commit": "6120313",
+  "dirty": true,
+  "domains": [
+    "vllm",
+    "xquad"
+  ],
+  "profile": "default",
+  "retrieval": {
+    "classifier_margin": 0.5,
+    "code_signal_weight": 0.5,
+    "doc_signal_weight": 0.5,
+    "skip_rerank_score": Infinity,
+    "bm25_score_floor": 5.5,
+    "reranker_model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    "rerank_fusion": "rrf",
+    "rrf_k": 60,
+    "doc_signal_languages": [
+      "en",
+      "es"
+    ],
+    "relevance_threshold": 0.0,
+    "rerank_doc_branch": false,
+    "code_aware_tokens": "code"
+  },
+  "device": "cuda",
+  "sets": {
+    "public/docs": {
+      "expected": "vllm",
+      "routing_accuracy": 1.0,
+      "chosen": {
+        "vllm": 100
+      },
+      "recall_at_k": {
+        "1": 0.76,
+        "3": 0.91,
+        "5": 0.92,
+        "10": 0.94
+      },
+      "seconds": 13.42,
+      "questions": 100
+    },
+    "public/code": {
+      "expected": "vllm",
+      "routing_accuracy": 1.0,
+      "chosen": {
+        "vllm": 100
+      },
+      "recall_at_k": {
+        "1": 0.51,
+        "3": 0.72,
+        "5": 0.8,
+        "10": 0.88
+      },
+      "seconds": 22.2,
+      "questions": 100
+    },
+    "es/docs": {
+      "expected": "vllm",
+      "routing_accuracy": 1.0,
+      "chosen": {
+        "vllm": 10
+      },
+      "recall_at_k": {
+        "1": 0.6,
+        "3": 0.8,
+        "5": 0.8,
+        "10": 0.9
+      },
+      "seconds": 1.98,
+      "questions": 10
+    },
+    "es/code": {
+      "expected": "vllm",
+      "routing_accuracy": 1.0,
+      "chosen": {
+        "vllm": 10
+      },
+      "recall_at_k": {
+        "1": 0.5,
+        "3": 0.7,
+        "5": 0.8,
+        "10": 0.9
+      },
+      "seconds": 2.24,
+      "questions": 10
+    },
+    "xquad/en": {
+      "expected": "xquad",
+      "routing_accuracy": 0.9824,
+      "chosen": {
+        "xquad": 1169,
+        "vllm": 21
+      },
+      "recall_at_k": {
+        "1": 0.9412,
+        "3": 0.9731,
+        "5": 0.9773,
+        "10": 0.9807
+      },
+      "seconds": 247.9,
+      "questions": 1190
+    },
+    "xquad/es": {
+      "expected": "xquad",
+      "routing_accuracy": 0.9782,
+      "chosen": {
+        "xquad": 1164,
+        "vllm": 26
+      },
+      "recall_at_k": {
+        "1": 0.9084,
+        "3": 0.9706,
+        "5": 0.9731,
+        "10": 0.9756
+      },
+      "seconds": 264.82,
+      "questions": 1190
+    }
+  }
+}

@@ -115,6 +115,12 @@ def test_end_to_end_index_and_search(tmp_path: Path,
     assert results
     assert all(r.file_path.endswith((".py", ".md")) for r in results)
     assert any("serving.md" in r.file_path for r in results)
+    # Without its own threshold the source uses the global gate.
+    assert retriever.settings.relevance_threshold == 0.0
+    source.relevance_threshold = -3.5
+    gated = Retriever.from_store("demo", config=config, store=store)
+    assert gated.settings.relevance_threshold == -3.5
+    assert config.retrieval.relevance_threshold == 0.0
 
 
 def test_store_and_index_mismatch_is_detected(

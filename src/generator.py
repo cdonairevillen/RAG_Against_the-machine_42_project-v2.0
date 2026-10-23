@@ -18,6 +18,13 @@ NOT_FOUND_PATTERNS = (
     r"no se encuentra en las fuentes",
     r"no (he )?encontrado (información|nada)",
     r"las fuentes (proporcionadas )?no contienen",
+    # Other refusals seen in the CV benchmark (31-cv-prompt).
+    r"no se (menciona|proporciona|encuentra en (los|las) "
+    r"(proporcionad|fuente|source))",
+    r"not (mentioned|provided|found) in the (provided )?sources",
+    # Domain messages (rag.toml not_found_message, e.g. the CV mode).
+    r"no dispongo de esa información",
+    r"i don't have that information",
 )
 
 NOT_FOUND_MESSAGE = "Not found in the provided sources."
@@ -58,13 +65,16 @@ def is_not_found(text: str) -> bool:
 
 
 def build_messages(question: str, sources: list[str],
-                   language: str) -> list[dict[str, str]]:
+                   language: str,
+                   extra_rules: str = "") -> list[dict[str, str]]:
     """Chat messages for a grounded answer.
 
     Args:
         question: The user's question.
         sources: Context blocks, numbered [1]..[n] in this order.
         language: 'es' or 'en'; the answer is requested in it.
+        extra_rules: The domain's own rules (rag.toml prompt_rules),
+            appended to the system prompt; empty for none.
 
     Returns:
         System and user messages for the chat template.
@@ -78,8 +88,11 @@ def build_messages(question: str, sources: list[str],
         f"QUESTION: {question}\n\n"
         f"Answer in {name}, citing the sources by number."
     )
+    system = SYSTEM_PROMPT
+    if extra_rules.strip():
+        system += "\n" + extra_rules.strip()
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]
 
@@ -164,13 +177,15 @@ class Generator:
         return self.model._tokenizer
 
     def answer_with_text(self, question: str,
-                         context_blocks: list[str]) -> str:
+                         context_blocks: list[str],
+                         extra_rules: str = "") -> str:
         """Generate a grounded answer from pre-built context blocks.
 
         Args:
             question: The natural-language question.
             context_blocks: Context strings, one per source, in the
                 order they are numbered and shown to the user.
+            extra_rules: Domain rules added to the system prompt.
 
         Returns:
             A concise answer citing its sources as [n], or
@@ -181,11 +196,14 @@ class Generator:
         if not context_blocks:
             return "No relevant sources found."
         return clean_output(
-            self.greedy_decode(self.build_prompt(question, context_blocks))
+            self.greedy_decode(self.build_prompt(
+                question, context_blocks, extra_rules
+            ))
         )
 
     def stream_answer(self, question: str,
-                      context_blocks: list[str]) -> Iterator[str]:
+                      context_blocks: list[str],
+                      extra_rules: str = "") -> Iterator[str]:
         """Like answer_with_text(), but yields the text as it is
         generated (same prompt and decoding).
 
@@ -195,12 +213,14 @@ class Generator:
         Args:
             question: The natural-language question.
             context_blocks: Context strings, one per source.
+            extra_rules: Domain rules added to the system prompt.
 
         Yields:
             Successive pieces of the answer.
         """
         if not question or not question.strip() or not context_blocks:
-            yield self.answer_with_text(question, context_blocks)
+            yield self.answer_with_text(question, context_blocks,
+                                        extra_rules)
             return
 
         from transformers import TextIteratorStreamer
@@ -209,7 +229,7 @@ class Generator:
             self.tokenizer, skip_prompt=True, skip_special_tokens=True
         )
         kwargs = self.generate_kwargs(
-            self.build_prompt(question, context_blocks)
+            self.build_prompt(question, context_blocks, extra_rules)
         )
         worker = Thread(target=self.generate, kwargs={
             **kwargs, "streamer": streamer,
@@ -220,13 +240,16 @@ class Generator:
                 yield piece
         worker.join()
 
-    def build_prompt(self, question: str, context_blocks: list[str]) -> str:
+    def build_prompt(self, question: str, context_blocks: list[str],
+                     extra_rules: str = "") -> str:
         """Chat-formatted prompt: numbered sources trimmed to the token
-        budget, answer language taken from the question."""
+        budget, answer language taken from the question, plus the
+        domain's own rules when given."""
         language = detect_language(question)
-        sources = self.fit_sources(question, context_blocks, language)
+        sources = self.fit_sources(question, context_blocks, language,
+                                   extra_rules)
         return str(self.tokenizer.apply_chat_template(
-            build_messages(question, sources, language),
+            build_messages(question, sources, language, extra_rules),
             tokenize=False, add_generation_prompt=True,
             enable_thinking=False,
         ))
@@ -236,7 +259,7 @@ class Generator:
         return len(self.tokenizer.encode(text, add_special_tokens=False))
 
     def fit_sources(self, question: str, blocks: list[str],
-                    language: str) -> list[str]:
+                    language: str, extra_rules: str = "") -> list[str]:
         """Trim sources so the full prompt fits max_input_tokens.
 
         Sources keep their order (and numbering); the last one that does
@@ -248,7 +271,8 @@ class Generator:
         """
         fixed = self.count_tokens(
             self.tokenizer.apply_chat_template(
-                build_messages(question, [], language), tokenize=False,
+                build_messages(question, [], language, extra_rules),
+                tokenize=False,
                 add_generation_prompt=True, enable_thinking=False,
             )
         )

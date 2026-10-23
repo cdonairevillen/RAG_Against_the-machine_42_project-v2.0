@@ -27,4 +27,4 @@ Thumbs.db
 .idea/
 
 # Personal data (CV mode sources) must never be committed
-cv/
+/cv/
