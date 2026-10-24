@@ -368,7 +368,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **Plan B del agente:** busca con la consulta anterior + la nueva, pero debe **responder a la pregunta original**. Con el 0.6B, responder a la mezcla da respuestas equivocadas en los seguimientos (medido, `FASE_6.md`). Se mide con `agent-bench` antes de adoptarlo.
 - **Regla de formato** (listas y negritas) solo en la web, probada por modelo: con el 0.6B, cada regla de más en el prompt puede costar aciertos.
 - **Juez de las respuestas, sobre todo las del CV:** para encontrar dónde fallan, no para mostrarlo en la web. **Decidido (P11): Groq**, hasta agotar los tokens gratuitos; si hace falta, se repite con Qwen3-4B como juez local.
-- **Libertad de longitud** (petición tuya, 2026-10-24): dejar que el LLM escriba lo que necesite sin quedarse en bucle. Sin propuesta concreta todavía; mientras, límite por modelo en la web (512, y 640 para Phi-4-mini) y botón Stop.
+- 🟡 **Libertad de longitud** (petición tuya, 2026-10-24): dejar que el LLM escriba lo que necesite sin quedarse en bucle. ✅ **Detector de bucles integrado** (`src/rag/loops.py`, `FASE_7.md` §7b.2): para la generación cuando el modelo empieza a repetir líneas o frases casi iguales. 0 falsos positivos en 11.550 respuestas, y los bucles de Phi pasan de 1.500 tokens a 419–661. Límite de la web subido a 1.024 tokens para todos los modelos (decisión tuya), ahora solo como red de seguridad.
 - **Agente desactivado por defecto en la web** (decisión tuya, 2026-10-24), marcado como trabajo en curso hasta mejorar el plan B.
 
 ### 7c — Visual

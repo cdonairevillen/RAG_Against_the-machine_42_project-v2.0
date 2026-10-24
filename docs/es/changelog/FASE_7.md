@@ -7,7 +7,7 @@ Fase abierta el 2026-10-24, tras el commit `3378494` (Fase 6). El plan está en 
 | Bloque | Estado |
 |---|---|
 | 7a — Dominio "about" (README, `docs/`, código) | ✅ Hecho: README, fuente, benchmark bilingüe, separación del CV (§7a.6), umbral y regla léxica (§7a.7), y web y bundle (§7a.8). Quedan 6 preguntas que se van a vLLM, sin palabras que las distingan |
-| 7b — Calidad de las respuestas (Markdown, plan B del agente, formato, juez del CV) | Agente desactivado por defecto en la web y límite de tokens por modelo (§7b.1); el resto, planificado (P11 resuelto: Groq) |
+| 7b — Calidad de las respuestas (Markdown, plan B del agente, formato, juez del CV) | Agente desactivado por defecto en la web, límite de tokens por modelo (§7b.1) y detector de bucles (§7b.2); el resto, planificado (P11 resuelto: Groq) |
 | Despliegue | Plataforma cambiada a Oracle Cloud Always Free (DEC-19); guía en `deploy/README.md` |
 | 7c — Visual (tarjetas que giran, scroll) | Planificado |
 | 7d — Opcionales (Gulliver, MLQA) | Aparcados; `repetition_penalty` descartado (§7b.1) |
@@ -216,7 +216,7 @@ El bucle es la degeneración de la generación *greedy* en respuestas largas: el
 
 **Pruebas:** `test_max_tokens_per_model` y `test_the_pool_applies_the_caps` en `tests/test_api.py`.
 
-## 7b.2 — Bucles de Phi-4-mini: investigación (propuesta, sin aplicar)
+## 7b.2 — Bucles de Phi-4-mini: detector integrado (aprobado por ti)
 
 **Reproducción** (Phi-4-mini, 10 fuentes, límite de 1.500 tokens, 6 preguntas de "paso a paso" y listas): 3 de las 6 agotan el límite. Las otras tres terminan solas en 133–493 tokens.
 
@@ -247,12 +247,29 @@ El bucle es la degeneración de la generación *greedy* en respuestas largas: el
 
 **Qué permitiría:** quitar el límite fijo de tokens de la web (o subirlo mucho) y dejar que el LLM escriba lo que necesite, parando solo cuando degenera. Responde a la "libertad de longitud" de 7b.
 
-**Pendiente de tu permiso** (cambia la generación de la web):
-1. Integrarlo como criterio de parada (`StoppingCriteria`), comprobando solo al cerrar cada línea o frase.
-2. Probarlo con los cuatro modelos.
-3. Decidir el nuevo límite.
+**Integrado** (con tu aprobación, 2026-10-24):
+- **`src/rag/loops.py`** (nuevo): `find_loop` (la regla de arriba) y `cut_loop`.
+- **`Generator.stopping_criteria`:** un criterio `Looping` que solo decodifica y comprueba el texto cuando el último token cierra una línea o una frase, y para la generación cuando hay bucle. Funciona en la web, la CLI, los benchmarks y el agente.
+- **`clean_output`:** recorta el bucle donde empieza, con o sin streaming. La web sustituye el texto que se ha ido mostrando por la respuesta final, así que la parte repetida desaparece al terminar.
+- **Una corrección de paso:** un número de lista ("5. ") ya no cuenta como final de frase. Lo encontró un test: el corte dejaba un "5." colgando.
+- **Sin interruptor:** con 0 falsos positivos medidos, no hace falta poder apagarlo. Las respuestas sin bucle no cambian.
 
-En los benchmarks no cambiaría nada: con 150 tokens no hay bucles, como muestran los 0 de 11.550.
+**Prueba de extremo a extremo** (Phi-4-mini en GPU, las 6 preguntas, límite de 1.500 tokens; `data/output/loop_detector/repro_guard.json`):
+
+| Pregunta | Antes | Con el detector |
+|---|---|---|
+| Paso a paso de vLLM | 1.500 tokens, 67 s | **419 tokens, 34 s** |
+| Step-by-step guide to serve a model | 1.500 tokens, 69 s | **661 tokens, 47 s** |
+| Command-line options of vllm serve | 1.500 tokens, 73 s | **499 tokens, 35 s** |
+| Las otras 3 | 133 / 248 / 493 tokens | **idénticas, carácter a carácter** |
+
+Las respuestas recortadas terminan en una línea completa. La de prosa conserva algunas frases ya repetitivas ("séptima… décima etapa"), que son las que el detector usa de referencia antes de confirmar el bucle.
+
+**Benchmarks:** no cambian. Con 150 tokens no hay bucles (0 de 11.550 respuestas marcadas).
+
+**Límite de la web: 1.024 tokens para todos los modelos** (decisión tuya, 2026-10-24), en `make api` y en la imagen del servidor. Antes eran 512, y 640 para Phi-4-mini (§7b.1). Ya no es la defensa contra los bucles, solo una red de seguridad. ⚠️ En CPU (servidor gratuito) el 0.6B escribe a ~1–1.5 tokens/s: una respuesta muy larga puede tardar varios minutos, aunque el streaming la va mostrando y el botón Stop la corta.
+
+**Pruebas:** `tests/test_loops.py` (6 tests: línea repetida, dos líneas alternas, frases con una palabra cambiada, palabra repetida, y tablas, código y respuestas buenas sin falso positivo).
 
 **Caso visto de paso:** "Paso a paso de vLLM" (corta y ambigua) va a "about" (3.13 frente a 2.09 de vLLM), porque la documentación habla del "paso a paso" del RAG. Con una formulación completa ("Explícame paso a paso cómo usar vLLM") va a vLLM (3.0 frente a 1.2). No se toca el router por un caso límite.
 

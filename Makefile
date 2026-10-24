@@ -96,12 +96,13 @@ web-stop:
 # API_MODELS: the LLMs the web offers (rag.toml profiles). Qwen3-4B is left
 # out: with retrieval on the GPU it does not fit in 12 GB (measured).
 API_MODELS ?= default,llm-qwen3-1.7b,llm-phi4-mini
-# Answer length cap per model in the web (rag.toml keeps 150 so gen-bench
-# stays comparable). The longest legit answers measured: 464 tokens
-# (Phi-4-mini, 10 sources) and 321 (Qwen3-1.7B); above that it was a loop
-# (Phi-4-mini), cut sooner this way. Capped answers are trimmed at their
-# last sentence, and the Stop button cuts any of them.
-API_MAX_TOKENS ?= default=512,llm-qwen3-1.7b=512,llm-phi4-mini=640
+# Answer length cap in the web (rag.toml keeps 150 so gen-bench stays
+# comparable). A safety net only: generation loops stop by themselves
+# (src/rag/loops.py), and the longest legit answer measured was 464
+# tokens. Capped answers are trimmed at their last sentence, and the
+# Stop button cuts any of them. One number for every model, or per model
+# ("default=1024,llm-phi4-mini=640").
+API_MAX_TOKENS ?= 1024
 # API_DOMAINS: the domains the web serves (empty: every indexed one).
 API_DOMAINS ?=
 api: db-up

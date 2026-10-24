@@ -7,6 +7,7 @@ from llm_sdk import Small_LLM_Model
 
 from src.config import GenerationConfig
 from src.rag.language import LANGUAGE_NAMES, detect_language
+from src.rag.loops import BOUNDARY, cut_loop, find_loop
 
 NOT_FOUND_PATTERNS = (
     r"not found in the provided sources",
@@ -113,12 +114,13 @@ def not_found_for(question: str) -> str:
 
 
 def clean_output(text: str) -> str:
-    """Remove reasoning traces and normalise "not found" answers."""
+    """Remove reasoning traces, cut a generation loop where it starts
+    (src/rag/loops.py) and normalise "not found" answers."""
     text = THINK_BLOCK.sub("", text)
     if "</think>" in text:
         # A reasoning trace without its opening tag: keep what follows.
         text = text.rsplit("</think>", 1)[1]
-    text = text.strip()
+    text = cut_loop(text.strip())
     if is_not_found(text):
         return NOT_FOUND_MESSAGE
     return text
@@ -357,15 +359,32 @@ class Generator:
             "do_sample": False,
             "pad_token_id": self.tokenizer.pad_token_id,
             "eos_token_id": self.eos_token_ids,
-            "stopping_criteria": self.stopping_criteria(),
+            "stopping_criteria": self.stopping_criteria(
+                inputs["input_ids"].shape[1]
+            ),
         }
 
-    def stopping_criteria(self) -> Any:
+    def stopping_criteria(self, prompt_length: int) -> Any:
         """Stop generating as soon as `cancel` is set (checked per token,
-        read when it runs, so the API can swap the Event per request)."""
+        read when it runs, so the API can swap the Event per request), or
+        when the answer falls into a loop (checked each time a line or a
+        sentence ends; clean_output then cuts the repeated part)."""
         from transformers import StoppingCriteria, StoppingCriteriaList
 
         generator = self
+
+        class Looping(StoppingCriteria):
+            def __call__(self, input_ids: Any, scores: Any,
+                         **kwargs: Any) -> Any:
+                stop = False
+                last = generator.tokenizer.decode(input_ids[0, -1:])
+                if BOUNDARY.search(last):
+                    text = generator.tokenizer.decode(
+                        input_ids[0, prompt_length:],
+                        skip_special_tokens=True)
+                    stop = find_loop(text) is not None
+                return torch.full((input_ids.shape[0],), stop,
+                                  dtype=torch.bool, device=input_ids.device)
 
         class Cancelled(StoppingCriteria):
             def __call__(self, input_ids: Any, scores: Any,
@@ -374,7 +393,7 @@ class Generator:
                 return torch.full((input_ids.shape[0],), stop,
                                   dtype=torch.bool, device=input_ids.device)
 
-        return StoppingCriteriaList([Cancelled()])
+        return StoppingCriteriaList([Cancelled(), Looping()])
 
     def generate(self, **kwargs: Any) -> Any:
         """Run the model's generate() without gradients."""
