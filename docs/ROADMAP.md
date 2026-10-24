@@ -53,9 +53,9 @@ Dado que vamos a hacer un frontend real, podríamos plantear la **modularizació
 - Cada fase cierra con su `changelog/FASE_N.md`: qué se ha cambiado, lista de ficheros, por qué, en qué afecta y qué debes saber de la arquitectura.
 
 ```
-Fase 0 ─► Fase 1 ─► Fase 2 ─► Fase 3 ─► [Pruebas 42] ─► Fase 4 ─► Fase 5 ─► Fase 6
-saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web +
-                                                                  MCP       deploy
+Fase 0 ─► Fase 1 ─► Fase 2 ─► Fase 3 ─► [Pruebas 42] ─► Fase 4 ─► Fase 5 ─► Fase 6 ─► Fase 7
+saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web +     opcionales
+                                                                  MCP       deploy    y mejoras
 ```
 
 ## Fase 0 — Saneamiento y profesionalización del repositorio
@@ -341,11 +341,47 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **README final**: se reescribe al terminar la mejora completa del proyecto.
 
 > 🟡 **Preparada hasta el punto de despliegue (2026-10-24)**, pendiente de tu revisión. Detalle en `changelog/FASE_6.md`, guía en `deploy/README.md` y decisiones en `docs/decisions.md` (DEC-04 a DEC-16).
-> - **API FastAPI** (`src/api`): `/chat` (SSE, con `agent: true|false` y `mode: demo|cv`), `/search`, `/sources/{id}`, `/metrics`, `/config` y `/health`. Probada con el índice real: 0 fugas.
-> - **Web React** (`web/`) con la estética de `src/web.py`, el interruptor de agente, los modos *Demo*/*CV* y las barras de recall. La API la sirve en `/`.
-> - **Despliegue:** Space de HF (Docker, CPU) con Qdrant dentro; índice en un bundle (`make bundle`, SHA256) en un **dataset privado** (el índice contiene el texto en bruto del CV); Pages con un workflow manual.
-> - **Queda en tus manos:** crear el dataset y el Space, poner los secretos y decidir el LLM, la estrategia de privacidad (DEC-09) y si se borra Streamlit (DEC-13).
-> - **P4 (modularización):** la web expone el modo, el agente sí/no y el filtro de dominios. El selector de modelo **no** se expone: en la CPU gratuita solo cabe uno cargado.
+> - **API FastAPI** (`src/api`): `/chat` (SSE, con `agent`, `domains`, `model` y `depth`), `/search`, `/sources/{id}`, `/metrics`, `/config` y `/health`. Probada con el índice real: 0 fugas.
+> - **Web React** (`web/`), revisada contigo en varias rondas (`FASE_6.md` §6b–6g):
+>   - Chat a pantalla completa y filtros de dominio (sin modos Demo/CV).
+>   - Interruptor de agente, selectores de modelo y de profundidad (5 por defecto).
+>   - Botón Stop y preguntas de ejemplo.
+>   - Retrievals del dominio de la respuesta con carrusel y esquinas de puntos, y tarjetas de recall por dominio.
+>   - La API sirve la web en `/`. Commit `3378494`.
+> - **Despliegue:** Space de HF (Docker, CPU) con Qdrant dentro; índice en un bundle (`make bundle`, SHA256) en un **dataset privado**; Pages con un workflow manual.
+> - **Queda en tus manos:** crear el dataset y el Space, poner los secretos y decidir el LLM del Space, la estrategia de privacidad (DEC-09) y si se borra Streamlit (DEC-13).
+> - **P4 (modularización):** la web expone los filtros de dominio, el agente sí/no, el modelo (los perfiles `llm-*`, uno cargado a la vez) y la profundidad.
+
+## Fase 7 — Opcionales y mejoras
+
+**Objetivo:** pulir lo que ha salido al usar la web y recoger los opcionales aparcados. Fase abierta el 2026-10-24, tras el commit `3378494`. Changelog en `changelog/FASE_7.md`.
+
+### 7a — Dominio "about": el proyecto habla de sí mismo (lo primero)
+1. **Reescribir el `README.md`** (pendiente desde la Fase 0), pensado para GitHub y los recruiters. Será la fuente principal del dominio. Se revisa contigo antes de indexarlo.
+2. **Fuente `about` en `rag.toml`:**
+   - **Entran:** el README, `ROADMAP.md`, `BENCHMARK_REPORT.md`, `decisions.md`, los changelogs y el código de `src/` (chunker de código AST).
+   - **Fuera:** `PLANING.md`, `RESPUESTA.md` (el planteamiento inicial, ya superado) y `Elements_frontend.md`.
+   - **A comprobar:** si el cargador actual acepta esa selección de ficheros o necesita uno propio, como el del CV.
+3. **Set de 15–20 preguntas** en inglés y español sobre el proyecto, para medir recall y generación.
+4. **Umbral propio** calibrado con `gate_scores`, y **`route-bench`**: 42 → vLLM al 100 %, XQuAD ~98 %, CV 100 %. `docs/` habla mucho de vLLM y del CV, así que el riesgo de robarles preguntas es real.
+5. **API y web:** chip "about" **siempre activo** (no se puede apagar), sus preguntas sugeridas en el desplegable de ejemplos, y el dominio dentro del bundle del despliegue.
+
+### 7b — Calidad de las respuestas
+- **Markdown en la web** (listas, negritas, código). Sin riesgo: no cambia ninguna respuesta.
+- **Plan B del agente:** busca con la consulta anterior + la nueva, pero debe **responder a la pregunta original**. Con el 0.6B, responder a la mezcla da respuestas equivocadas en los seguimientos (medido, `FASE_6.md`). Se mide con `agent-bench` antes de adoptarlo.
+- **Regla de formato** (listas y negritas) solo en la web, probada por modelo: con el 0.6B, cada regla de más en el prompt puede costar aciertos.
+- **Juez de las respuestas, sobre todo las del CV:** para encontrar dónde fallan, no para mostrarlo en la web. **Decisión tuya pendiente:** Groq (el juez de la Fase 3; las fuentes del CV saldrían a un servicio externo) o un juez local (Qwen3-4B en la GPU; nada sale de la máquina, pero es un juez más débil).
+
+### 7c — Visual
+- Tarjetas de recall flotantes que giran al pasar de una a otra.
+- Estilo definitivo de la barra de scroll.
+
+### 7d — Opcionales aparcados
+- **4c, Gulliver** (multimedia). El plan está en la Fase 4.
+- **MLQA.**
+- **`repetition_penalty`** contra los bucles de generación (visto con Phi-4-mini). Cambia todas las respuestas, así que exige repetir `gen-bench`.
+
+**Nota sobre el despliegue:** Phi-4-mini no cabe en el Space gratuito (en CPU, en float32, ocuparía ~15 GB, y además está la búsqueda). Incluso cargado a media precisión, tardaría minutos por respuesta en 2 CPU (estimado, sin medir). En el Space, lo realista es el 0.6B y quizá el 1.7B. Phi sigue siendo una opción en local.
 
 ---
 
@@ -359,7 +395,9 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 | P8 | ~~¿`bge-m3` por defecto aunque indexar en CPU lleve ~2 h?~~ → resuelto: `bge-m3` en la base y perfil `cpu-light` (`e5-small`) | Hecho |
 | P9 | ~~`bge-reranker-v2-m3`~~ → resuelto: perfil opcional `gpu-quality` | Hecho |
 | P3 | ~~Dominios nuevos~~ → resuelto: XQuAD (cultura general, en/es) y después MLQA | Hecho |
-| P4 | Modularización: qué opciones se exponen en la web y cómo se navega. **Propuesta aplicada (2026-10-24), a revisar:** modo *Demo*/*CV*, interruptor de agente y filtro de dominios; sin selector de modelo (en la CPU gratuita solo cabe uno) | Al revisar la Fase 6 |
+| P4 | ~~Modularización: qué opciones se exponen en la web~~ → resuelto en la revisión de la Fase 6: filtros de dominio, agente sí/no, modelo y profundidad | Hecho |
+| P11 | ~~Juez de las respuestas del CV (Fase 7b)~~ → resuelto (2026-10-24, decisión tuya): **Groq**, también con las preguntas del CV, hasta agotar los tokens gratuitos. Si hace falta, se repite con Qwen3-4B como juez local | Hecho |
+| P12 | LLM del Space: el 0.6B (la base) o el 1.7B (mejor agente; su latencia en CPU está sin medir) | Antes del despliegue |
 | P5 | ~~GPU de los ordenadores de 42~~ → resuelto: no aceptan CUDA (vLLM tarda ~10 h en indexarse). Se descarta indexar en 42 y el proyecto se sirve en línea | Hecho |
 | P10 | Hugging Face Datasets: usarlos como fuente de la ingesta y alojar allí los nuestros (los de 42, los derivados multimedia y quizá el índice). Falta revisar si la licencia de los datasets de 42 permite publicarlos. **Avance (2026-10-24):** el índice preconstruido va en un dataset **privado** de HF (DEC-09). Publicar los datasets de 42 sigue sin hacerse: la licencia no está revisada | A desarrollar; antes de la Fase 6 (despliegue) o de la 4c si se retoma |
 | P6 | Proveedor de la key gratuita para el juez LLM | Antes de la Fase 3 |
@@ -405,4 +443,6 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-23**: datasets de 42 movidos de `data/datasets/` a `bench/datasets/public/`: `bench/` queda para lo versionado y `data/` para lo local (DEC-01). El evaluador de 42 se conserva como métrica de referencia.
 - **2026-10-24**: redes de seguridad del agente (DEC-03) y benchmark de agente frente a directo con cuatro modelos (`BENCHMARK_REPORT.md` §8). Fase 5 completada, pendiente de revisión.
 - **2026-10-24**: Fase 6 preparada hasta el punto de despliegue (API, web React, bundle del índice, imagen del Space, workflow de Pages), sin commits ni publicación. Decisiones tomadas por necesidad en `docs/decisions.md`.
+- **2026-10-24**: revisión de la web contigo (`FASE_6.md` §6b–6g). Commit `3378494` ("Phase 6: Frontend and deployment"). El despliegue en Hugging Face queda pendiente de tus cuentas.
+- **2026-10-24**: abierta la **Fase 7 (opcionales y mejoras)**. Empieza por el dominio "about" (el proyecto hablando de sí mismo, con el README reescrito, `docs/` y el código). El juez de las respuestas del CV queda pendiente de decidir (P11).
 - **2026-10-23**: biografía del modo CV, borrador v1 en `data/raw/cv/autobiography.md` (ignorado por git), con los datos pendientes marcados.

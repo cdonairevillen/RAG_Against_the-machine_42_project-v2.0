@@ -139,6 +139,7 @@ space-stage: web-build
 	@cp deploy/space/entrypoint.sh $(STAGE)/deploy/space/
 	@cp deploy/space/Dockerfile $(STAGE)/Dockerfile
 	@cp deploy/space/README.md $(STAGE)/README.md
+	@cp LICENSE $(STAGE)/LICENSE
 	@find $(STAGE) -name "__pycache__" -type d -exec rm -rf {} +
 	@echo "Space content ready in $(STAGE)"
 

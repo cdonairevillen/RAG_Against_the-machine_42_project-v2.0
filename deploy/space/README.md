@@ -5,6 +5,7 @@ colorFrom: red
 colorTo: gray
 sdk: docker
 app_port: 7860
+license: mit
 pinned: false
 short_description: Multi-domain RAG with an agent (vLLM, Wikipedia, CV)
 ---

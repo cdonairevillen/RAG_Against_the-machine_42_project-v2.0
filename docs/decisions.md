@@ -127,7 +127,12 @@ La API serializa la generación con un candado. Con un solo LLM en una CPU gratu
 
 ## DEC-14 — Sin licencia en la ficha del Space
 
-El repo no tiene `LICENSE`. Había puesto `license: mit` en la ficha del Space y **lo quité**: elegir licencia es decisión tuya. Ojo: los datos de XQuAD son CC-BY-SA 4.0, y eso obliga a citar (ya se cita en la web y en la ficha) y a publicar los derivados con la misma licencia.
+El repo no tenía `LICENSE`. Había puesto `license: mit` en la ficha del Space y **lo quité**: elegir licencia es decisión tuya. Ojo: los datos de XQuAD son CC-BY-SA 4.0, y eso obliga a citar (ya se cita en la web y en la ficha) y a publicar los derivados con la misma licencia.
+
+**Resuelto (2026-10-24, Fase 7):** pediste crear la licencia.
+- **MIT** para el código y la documentación propios (`LICENSE`). La alternativa, Apache-2.0, solo añade una cláusula de patentes que no aporta nada a un portfolio.
+- **Lo de terceros queda fuera, y se dice en el README:** `bench/datasets/xquad/` (CC-BY-SA 4.0), los datasets de 42 (`public/`, y su subconjunto traducido en `en/` y `es/`) y `llm_sdk/`.
+- **La ficha del Space** vuelve a llevar `license: mit`, y `make space-stage` copia el `LICENSE`.
 
 ## DEC-15 — FastAPI y uvicorn como dependencias normales
 
