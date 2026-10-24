@@ -99,9 +99,9 @@ navegador ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) �
 | Prueba | Resultado |
 |---|---|
 | `/health` hasta `loaded: true`; `/config` | ✅ 3 dominios (vllm 37 381 chunks, xquad 1 217, cv 162) |
-| "¿Dónde nació Chrystian?" (CV, agente) | ✅ "…nació el 20 de enero de 1996 en Madrid. [3]", con 14 eventos de *streaming* y la cita en la biografía |
-| Seguimiento "¿Y en qué año?" con el mismo `session_id` | ✅ El agente reescribe la consulta ("¿Y en qué año? Chrystian Donaire Villén nació en Madrid.") y responde con el año |
-| Pregunta por un dato de contacto privado | ✅ "I don't have that information, but you can ask him yourself! cdonairevillen@gmail.com" |
+<!-- about:skip -->| "¿Dónde nació Chrystian?" (CV, agente) | ✅ "…nació el 20 de enero de 1996 en Madrid. [3]", con 14 eventos de *streaming* y la cita en la biografía |<!-- /about:skip -->
+<!-- about:skip -->| Seguimiento "¿Y en qué año?" con el mismo `session_id` | ✅ El agente reescribe la consulta ("¿Y en qué año? Chrystian Donaire Villén nació en Madrid.") y responde con el año |<!-- /about:skip -->
+<!-- about:skip -->| Pregunta por un dato de contacto privado | ✅ "I don't have that information, but you can ask him yourself! cdonairevillen@gmail.com" |<!-- /about:skip -->
 | **Fugas** en todas las respuestas, fuentes y vistas previas | ✅ **0** (la vista previa del CV muestra `[dato privado]`) |
 | "How do I enable prefix caching in vLLM?" (directo) | ✅ `enable_prefix_caching=True`, con 5 fuentes de vLLM (router: vllm 10.2, xquad −5.2, cv −5.9) |
 | "¿Quién ganó la Super Bowl 50?" (filtro `xquad`) | ✅ "…los Broncos", con el crédito CC-BY-SA en la fuente |
@@ -140,8 +140,8 @@ navegador ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) �
 
 | Pregunta | Directo (12 hilos) | Agente (12 hilos) | **Directo (2 hilos)** | **Agente (2 hilos)** |
 |---|---|---|---|---|
-| ¿Dónde nació Chrystian? (CV) | 25.1 / 47.9 | 61.3 / 84.2 | **10.6 / 14.4** | **18.2 / 22.0** |
-| ¿Y en qué año? (CV, seguimiento) | 24.4 / 53.2 | 67.8 / 90.9 | **9.6 / 14.3** | **19.8 / 23.6** |
+<!-- about:skip -->| ¿Dónde nació Chrystian? (CV) | 25.1 / 47.9 | 61.3 / 84.2 | **10.6 / 14.4** | **18.2 / 22.0** |<!-- /about:skip -->
+<!-- about:skip -->| ¿Y en qué año? (CV, seguimiento) | 24.4 / 53.2 | 67.8 / 90.9 | **9.6 / 14.3** | **19.8 / 23.6** |<!-- /about:skip -->
 | How do I enable prefix caching in vLLM? | 38.8 / 88.3 | 74.4 / 123.4 | **15.7 / 24.0** | **23.4 / 31.7** |
 | Who won Super Bowl 50? | 40.3 / 51.5 | 83.8 / 94.6 | **17.5 / 19.3** | **27.5 / 29.4** |
 
@@ -150,7 +150,7 @@ navegador ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) �
 - **Lectura:**
   - En el Space gratuito, una respuesta directa tarda ~15–25 s y una con agente ~22–32 s. Los primeros tokens llegan a los ~10–28 s.
   - El agente añade ~8 s (su llamada de planificación al LLM).
-  - El directo, con la respuesta en su memoria, contesta mal al seguimiento ("En el año 2017, dejó su formación…"); el agente lo resuelve bien.
+  - El directo, con la respuesta en su memoria, contesta mal al seguimiento <!-- about:skip -->("En el año 2017, dejó su formación…")<!-- /about:skip -->; el agente lo resuelve bien.
   - **No he desglosado** cuánto de los ~10 s previos al primer token es búsqueda (embeddings y reranker) y cuánto la lectura del prompt por el LLM.
 - **Ojo:** es una simulación en mi máquina. La CPU real del Space puede ser más lenta o más rápida.
 
@@ -236,7 +236,7 @@ navegador ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) �
 
 ## 6f. Respuestas cortadas y en inglés (2026-10-24)
 
-**Respuestas en inglés a preguntas en español.** Tu pregunta era "Experiencia laboral de Chrystian". Ninguna de sus palabras estaba entre los marcadores del detector de idioma (`src/rag/language.py`): devolvía "?", no se pedía ningún idioma y el modelo seguía el de las fuentes, que es el inglés.
+**Respuestas en inglés a preguntas en español.** Tu pregunta era <!-- about:skip -->"Experiencia laboral de Chrystian"<!-- /about:skip -->. Ninguna de sus palabras estaba entre los marcadores del detector de idioma (`src/rag/language.py`): devolvía "?", no se pedía ningún idioma y el modelo seguía el de las fuentes, que es el inglés.
 - **Nuevos marcadores en español:** "de", "y", "en", "sobre", "mi", "tu", "quién".
 - **Nuevos marcadores en inglés:** "in", "an", "his", "about", "from", "who", "where".
 - **Señal extra:** las tildes, la ñ y ¿¡ cuentan como español.
@@ -247,7 +247,7 @@ navegador ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) �
 | Modelo | Tokens por respuesta con un límite de 600 |
 |---|---|
 | Qwen3-0.6B | 12–61: nunca llega al límite |
-| Qwen3-1.7B | 20–145, pero "Experiencia laboral de Chrystian" necesita **265** (12.9 s en la 3080 Ti) |
+| Qwen3-1.7B | 20–145, pero <!-- about:skip -->"Experiencia laboral de Chrystian"<!-- /about:skip --> necesita **265** (12.9 s en la 3080 Ti) |
 
 - **La web sube el límite a 400** (`API_MAX_TOKENS` en `make api`; `RAG_GENERATION_MAX_NEW_TOKENS=400` en la imagen del Space).
 - **`rag.toml` mantiene 150,** para que `gen-bench` siga siendo comparable con las fases anteriores.

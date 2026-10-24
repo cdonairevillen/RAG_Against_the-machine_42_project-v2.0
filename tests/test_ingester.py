@@ -4,7 +4,9 @@ from src.rag.ingestion.chunkers import (
     chunk_markdown_packed, chunk_python_file,
     markdown_sections, split_by_size,
 )
-from src.rag.ingestion.pipeline import Ingester, assign_ids, walk_source
+from src.rag.ingestion.pipeline import (
+    Ingester, assign_ids, blank_marked, walk_source,
+)
 
 PYTHON_SOURCE = '''import os
 
@@ -260,3 +262,21 @@ def test_exclude_paths_skips_one_folder_not_its_namesakes(tmp_path) -> None:
     # By path: only that folder; src/deploy and src/data stay.
     assert found == ["README.md", "deploy/README.md", "src/data/y.py",
                      "src/deploy/bundle.py"]
+
+
+def test_blank_marked_keeps_offsets_and_line_breaks() -> None:
+    text = ("Keep this.\n<!-- about:skip -->\nborn in 1996\n"
+            "<!-- /about:skip -->\nAnd this.")
+    blanked = blank_marked(text)
+    assert len(blanked) == len(text)
+    assert blanked.count("\n") == text.count("\n")
+    assert "1996" not in blanked and "about:skip" not in blanked
+    assert blanked.index("And this.") == text.index("And this.")
+    assert blanked.startswith("Keep this.\n")
+
+
+def test_blank_marked_rejects_an_unclosed_region() -> None:
+    import pytest
+
+    with pytest.raises(ValueError):
+        blank_marked("a <!-- about:skip --> b")

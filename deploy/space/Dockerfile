@@ -27,7 +27,7 @@ ENV HOME=/home/user \
     HF_HOME=/home/user/.cache/huggingface \
     UV_PROJECT_ENVIRONMENT=/home/user/venv \
     RAG_MODELS_DEVICE=cpu \
-    RAG_GENERATION_MAX_NEW_TOKENS=1024 \
+    RAG_API_MAX_TOKENS=512 \
     PYTHONUNBUFFERED=1
 WORKDIR /home/user/app
 

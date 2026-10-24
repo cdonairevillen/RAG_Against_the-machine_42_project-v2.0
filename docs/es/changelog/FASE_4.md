@@ -16,6 +16,7 @@ Aplazada: 4c (Gulliver).
 
 ---
 
+<!-- about:skip -->
 ## 4b — Modo CV
 
 ### Decisiones (tuyas)
@@ -124,6 +125,7 @@ Cada cambio se mide por separado con el `gen-bench` del CV (60 preguntas más 20
   - A otra, da tu Gmail como si fuera el contacto pedido. No hay fuga, pero la afirmación es falsa.
   - Posible arreglo en el prompt: "el único contacto público es cdonairevillen@gmail.com".
 - **Router con los tres dominios** (`46-router-cv`): el 100 % de las preguntas de 42 y del CV llegan a su dominio. XQuAD se queda en el 98 %, y solo 5 de 2 380 van al CV.
+<!-- /about:skip -->
 
 ## 4a — Cultura general: XQuAD
 

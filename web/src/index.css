@@ -92,6 +92,9 @@ html, body {
   cursor: pointer;
 }
 .chip.on { color: var(--accent); border-color: var(--accent); }
+/* Always searched: no pointer, and a dot in front marks it as fixed. */
+.chip.pinned { cursor: default; }
+.chip.pinned::before { content: "● "; font-size: 0.55rem; vertical-align: 0.1em; }
 
 .notice { font-family: var(--mono); font-size: 0.75rem; color: #888; border: 1px dashed var(--line-strong); border-radius: 4px; padding: 0.7rem 1rem; margin-top: 1rem; }
 

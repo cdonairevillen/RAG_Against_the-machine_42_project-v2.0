@@ -135,6 +135,11 @@ class SourceConfig(BaseModel):
     # for one folder whose name exists elsewhere too (deploy/stage but
     # not src/deploy).
     exclude_paths: list[str] = Field(default_factory=list)
+    # Blank the regions of Markdown files between the about:skip markers
+    # (HTML comments, see ingestion/pipeline.py) before chunking, keeping
+    # the offsets: parts of a document this source must not index (Phase
+    # 7a: test transcripts quoting CV answers inside the changelogs).
+    skip_marked: bool = False
     code_extensions: list[str] = Field(default_factory=list)
     chunkers: dict[str, str] = Field(default_factory=dict)
     default_chunker: str = "size"
@@ -142,6 +147,14 @@ class SourceConfig(BaseModel):
     # retrieval.relevance_threshold. Calibrated with `gate_scores`: the
     # reranker scores each corpus on its own scale (see FASE_4.md).
     relevance_threshold: Optional[float] = None
+    # Regular expressions (case-insensitive) that name this domain in a
+    # question ("this project"). The router lets a matching domain win
+    # when it also passes its own relevance_threshold; otherwise routing
+    # is unchanged (see DomainRouter.route).
+    route_hints: list[str] = Field(default_factory=list)
+    # The web always searches this domain: it joins every domain filter
+    # and its chip cannot be turned off (Phase 7a: "about").
+    pinned: bool = False
     # Data hidden at answer time ("phone", "email"): masked in the
     # context given to the LLM, in the answer and in the sources shown.
     # The indexed material is not modified. public_emails stay visible.

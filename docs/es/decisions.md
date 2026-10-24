@@ -172,3 +172,24 @@ El repo no tenía `LICENSE`. Había puesto `license: mit` en la ficha del Space 
 ## DEC-18 — Datos de ejemplo ficticios
 
 Los ejemplos de los tests y de los comentarios del enmascarado (`src/rag/domain_rules.py`, `tests/test_domain_rules.py`, `tests/test_api.py`) usan datos ficticios. El patrón de enmascarado es genérico, así que el comportamiento no cambia. Comprobado: ni el código ni `deploy/stage/` (lo que se sube al Space) contienen datos personales.
+
+## DEC-19 — Plataforma de despliegue: Oracle Cloud Always Free (2026-10-24, decisión tuya)
+
+**Problema:** desde julio de 2026, Hugging Face exige un plan de pago (PRO) para crear Spaces de Docker o Gradio; solo los estáticos son gratis. El plan de la Fase 6 (Space de Docker en CPU gratuito) deja de ser gratuito. Además, Google Cloud queda fuera: ya tiene un servicio tuyo y quieres entornos separados.
+
+| Opción | Pros | Contras |
+|---|---|---|
+| **A. VM ARM de Oracle Cloud Always Free (2 OCPU, 12 GB, 200 GB de disco) con Docker + Caddy** ✅ | Gratis y siempre encendida; la misma imagen del Space; separada de Google | Pide tarjeta para verificar; a veces no hay capacidad ARM; la velocidad en ARM está sin medir |
+| B. Tu PC + Cloudflare Tunnel | Gratis y con GPU | Solo funciona con tu PC encendido |
+| C. Google Cloud Run | Ya tienes cuenta | La cuota gratuita da pocas horas con 8–16 GB de RAM; mezcla con tu otro servicio |
+| D. Hugging Face PRO | Lo preparado funciona sin cambios | 9 $/mes |
+
+**Medido para elegir A:** la imagen con `--cpus=2 --memory=12g` ocupa 4.2 GB tras cargar y 5.0 GB de pico respondiendo. El `uv.lock` tiene torch para `aarch64`, así que la imagen se construye en la máquina ARM.
+
+**Cambios respecto a DEC-08 y DEC-09:**
+- **DEC-08:** el contenedor sigue sirviendo la API y la web, y Pages sigue siendo opcional. Delante va Caddy, que pone el HTTPS (necesario para que Pages pueda llamar a la API), con un subdominio gratuito de DuckDNS.
+- **DEC-09:** el bundle se copia con `scp` a tu máquina y se monta en el contenedor. El dataset privado de Hugging Face ya no hace falta, aunque `entrypoint.sh` lo sigue aceptando.
+
+**Ficheros:** `deploy/oracle/` (`compose.yml`, `Caddyfile`, `.env.example`) y la guía `deploy/README.md`. `make space-stage` incluye `deploy/oracle/`.
+
+**Reversible:** sí. `deploy/space/` sigue intacto para un Space de pago.

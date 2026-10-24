@@ -32,6 +32,8 @@ SETS = (
     ("xquad", "es", "xquad"),
     ("cv", "en", "cv"),
     ("cv", "es", "cv"),
+    ("about", "en", "about"),
+    ("about", "es", "about"),
 )
 
 

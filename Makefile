@@ -96,16 +96,16 @@ web-stop:
 # API_MODELS: the LLMs the web offers (rag.toml profiles). Qwen3-4B is left
 # out: with retrieval on the GPU it does not fit in 12 GB (measured).
 API_MODELS ?= default,llm-qwen3-1.7b,llm-phi4-mini
-# The web lets the LLM write what it needs (rag.toml keeps 150 so
-# gen-bench stays comparable): the longest legit answer measured was 464
-# tokens, so 1024 is only a safety net against loops; the Stop button cuts
-# them and a capped answer is trimmed at its last sentence.
-API_MAX_TOKENS ?= 1024
+# Answer length cap per model in the web (rag.toml keeps 150 so gen-bench
+# stays comparable). The longest legit answers measured: 464 tokens
+# (Phi-4-mini, 10 sources) and 321 (Qwen3-1.7B); above that it was a loop
+# (Phi-4-mini), cut sooner this way. Capped answers are trimmed at their
+# last sentence, and the Stop button cuts any of them.
+API_MAX_TOKENS ?= default=512,llm-qwen3-1.7b=512,llm-phi4-mini=640
 # API_DOMAINS: the domains the web serves (empty: every indexed one).
-# "about" (Phase 7a) stays out until its threshold and routing are checked.
-API_DOMAINS ?= vllm,xquad,cv
+API_DOMAINS ?=
 api: db-up
-	RAG_API_DOMAINS=$(API_DOMAINS) RAG_API_MODELS=$(API_MODELS) RAG_GENERATION_MAX_NEW_TOKENS=$(API_MAX_TOKENS) \
+	RAG_API_DOMAINS=$(API_DOMAINS) RAG_API_MODELS=$(API_MODELS) RAG_API_MAX_TOKENS=$(API_MAX_TOKENS) \
 		$(ENV) $(UV) run --project . $(PY) -m src.api
 
 # React web in development (Vite, http://localhost:5173, talks to make api).
@@ -130,16 +130,18 @@ space-build: web-build
 space-run:
 	docker run --rm -p 7860:7860 -v "$(CURDIR)/$(BUNDLE):/home/user/app/bundle:ro" $(SPACE_IMAGE)
 
-# The Space repository content (a Space needs its Dockerfile at the root):
-# deploy/stage/ mirrors the paths the Dockerfile copies. Push it to the
-# Space's git (deploy/README.md). No data and no bundle inside.
+# The code the server builds (Dockerfile at the root): deploy/stage/
+# mirrors the paths the Dockerfile copies, plus deploy/oracle/ (Caddy +
+# compose). Copied to the Oracle VM (deploy/README.md) or pushed to a
+# Space's git. No data and no bundle inside.
 STAGE     := deploy/stage
 space-stage: web-build
-	@rm -rf $(STAGE) && mkdir -p $(STAGE)/deploy/space $(STAGE)/bench $(STAGE)/web
+	@rm -rf $(STAGE) && mkdir -p $(STAGE)/deploy/space $(STAGE)/deploy/oracle $(STAGE)/bench $(STAGE)/web
 	@cp -r src llm_sdk rag.toml pyproject.toml uv.lock $(STAGE)/
 	@cp -r bench/results $(STAGE)/bench/
 	@cp -r web/dist $(STAGE)/web/
 	@cp deploy/space/entrypoint.sh $(STAGE)/deploy/space/
+	@cp deploy/oracle/compose.yml deploy/oracle/Caddyfile deploy/oracle/.env.example $(STAGE)/deploy/oracle/
 	@cp deploy/space/Dockerfile $(STAGE)/Dockerfile
 	@cp deploy/space/README.md $(STAGE)/README.md
 	@cp LICENSE $(STAGE)/LICENSE

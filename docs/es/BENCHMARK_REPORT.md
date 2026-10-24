@@ -260,6 +260,7 @@ Las respuestas de referencia de XQuAD son fragmentos cortos (por ejemplo, "308")
 
 ---
 
+<!-- about:skip -->
 ## 7. Modo CV (Fase 4b)
 
 Corpus: CV (`.docx`, inglés), perfil de LinkedIn (`.pdf`, español) y biografía (español + versión en inglés). Benchmark propio: 30 preguntas iguales en inglés y en español, más 10 sobre ti sin respuesta en los datos (contacto privado, temas reservados, datos que faltan). Qwen3-0.6B.
@@ -280,6 +281,8 @@ Corpus: CV (`.docx`, inglés), perfil de LinkedIn (`.pdf`, español) y biografí
 - **Las mayores ganancias vienen de los datos** (la versión en inglés) y del **tamaño del chunk** (menos mezcla de trabajos). Las reglas de prompt arreglan casos concretos (los temas reservados, el contacto), pero con un modelo de 0.6B cada regla de más puede costar aciertos (`36`).
 
 ---
+
+<!-- /about:skip -->
 
 ## 8. Agente frente a acceso directo (Fase 5)
 

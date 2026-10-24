@@ -11,6 +11,8 @@ export interface Domain {
   name: string;
   description: string;
   chunks: number;
+  // Always searched: its chip cannot be turned off.
+  pinned?: boolean;
 }
 
 export interface ModelOption {

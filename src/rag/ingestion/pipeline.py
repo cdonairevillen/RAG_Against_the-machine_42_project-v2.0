@@ -18,6 +18,33 @@ INDEX_DIR = "bm25_index"
 INDEX_CODE_DIR = "bm25_code_index"
 INDEX_DOC_DIR = "bm25_doc_index"
 MANIFEST_FILE = "manifest.json"
+# Markers of the regions a source with skip_marked does not index.
+SKIP_START = "<!-- about:skip -->"
+SKIP_END = "<!-- /about:skip -->"
+
+
+def blank_marked(text: str) -> str:
+    """Replace every marked region (markers included) with spaces.
+
+    Line breaks are kept and the length does not change, so the offsets
+    of everything else stay exact.
+
+    Raises:
+        ValueError: If a start marker has no end marker.
+    """
+    parts = []
+    pos = 0
+    while (start := text.find(SKIP_START, pos)) != -1:
+        end = text.find(SKIP_END, start)
+        if end == -1:
+            raise ValueError(f"{SKIP_START} at {start} is never closed")
+        end += len(SKIP_END)
+        parts.append(text[pos:start])
+        parts.append("".join(c if c == "\n" else " "
+                             for c in text[start:end]))
+        pos = end
+    parts.append(text[pos:])
+    return "".join(parts)
 
 
 def walk_source(source: SourceConfig) -> Iterator[str]:
@@ -176,10 +203,14 @@ class Ingester:
                 print(f"Skipping {rel_path}: {exc}")
                 continue
 
+            _, ext = os.path.splitext(abs_path)
+            if self.source.skip_marked and ext == ".md":
+                # Markdown only: the code that handles the markers
+                # contains them too.
+                content = blank_marked(content)
             if not content.strip():
                 continue
 
-            _, ext = os.path.splitext(abs_path)
             chunk_type = self.source.chunk_type_for(ext)
             max_size = (
                 self.chunking.code_chunk_size if chunk_type == "code"
@@ -187,6 +218,9 @@ class Ingester:
             )
             chunker = get_chunker(self.source.chunker_for(ext))
             file_chunks = chunker(rel_path, content, max_size)
+            if self.source.skip_marked:
+                # A section that was entirely blanked leaves no chunk.
+                file_chunks = [c for c in file_chunks if c.text.strip()]
             for chunk in file_chunks:
                 chunk.chunk_type = chunk_type
             all_chunks.extend(file_chunks)

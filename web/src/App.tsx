@@ -8,7 +8,7 @@ import { EXAMPLES } from "./examples";
 const GITHUB = "https://github.com/cdonairevillen/RAG_Against_the-machine_42_project-v2.0";
 
 const BLURB =
-  "A multi-domain RAG over the vLLM docs and code, general knowledge from Wikipedia (English and Spanish) and the author's profile. The filters choose where it searches.";
+  "A multi-domain RAG over the vLLM docs and code, general knowledge from Wikipedia (English and Spanish) and the author's profile, and the project explaining itself (\"about\", always on). The filters choose where it searches.";
 
 // Short notes for the model menu (docs/BENCHMARK_REPORT.md §5 and §8).
 const MODEL_NOTES: Record<string, string> = {
@@ -364,8 +364,11 @@ export default function App() {
 
   const stop = () => controller.current?.abort();
 
-  const toggleDomain = (name: string) =>
+  const pinned = (name: string) => config?.domains.some((d) => d.name === name && d.pinned) ?? false;
+  const toggleDomain = (name: string) => {
+    if (pinned(name)) return;
     setDomains((d) => (d.includes(name) ? d.filter((x) => x !== name) : [...d, name]));
+  };
 
   const models = config?.models ?? [{ id: "default", label: config?.model ?? "Qwen3-0.6B", model: "", loaded: true }];
   const modelInfo = (id: string) => models.find((m) => m.id === id);
@@ -384,9 +387,10 @@ export default function App() {
               {config?.domains.map((d) => (
                 <button
                   key={d.name}
-                  className={`chip ${domains.includes(d.name) ? "on" : ""}`}
-                  title={d.description}
+                  className={`chip ${domains.includes(d.name) ? "on" : ""} ${d.pinned ? "pinned" : ""}`}
+                  title={d.pinned ? `${d.description} (always on)` : d.description}
                   aria-pressed={domains.includes(d.name)}
+                  aria-disabled={d.pinned}
                   onClick={() => toggleDomain(d.name)}
                 >
                   {d.name}
@@ -465,7 +469,7 @@ export default function App() {
                   ask(question);
                 }
               }}
-              placeholder="Ask anything about vLLM, Wikipedia or the author…"
+              placeholder="Ask anything about vLLM, Wikipedia, the author or this project…"
               maxLength={1000}
               disabled={!loaded}
             />

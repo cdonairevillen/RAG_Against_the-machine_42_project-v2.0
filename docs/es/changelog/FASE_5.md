@@ -68,7 +68,7 @@ Se inspira en AgentSmith: estructura del bucle, traza de pasos y plan B cuando e
 
 **Flujo por pregunta** (`Agent.ask`):
 1. **Planificar:** el LLM recibe los dominios (con su descripción), la conversación y la pregunta, y llama a `search` con una **pregunta completa**: aquí es donde se reescriben los seguimientos. Puede buscar hasta 3 veces y para cuando deja de llamar a la herramienta.
-2. **Plan B determinista:** si no hace ninguna llamada válida, se busca la pregunta precedida de la última consulta que escribió el modelo. Así un seguimiento conserva su tema ("¿Dónde nació Chrystian? ¿Y en qué año?").
+2. **Plan B determinista:** si no hace ninguna llamada válida, se busca la pregunta precedida de la última consulta que escribió el modelo. Así un seguimiento conserva su tema <!-- about:skip -->("¿Dónde nació Chrystian? ¿Y en qué año?")<!-- /about:skip -->.
 3. **Responder:** las fuentes reunidas van al **mismo generador del flujo directo**, con las reglas del dominio (citas, prompt del CV, datos privados, tu mensaje de "no encontrado") y en el **idioma del usuario**, aunque la búsqueda se haya reescrito en otro.
 4. **Memoria:** el turno se añade a la sesión (`Session`, solo en memoria; D7).
 
@@ -85,7 +85,7 @@ Se inspira en AgentSmith: estructura del bucle, traza de pasos y plan B cuando e
 |---|---|
 | Con el historial como turnos de chat anteriores (usuario/asistente), en los seguimientos el modelo **copiaba el patrón y respondía sin buscar** | El historial va **dentro del turno del usuario** ("Conversation so far: … New question: …"), y así el patrón siempre es pregunta → herramienta |
 | En los seguimientos respondía "DONE" sin buscar ("la conversación ya lo dice") | Regla del prompt: "toda pregunta nueva necesita al menos una búsqueda"; DONE solo después de buscar |
-| El plan B encadenaba consultas ("¿Dónde nació…? ¿Y en qué año? ¿En qué barrio…?") y perdía el tema | El plan B usa la última consulta escrita por el **modelo**, no las de otros planes B |
+| El plan B encadenaba consultas <!-- about:skip -->("¿Dónde nació…? ¿Y en qué año? ¿En qué barrio…?")<!-- /about:skip --> y perdía el tema | El plan B usa la última consulta escrita por el **modelo**, no las de otros planes B |
 
 **Redes de seguridad** (tras la ronda 1 del benchmark; tu propuesta, acotada; `docs/decisions.md`, DEC-03):
 
@@ -98,7 +98,7 @@ Se inspira en AgentSmith: estructura del bucle, traza de pasos y plan B cuando e
 - **Si las dos fallan**, se usa el plan B determinista de siempre.
 - **Cada uso queda en la traza** (`AgentAnswer.retries`: `"all-domains"`, `"original-question"`), visible en la web y en `chat`.
 
-Con esto, Qwen3-0.6B reescribe de verdad: "¿Y en qué año?" → "¿Y en qué año? Chrystian Donaire Villén nació en Madrid."; "¿En qué barrio creció?" → "¿En qué barrio creció Chrystian Donaire Villén?"; "And which one unloads it?" → "which endpoint unloads a LoRA adapter in vLLM" (con `domains: vllm`).
+Con esto, Qwen3-0.6B reescribe de verdad: <!-- about:skip -->"¿Y en qué año?" → "¿Y en qué año? Chrystian Donaire Villén nació en Madrid."; "¿En qué barrio creció?" → "¿En qué barrio creció Chrystian Donaire Villén?";<!-- /about:skip --> "And which one unloads it?" → "which endpoint unloads a LoRA adapter in vLLM" (con `domains: vllm`).
 
 **Uso:**
 - `answer` usa el **agente por defecto** (D7); `--agent False` usa el flujo directo.

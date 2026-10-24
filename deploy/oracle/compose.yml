@@ -1,0 +1,44 @@
+# Production on an Oracle Cloud Always Free VM (ARM, 2 OCPU, 12 GB):
+# the RAG API + web (the same image as the Space) behind Caddy, which
+# gets and renews the HTTPS certificate for RAG_DOMAIN by itself.
+#
+# Runs from deploy/oracle/ inside the staged code (make stage), with the
+# index bundle copied next to it (~/rag/bundle). Settings in a .env file
+# beside this one (see .env.example). Guide: deploy/README.md.
+#
+#   docker compose up -d --build
+services:
+  rag:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: rag-app
+    restart: unless-stopped
+    environment:
+      # Web origins allowed to call the API (GitHub Pages); * = any.
+      RAG_ALLOWED_ORIGINS: ${RAG_ALLOWED_ORIGINS:-*}
+    volumes:
+      # Private index bundle (raw CV text): copied with scp, never public.
+      # Default: ~/rag/bundle, with the code in ~/rag/app.
+      - ${BUNDLE_DIR:-../../../bundle}:/home/user/app/bundle:ro
+    expose:
+      - "7860"
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    depends_on:
+      - rag
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      RAG_DOMAIN: ${RAG_DOMAIN:?set RAG_DOMAIN in deploy/oracle/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

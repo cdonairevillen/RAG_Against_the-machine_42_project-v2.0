@@ -160,6 +160,9 @@ class Retriever:
         # Sources for the LLM when answering from this domain (rag.toml
         # answer_k); None keeps the caller's k.
         self.answer_k: Optional[int] = None
+        # Patterns that name this domain in a question (rag.toml
+        # route_hints), used by the DomainRouter.
+        self.route_hints: list[re.Pattern[str]] = []
 
         self.chunk_map: dict = {}
         self.parent_chunk_map: dict = {}
@@ -331,6 +334,10 @@ class Retriever:
         retriever.store = store
         retriever.domain = domain
         retriever.answer_k = source.answer_k if source else None
+        retriever.route_hints = [
+            re.compile(hint, re.IGNORECASE)
+            for hint in (source.route_hints if source else [])
+        ]
         retriever.embeddings = config.embeddings
         if config.embeddings.enabled:
             retriever.load_embedder(manifest.get("embedding_model"),

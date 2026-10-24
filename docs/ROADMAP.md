@@ -231,22 +231,7 @@ The results obtained during the evaluation must not get worse.
 
 ### 4b — CV mode
 
-- **Material** (in `data/raw/cv/`, **ignored by git**; moved from the root, where `git add .` would have uploaded it):
-  - The CV as `.docx` and the LinkedIn profile as a PDF.
-  - `autobiography.md`, an autobiography with tastes, hobbies and travels, **to be written together later**.
-- **Ingestion:** Docling for the `.docx` and the PDF; Markdown for the autobiography. The `cv` collection.
-- **Multilingual**, with guardrails: if something is not in the data, it is not made up, and contact is offered.
-- **Privacy review before indexing:** which personal data goes in and which does not. The author decides.
-- **The external judge (Groq) is not used with personal data** unless the author explicitly decides so.
-
-> ✅ **Completed (2026-10-23).** Details in `changelog/FASE_4.md` (4b) and `BENCHMARK_REPORT.md` §7.
-> - **Indexed:** the CV (`.docx`, EN), LinkedIn (`.pdf`, ES) and the biography (ES + an EN version), with Docling.
-> - **Privacy:** private contact data is masked at answer time, without touching the files. 0 leaks in every test.
-> - **Missing data**, it answers: *"I don't have that information, but you can ask him yourself! cdonairevillen@gmail.com"* (and its Spanish version).
-> - **CV mode prompt** in the third person, without mixing jobs, reserved topics and contact. Chunks of 800, 8 sources and a −3.0 threshold.
-> - **Result:** contains the right answer in 73% (EN) and 80% (ES); the router sends 100% of the CV questions to their domain.
-
-- **Future, a module of the author's own texts:** some of his stories could be ingested as part of the CV mode (or as a separate domain).
+> ✅ **Completed (2026-10-23).** The `cv` domain: the author presented by his own documents, with private contact data protected. Details in `changelog/FASE_4.md` (4b) and `BENCHMARK_REPORT.md` §7.
 
 ### 4c — Multimedia: *Gulliver's Travels* (1939) vs Swift's novel (1726)
 
@@ -392,6 +377,7 @@ The results obtained during the evaluation must not get worse.
 ### 7d — Parked optional items
 - **4c, Gulliver** (multimedia). The plan is in Phase 4.
 - **MLQA.**
+- **A module of the author's own texts:** his stories, as part of the CV mode or as a separate domain.
 - **`repetition_penalty`** against generation loops (seen with Phi-4-mini). It changes every answer, so it requires rerunning `gen-bench`.
 
 **Note on deployment:** Phi-4-mini does not fit in the free Space (on a CPU, in float32, it would take ~15 GB, plus the retrieval). Even loaded at half precision, it would take minutes per answer on 2 CPUs (estimated, not measured). In the Space, the realistic options are the 0.6B and maybe the 1.7B. Phi remains an option locally.
@@ -458,6 +444,5 @@ The results obtained during the evaluation must not get worse.
 - **2026-10-24**: Phase 6 prepared up to the point of deployment (API, React web, index bundle, Space image, Pages workflow), with no commits or publication. Decisions taken out of necessity in `decisions.md`.
 - **2026-10-24**: review of the web with the author (`FASE_6.md` §6b–6g). Commit `3378494` ("Phase 6: Frontend and deployment"). Deployment on Hugging Face is pending the author's accounts.
 - **2026-10-24**: **agent off by default in the web** (the author's decision): with small models, its memory mixes topics or gives answers that are too basic. When turned on, a "work in progress" note. The CLI keeps D7. Reviewed after the fallback improvement (7b). The "about" domain stays out of the web (`API_DOMAINS`) until it is calibrated. See `changelog/FASE_7.md`.
-- **2026-10-24**: **documentation in two languages** (the author's decision, like the ES + EN biography). The Spanish originals move to `docs/es/` (with `git mv`, which keeps the history) and remain the working version. `docs/` holds the English translation, updated at the end of each phase. The README has its Spanish copy in `docs/es/README.md`. `CLAUDE.md` loads the rules from `docs/es/`. Both languages are indexed in the "about" domain.
+- **2026-10-24**: **documentation in two languages** (the author's decision). The Spanish originals move to `docs/es/` (with `git mv`; Git only records it as a rename for `PLANING.md`, `RESPUESTA.md` and `Elements_frontend.md`. For the others, the translation reuses the old path, so their Spanish history is found with `git log docs/<file>`, not with `--follow` on `docs/es/`) and remain the working version. `docs/` holds the English translation, updated at the end of each phase. The README has its Spanish copy in `docs/es/README.md`. `CLAUDE.md` loads the rules from `docs/es/`. Both languages are indexed in the "about" domain.
 - **2026-10-24**: **Phase 7 (optional work and polish)** opened. It starts with the "about" domain (the project talking about itself, with the rewritten README, `docs/` and the code). The judge for the CV answers is decided: Groq (P11).
-- **2026-10-23**: the CV mode's biography, draft v1 in `data/raw/cv/autobiography.md` (ignored by git), with the pending data marked.

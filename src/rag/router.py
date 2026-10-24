@@ -161,7 +161,9 @@ class DomainRouter:
         Returns:
             (domain, score, sources) per domain, best score first. The
             score is the best cross-encoder logit of the domain's top
-            ROUTE_TOP sources; -inf without a reranker or results.
+            ROUTE_TOP sources; -inf without a reranker or results. A
+            domain the question names (route_hints) goes first when it
+            passes its own threshold.
         """
         ranked = []
         for domain in self.selected(domains):
@@ -173,9 +175,30 @@ class DomainRouter:
             ranked.append((domain, score, sources))
         # Stable sort: ties keep rag.toml order.
         ranked.sort(key=lambda item: -item[1])
+        hinted = self.hinted(query, ranked)
+        if hinted is not None:
+            ranked.insert(0, ranked.pop(hinted))
         self.last_route = [(domain, score) for domain, score, _ in ranked]
         self.last_ranked = ranked
         return ranked
+
+    def hinted(self, query: str,
+               ranked: list[tuple[str, float, list[MinimalSource]]]
+               ) -> Optional[int]:
+        """Position of the best domain the question names (route_hints)
+        that also passes its own threshold, or None.
+
+        A hint alone never decides: a question that mentions "the
+        project" but is not about this one keeps the normal routing.
+        """
+        for pos, (domain, score, _) in enumerate(ranked):
+            retriever = self.retrievers[domain]
+            if not any(h.search(query) for h in retriever.route_hints):
+                continue
+            threshold = retriever.settings.relevance_threshold
+            if threshold is None or score >= threshold:
+                return pos
+        return None
 
     def search_smart(self, query: str, k: int = 10,
                      domains: Optional[str | Sequence[str]] = None

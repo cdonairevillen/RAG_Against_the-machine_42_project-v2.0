@@ -60,14 +60,14 @@ Every figure comes from `BENCHMARK_REPORT.md`, `CHECKPOINT_42.md` and the change
 
 ## 7a.3 — "about" kept out of the web until it is calibrated
 
-With the API restarted after indexing "about", that domain entered the router **uncalibrated**. The author's example with the 1.7B: to "Chrystian Donaire Villén Que me estas contando" it answered with his date of birth and added *"the answer is given with the agent by default (D7)"*. The changelogs contain test transcripts (for example, `FASE_6.md` §5 quotes CV answers) and internal jargon, and the router picked them.
+With the API restarted after indexing "about", that domain entered the router **uncalibrated**. The author's example with the 1.7B: <!-- about:skip -->to "Chrystian Donaire Villén Que me estas contando" it answered with his date of birth and<!-- /about:skip --> added *"the answer is given with the agent by default (D7)"*. The changelogs contain test transcripts (for example, `FASE_6.md` §5 quotes CV answers) and internal jargon, and the router picked them.
 - **`RAG_API_DOMAINS`:** the list of domains the web serves (empty: every indexed one). `make api` uses `API_DOMAINS ?= vllm,xquad,cv` until steps 4–5 of 7a are done. `RagTools.load` accepts the domain list (optional; without it, as before).
 - **Pending for step 4:** decide whether the changelogs' test transcripts stay in the "about" index or are excluded, because they put CV answers inside "about".
 
 ## 7a.4 — Documentation in two languages (the author's decision, 2026-10-24)
 
-As with the biography (ES + EN), the documents exist in both languages, so that "about" answers well in both and recruiters can follow the workflow in English.
-- **`docs/es/`:** the Spanish originals, moved with `git mv` (which keeps the history). They remain **the working version**. Also `PLANING.md`, `RESPUESTA.md` and `Elements_frontend.md`, which are not translated.
+The documents exist in both languages, so that "about" answers well in both and recruiters can follow the workflow in English.
+- **`docs/es/`:** the Spanish originals, moved with `git mv` (with `git mv`; Git only records it as a rename for `PLANING.md`, `RESPUESTA.md` and `Elements_frontend.md`. For the others, the translation reuses the old path, so their Spanish history is found with `git log docs/<file>`, not with `--follow` on `docs/es/`). They remain **the working version**. Also `PLANING.md`, `RESPUESTA.md` and `Elements_frontend.md`, which are not translated.
 - **`docs/`:** the English translation of `ROADMAP.md`, `BENCHMARK_REPORT.md`, `decisions.md` and the changelogs. Updated **at the end of each phase**. Where the original speaks to the author as "you", the translation says "the author".
 - **`docs/es/README.md`:** the Spanish translation of the README, with its links adjusted to its folder.
 - **`CLAUDE.md`** loads the rules and the roadmap from `docs/es/`.

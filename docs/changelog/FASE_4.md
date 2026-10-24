@@ -18,6 +18,7 @@ Postponed: 4c (Gulliver).
 
 ---
 
+<!-- about:skip -->
 ## 4b — CV mode
 
 ### Decisions (the author's)
@@ -126,6 +127,7 @@ Each change is measured separately with the CV `gen-bench` (60 questions plus 20
   - To another, it gives the Gmail as if it were the contact asked for. No leak, but the statement is false.
   - A possible fix in the prompt: "the only public contact is cdonairevillen@gmail.com".
 - **Router with the three domains** (`46-router-cv`): 100% of the 42 and CV questions reach their domain. XQuAD stays at 98%, and only 5 of 2,380 go to the CV.
+<!-- /about:skip -->
 
 ## 4a — General knowledge: XQuAD
 

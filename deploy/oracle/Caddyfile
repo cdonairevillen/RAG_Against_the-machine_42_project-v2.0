@@ -1,0 +1,10 @@
+# HTTPS in front of the RAG API + web. Caddy gets the Let's Encrypt
+# certificate for RAG_DOMAIN (ports 80 and 443 must be open) and
+# renews it by itself.
+{$RAG_DOMAIN} {
+	encode gzip
+	reverse_proxy rag:7860 {
+		# Answers are streamed (SSE): pass every token on at once.
+		flush_interval -1
+	}
+}

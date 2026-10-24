@@ -229,23 +229,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 
 ### 4b — Modo CV
 
-- **Material** (en `data/raw/cv/`, **ignorado por git**; se movió desde la raíz, donde se habría subido con `git add .`):
-  - CV en `.docx` y perfil de LinkedIn en PDF.
-  - `autobiography.md`, una autobiografía con gustos, aficiones y viajes, **por escribir juntos más adelante**.
-- **Ingesta:** Docling para el `.docx` y el PDF; Markdown para la autobiografía. Colección `cv`.
-- **Multilingüe**, con guardarraíles: si algo no está en los datos, no se inventa y se ofrece contacto.
-- **Revisión de privacidad antes de indexar:** qué datos personales entran y cuáles no. Lo decides tú.
-- **El juez externo (Groq) no se usa con datos personales** salvo que lo decidas expresamente.
-
-
-> ✅ **Completada (2026-10-23).** Detalle en `changelog/FASE_4.md` (4b) y `BENCHMARK_REPORT.md` §7.
-> - **Indexado:** CV (`.docx`, EN), LinkedIn (`.pdf`, ES) y biografía (ES + versión EN), con Docling.
-> - **Privacidad:** los datos de contacto privados se enmascaran al responder, sin tocar los ficheros. 0 fugas en todas las pruebas.
-> - **Sin dato**, responde: *"No dispongo de esa información, ¡pero puedes preguntárselo tú! cdonairevillen@gmail.com"*.
-> - **Prompt del modo CV** con tercera persona, sin mezclar trabajos, temas reservados y contacto. Chunks de 800, 8 fuentes y umbral −3.0.
-> - **Resultado:** contiene la respuesta correcta en el 73 % (EN) y el 80 % (ES); el router manda el 100 % de las preguntas del CV a su dominio.
-
-- **Futuro, módulo de textos propios:** algunos relatos tuyos podrán ingestarse como parte del modo CV (o como dominio aparte).
+> ✅ **Completada (2026-10-23).** Dominio `cv`: el autor presentado por sus propios documentos, con los datos de contacto privados protegidos. Detalle en `changelog/FASE_4.md` (4b) y `BENCHMARK_REPORT.md` §7.
 
 ### 4c — Multimedia: *Los viajes de Gulliver* (1939) frente a la novela de Swift (1726)
 
@@ -335,7 +319,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
   - **Interruptor "Con agente / Sin agente"** (petición tuya, 2026-10-23): un switch en la interfaz de chat que alterna entre el agente (por defecto: memoria de sesión, reescritura y herramientas) y la conversación directa con el RAG (el flujo actual, pregunta a pregunta). La API lo recibe como parámetro de la petición (`agent: true|false`); la Fase 5 deja los dos caminos listos detrás de ese mismo parámetro.
   - **Base ya preparada (Fase 2):** los perfiles de `rag.toml` (`available_profiles`) son las opciones que podría ofrecer un selector de ingesta, reranker o embeddings. La base estable sigue siendo la del benchmark. *A plantear en esta fase.*
 - **Despliegue sin coste**:
-  - Backend en un Hugging Face Space (Docker, CPU gratuito).
+  - ~~Backend en un Hugging Face Space (Docker, CPU gratuito).~~ → **Oracle Cloud Always Free** (DEC-19, 2026-10-24): desde julio de 2026, los Spaces de Docker son de pago.
   - Frontend estático en GitHub Pages.
   - **Google Cloud no se toca.**
   - En el despliegue gratuito probablemente solo quepa un modelo cargado; el resto, en local.
@@ -375,13 +359,16 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - ✅ **2.** Fuente `about` indexada. Hizo falta un campo nuevo, `exclude_paths`, para excluir `deploy/stage` sin perder `src/deploy`.
 - 🟡 **3.** 18 preguntas EN/ES (`bench/datasets/about/`). Primera medida: EN R@5 0.78, ES 0.22. El español se hunde porque cada pregunta solo admitía una fuente (la del README), y las preguntas en español encuentran lo mismo en los documentos en español.
 - **Decisión tuya:** documentación en dos idiomas (`docs/` en inglés y `docs/es/` en español) y varias fuentes válidas por pregunta.
-- **Fuera de la web por ahora** (`API_DOMAINS`) hasta los pasos 4–5: sin calibrar, el router lo elegía y mezclaba transcripciones de pruebas de los changelogs en respuestas del CV.
+- ✅ **3 (cont.).** Ground truth en el idioma de la pregunta; con la métrica "contiene la respuesta", la respuesta está en las 5 primeras fuentes en el 89 % (EN y ES).
+- ✅ **4.** Lo personal del CV fuera de "about" (marcas `about:skip`, decisión tuya: redirigir y no repetir). Umbral −1.0 y regla léxica del proyecto (`route_hints`). Route-bench `76`: CV 0.97 / 0.97, about 0.78 / 0.89, y 42 y XQuAD sin cambios.
+- ✅ **5.** Chip "about" fijo (`pinned`), ejemplos comprobados uno a uno y bundle con los cuatro dominios. Detalle en `FASE_7.md` §7a.6–7a.8.
 
 ### 7b — Calidad de las respuestas
 - **Markdown en la web** (listas, negritas, código). Sin riesgo: no cambia ninguna respuesta.
 - **Plan B del agente:** busca con la consulta anterior + la nueva, pero debe **responder a la pregunta original**. Con el 0.6B, responder a la mezcla da respuestas equivocadas en los seguimientos (medido, `FASE_6.md`). Se mide con `agent-bench` antes de adoptarlo.
 - **Regla de formato** (listas y negritas) solo en la web, probada por modelo: con el 0.6B, cada regla de más en el prompt puede costar aciertos.
 - **Juez de las respuestas, sobre todo las del CV:** para encontrar dónde fallan, no para mostrarlo en la web. **Decidido (P11): Groq**, hasta agotar los tokens gratuitos; si hace falta, se repite con Qwen3-4B como juez local.
+- **Libertad de longitud** (petición tuya, 2026-10-24): dejar que el LLM escriba lo que necesite sin quedarse en bucle. Sin propuesta concreta todavía; mientras, límite por modelo en la web (512, y 640 para Phi-4-mini) y botón Stop.
 - **Agente desactivado por defecto en la web** (decisión tuya, 2026-10-24), marcado como trabajo en curso hasta mejorar el plan B.
 
 ### 7c — Visual
@@ -391,7 +378,8 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 ### 7d — Opcionales aparcados
 - **4c, Gulliver** (multimedia). El plan está en la Fase 4.
 - **MLQA.**
-- **`repetition_penalty`** contra los bucles de generación (visto con Phi-4-mini). Cambia todas las respuestas, así que exige repetir `gen-bench`.
+- **Módulo de textos propios:** relatos del autor, como parte del modo CV o como dominio aparte.
+- ~~**`repetition_penalty`**~~ → **descartado** (2026-10-24, decisión tuya): en sus bucles, Phi-4-mini cambia palabras en cada vuelta, así que penalizar la repetición no los corta. La plantilla oficial y los tokens de parada se comprobaron y están bien (`FASE_7.md` §7b.1).
 
 **Nota sobre el despliegue:** Phi-4-mini no cabe en el Space gratuito (en CPU, en float32, ocuparía ~15 GB, y además está la búsqueda). Incluso cargado a media precisión, tardaría minutos por respuesta en 2 CPU (estimado, sin medir). En el Space, lo realista es el 0.6B y quizá el 1.7B. Phi sigue siendo una opción en local.
 
@@ -409,9 +397,9 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 | P3 | ~~Dominios nuevos~~ → resuelto: XQuAD (cultura general, en/es) y después MLQA | Hecho |
 | P4 | ~~Modularización: qué opciones se exponen en la web~~ → resuelto en la revisión de la Fase 6: filtros de dominio, agente sí/no, modelo y profundidad | Hecho |
 | P11 | ~~Juez de las respuestas del CV (Fase 7b)~~ → resuelto (2026-10-24, decisión tuya): **Groq**, también con las preguntas del CV, hasta agotar los tokens gratuitos. Si hace falta, se repite con Qwen3-4B como juez local | Hecho |
-| P12 | LLM del Space: el 0.6B (la base) o el 1.7B (mejor agente; su latencia en CPU está sin medir) | Antes del despliegue |
+| P12 | LLM del servidor: el 0.6B (la base) o el 1.7B (mejor agente; su latencia en CPU está sin medir). En Oracle, el 1.7B cabría en memoria (estimado ~9.5 GB de 12) | Antes del despliegue |
 | P5 | ~~GPU de los ordenadores de 42~~ → resuelto: no aceptan CUDA (vLLM tarda ~10 h en indexarse). Se descarta indexar en 42 y el proyecto se sirve en línea | Hecho |
-| P10 | Hugging Face Datasets: usarlos como fuente de la ingesta y alojar allí los nuestros (los de 42, los derivados multimedia y quizá el índice). Falta revisar si la licencia de los datasets de 42 permite publicarlos. **Avance (2026-10-24):** el índice preconstruido va en un dataset **privado** de HF (DEC-09). Publicar los datasets de 42 sigue sin hacerse: la licencia no está revisada | A desarrollar; antes de la Fase 6 (despliegue) o de la 4c si se retoma |
+| P10 | Hugging Face Datasets: usarlos como fuente de la ingesta y alojar allí los nuestros (los de 42, los derivados multimedia y quizá el índice). Falta revisar si la licencia de los datasets de 42 permite publicarlos. **Avance (2026-10-24):** con Oracle, el índice preconstruido va por `scp` a la máquina (DEC-19); el dataset **privado** de HF (DEC-09) queda como alternativa. Publicar los datasets de 42 sigue sin hacerse: la licencia no está revisada | A desarrollar; antes de la Fase 6 (despliegue) o de la 4c si se retoma |
 | P6 | Proveedor de la key gratuita para el juez LLM | Antes de la Fase 3 |
 
 ---
@@ -457,6 +445,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-24**: Fase 6 preparada hasta el punto de despliegue (API, web React, bundle del índice, imagen del Space, workflow de Pages), sin commits ni publicación. Decisiones tomadas por necesidad en `docs/decisions.md`.
 - **2026-10-24**: revisión de la web contigo (`FASE_6.md` §6b–6g). Commit `3378494` ("Phase 6: Frontend and deployment"). El despliegue en Hugging Face queda pendiente de tus cuentas.
 - **2026-10-24**: **agente desactivado por defecto en la web** (decisión tuya): con los modelos pequeños, su memoria mezcla temas o da respuestas demasiado básicas. Al encenderlo, un aviso "work in progress". La CLI mantiene D7. Se revisa tras la mejora del plan B (7b). El dominio "about" queda fuera de la web (`API_DOMAINS`) hasta calibrarlo. Ver `changelog/FASE_7.md`.
-- **2026-10-24**: **documentación en dos idiomas** (decisión tuya, como la biografía en ES + EN). Los originales en español pasan a `docs/es/` (con `git mv`, que conserva el historial) y siguen siendo la versión de trabajo. `docs/` tiene la traducción al inglés, que se actualiza al cerrar cada fase. El README tiene su copia en español en `docs/es/README.md`. `CLAUDE.md` carga las normas desde `docs/es/`. Los dos idiomas se indexan en el dominio "about".
+- **2026-10-24**: **documentación en dos idiomas** (decisión tuya). Los originales en español pasan a `docs/es/` (con `git mv`; Git solo lo registra como renombrado en `PLANING.md`, `RESPUESTA.md` y `Elements_frontend.md`. En los demás, la traducción reutiliza la ruta antigua, así que su historial en español se consulta con `git log docs/<fichero>` y no con `--follow` sobre `docs/es/`) y siguen siendo la versión de trabajo. `docs/` tiene la traducción al inglés, que se actualiza al cerrar cada fase. El README tiene su copia en español en `docs/es/README.md`. `CLAUDE.md` carga las normas desde `docs/es/`. Los dos idiomas se indexan en el dominio "about".
 - **2026-10-24**: abierta la **Fase 7 (opcionales y mejoras)**. Empieza por el dominio "about" (el proyecto hablando de sí mismo, con el README reescrito, `docs/` y el código). El juez de las respuestas del CV queda pendiente de decidir (P11).
-- **2026-10-23**: biografía del modo CV, borrador v1 en `data/raw/cv/autobiography.md` (ignorado por git), con los datos pendientes marcados.
+- **2026-10-24**: dominio "about" terminado y en la web (chip fijo). La información personal del CV deja de repetirse en la documentación: se redirige a `FASE_4.md` §4b y se excluye del índice de "about".
+- **2026-10-24**: **despliegue en Oracle Cloud Always Free** en lugar de Hugging Face, que desde julio de 2026 cobra por los Spaces de Docker. Separado de Google Cloud (decisión tuya). Medido: 5.0 GB de pico de RAM con 2 CPU y 12 GB (DEC-19, `deploy/README.md`).

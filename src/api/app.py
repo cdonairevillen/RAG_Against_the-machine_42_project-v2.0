@@ -104,6 +104,22 @@ def model_label(name: str) -> str:
     return name.rsplit("/", 1)[-1]
 
 
+def parse_max_tokens(value: str, models: list[str]) -> dict[str, int]:
+    """Per-model token caps from "512" (every model) or
+    "default=512,llm-phi4-mini=640" (unknown ids are ignored)."""
+    value = value.strip()
+    if not value:
+        return {}
+    if "=" not in value:
+        return {model: int(value) for model in models}
+    caps = {}
+    for item in value.split(","):
+        model, _, cap = item.partition("=")
+        if model.strip() in models:
+            caps[model.strip()] = int(cap)
+    return caps
+
+
 class ModelPool:
     """The LLMs the web can choose: the base plus the rag.toml profiles
     that change the generator (llm-*).
@@ -115,6 +131,9 @@ class ModelPool:
     Environment:
         RAG_API_MODELS: comma-separated ids to offer (default: all).
         RAG_API_MAX_LOADED: models kept loaded at once (default 1).
+        RAG_API_MAX_TOKENS: answer length cap, one number for every model
+            or per model ("default=512,llm-phi4-mini=640"); models not
+            listed keep their configuration's max_new_tokens.
     """
 
     def __init__(self, config: RagConfig) -> None:
@@ -132,6 +151,11 @@ class ModelPool:
             self.options = OrderedDict(
                 (k, v) for k, v in self.options.items()
                 if k in wanted or k == "default")
+        caps = parse_max_tokens(os.environ.get("RAG_API_MAX_TOKENS", ""),
+                                list(self.options))
+        for key, cap in caps.items():
+            self.options[key] = self.options[key].model_copy(
+                update={"max_new_tokens": cap})
         self.max_loaded = max(1, int(os.environ.get(
             "RAG_API_MAX_LOADED", "1")))
         self.loaded: "OrderedDict[str, Any]" = OrderedDict()
@@ -289,11 +313,14 @@ class RagService:
 
     def domains_for(self, request: ChatRequest) -> Optional[list[str]]:
         """The domain filter of a request: None for every domain, [] when
-        every filter is off (unknown domains are ignored)."""
+        every filter is off (unknown domains are ignored). Pinned domains
+        (rag.toml `pinned`) join every filter."""
         if request.domains is None:
             return None
-        known = set(self.load().router.domains)
-        return [d for d in request.domains if d in known]
+        loaded = self.load().router.domains
+        wanted = [d for d in request.domains if d in loaded]
+        return wanted + [d for d in loaded if d not in wanted
+                         and self.config.sources[d].pinned]
 
     def describe_sources(self, sources: list[Any]) -> list[dict[str, Any]]:
         """Sources as the web shows them (masked previews and credits)."""
@@ -490,7 +517,10 @@ def create_app(config: Optional[RagConfig] = None,
         return {
             "model": config.generation.model,
             "profile": config.profile,
-            "domains": tools.list_domains(),
+            "domains": [
+                {**d, "pinned": config.sources[d["name"]].pinned}
+                for d in tools.list_domains()
+            ],
             "models": service.models.describe(),
             "depths": DEPTHS,
             "depth_default": DEPTH_DEFAULT,

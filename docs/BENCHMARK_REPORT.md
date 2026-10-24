@@ -262,6 +262,7 @@ XQuAD's reference answers are short spans (for example, "308") and the model ans
 
 ---
 
+<!-- about:skip -->
 ## 7. CV mode (Phase 4b)
 
 Corpus: the CV (`.docx`, English), the LinkedIn profile (`.pdf`, Spanish) and the biography (Spanish + an English version). Own benchmark: the same 30 questions in English and Spanish, plus 10 about the author with no answer in the data (private contact, reserved topics, missing data). Qwen3-0.6B.
@@ -282,6 +283,7 @@ Corpus: the CV (`.docx`, English), the LinkedIn profile (`.pdf`, Spanish) and th
 - **The biggest gains come from the data** (the English version) and from the **chunk size** (less mixing of jobs). Prompt rules fix specific cases (reserved topics, the contact), but with a 0.6B model every extra rule can cost correct answers (`36`).
 
 ---
+<!-- /about:skip -->
 
 ## 8. Agent vs direct access (Phase 5)
 

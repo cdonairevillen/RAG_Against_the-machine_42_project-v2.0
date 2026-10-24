@@ -155,6 +155,21 @@ exclude_dirs = [
     "CLAUDE.md",
 ]
 exclude_paths = ["deploy/stage", "deploy/bundle"]
+# Test transcripts quoting CV answers, marked inside the changelogs, are
+# left out (they made the router pick "about" for CV questions).
+skip_marked = true
+# Own gate (`gate_scores`, FASE_7.md 7a.7): -1.0 accepts 83% (en) /
+# 78% (es) of the questions about the project; the global 0.0 only 67%.
+relevance_threshold = -1.0
+# Questions that name the project go to "about" when it passes its gate
+# (a hint alone never decides: XQuAD also has "the project").
+route_hints = [
+    '\b(this|the|your) project\b',
+    '\b(este|el|tu) proyecto\b',
+    'rag against the machine',
+]
+# The web always searches it (chip always on, it joins every filter).
+pinned = true
 code_extensions = [".py"]
 default_chunker = "markdown_headers_packed"
 

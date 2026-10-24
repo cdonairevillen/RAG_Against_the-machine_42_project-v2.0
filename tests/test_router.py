@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 import pytest
@@ -18,6 +19,7 @@ class FakeRetriever:
         self.reranker = object()
         self.chunks: list[Any] = []
         self.answer_k = None
+        self.route_hints: list[re.Pattern[str]] = []
 
     def source(self) -> MinimalSource:
         return MinimalSource(file_path=f"{self.domain}.md",
@@ -84,3 +86,24 @@ def test_gate_uses_the_winning_domain_threshold() -> None:
     assert r.search_for_generation("q")[0].file_path == "xquad.md"
     r.retrievers["xquad"].settings.relevance_threshold = -1.0
     assert r.search_for_generation("q") == []
+
+
+def test_a_hinted_domain_wins_when_it_passes_its_threshold() -> None:
+    r = DomainRouter({  # type: ignore[dict-item]
+        "vllm": FakeRetriever("vllm", 2.0),
+        "about": FakeRetriever("about", -0.5, threshold=-1.0),
+    })
+    r.retrievers["about"].route_hints = [re.compile("this project", re.I)]
+    assert r.search_smart("Which reranker does THIS project use?"
+                          )[0].file_path == "about.md"
+    # No hint in the question: the best score wins as before.
+    assert r.search_smart("Which reranker?")[0].file_path == "vllm.md"
+
+
+def test_a_hint_alone_does_not_route() -> None:
+    r = DomainRouter({  # type: ignore[dict-item]
+        "xquad": FakeRetriever("xquad", 1.0, threshold=-2.0),
+        "about": FakeRetriever("about", -4.0, threshold=-1.0),
+    })
+    r.retrievers["about"].route_hints = [re.compile("the project", re.I)]
+    assert r.search_smart("Who led the project?")[0].file_path == "xquad.md"

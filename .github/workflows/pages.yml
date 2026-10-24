@@ -4,7 +4,7 @@
 # run it from the Actions tab. Before the first run:
 #   1. Settings > Pages > Source: "GitHub Actions".
 #   2. Settings > Secrets and variables > Actions > Variables:
-#      RAG_API_URL = the Space URL (e.g. https://<user>-<space>.hf.space).
+#      RAG_API_URL = the server URL (e.g. https://<name>.duckdns.org).
 # See deploy/README.md.
 name: web (GitHub Pages)
 

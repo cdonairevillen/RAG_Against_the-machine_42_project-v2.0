@@ -70,7 +70,7 @@ It is inspired by AgentSmith: the loop's structure, the trace of steps and a fal
 
 **Flow per question** (`Agent.ask`):
 1. **Plan:** the LLM gets the domains (with their descriptions), the conversation and the question, and calls `search` with a **complete question**: this is where follow-ups are rewritten. It can search up to 3 times and stops when it no longer calls the tool.
-2. **Deterministic fallback:** if it makes no valid call, the question is searched preceded by the last query the model itself wrote. That way a follow-up keeps its topic ("Where was Chrystian born? And in which year?").
+2. **Deterministic fallback:** if it makes no valid call, the question is searched preceded by the last query the model itself wrote. That way a follow-up keeps its topic <!-- about:skip -->("Where was Chrystian born? And in which year?")<!-- /about:skip -->.
 3. **Answer:** the gathered sources go to **the same generator as the direct pipeline**, with the domain's rules (citations, the CV prompt, private data, the author's "not found" message) and in **the user's language**, even if the search was rewritten in another one.
 4. **Memory:** the turn is added to the session (`Session`, in memory only; D7).
 
@@ -87,7 +87,7 @@ It is inspired by AgentSmith: the loop's structure, the trace of steps and a fal
 |---|---|
 | With the history as earlier chat turns (user/assistant), on follow-ups the model **copied the pattern and answered without searching** | The history goes **inside the user turn** ("Conversation so far: … New question: …"), so the pattern is always question → tool |
 | On follow-ups it answered "DONE" without searching ("the conversation already says it") | A prompt rule: "every new question needs at least one search"; DONE only after searching |
-| The fallback chained queries ("Where was… born? And in which year? In which neighbourhood…?") and lost the topic | The fallback uses the last query written by the **model**, not those of other fallbacks |
+| The fallback chained queries <!-- about:skip -->("Where was… born? And in which year? In which neighbourhood…?")<!-- /about:skip --> and lost the topic | The fallback uses the last query written by the **model**, not those of other fallbacks |
 
 **Safety nets** (after round 1 of the benchmark; the author's proposal, bounded; `decisions.md`, DEC-03):
 
@@ -100,7 +100,7 @@ It is inspired by AgentSmith: the loop's structure, the trace of steps and a fal
 - **If both fail**, the usual deterministic fallback is used.
 - **Every use is recorded in the trace** (`AgentAnswer.retries`: `"all-domains"`, `"original-question"`), visible in the web and in `chat`.
 
-With this, Qwen3-0.6B really rewrites: "¿Y en qué año?" → "¿Y en qué año? Chrystian Donaire Villén nació en Madrid."; "¿En qué barrio creció?" → "¿En qué barrio creció Chrystian Donaire Villén?"; "And which one unloads it?" → "which endpoint unloads a LoRA adapter in vLLM" (with `domains: vllm`).
+With this, Qwen3-0.6B really rewrites: <!-- about:skip -->"¿Y en qué año?" → "¿Y en qué año? Chrystian Donaire Villén nació en Madrid."; "¿En qué barrio creció?" → "¿En qué barrio creció Chrystian Donaire Villén?";<!-- /about:skip --> "And which one unloads it?" → "which endpoint unloads a LoRA adapter in vLLM" (with `domains: vllm`).
 
 **Usage:**
 - `answer` uses **the agent by default** (D7); `--agent False` uses the direct pipeline.

@@ -279,3 +279,39 @@ def test_a_stopped_request_does_nothing(client: TestClient) -> None:
                           lambda p: None, cancel)
     assert result["trace"] == {"mode": "stopped"}
     assert service.tools.pipeline.calls == []
+
+
+def test_max_tokens_per_model() -> None:
+    from src.api.app import parse_max_tokens
+
+    models = ["default", "llm-qwen3-1.7b", "llm-phi4-mini"]
+    assert parse_max_tokens("", models) == {}
+    assert parse_max_tokens("512", models) == dict.fromkeys(models, 512)
+    assert parse_max_tokens("default=512,llm-phi4-mini=640,nope=9",
+                            models) == {"default": 512,
+                                        "llm-phi4-mini": 640}
+
+
+def test_the_pool_applies_the_caps(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.api.app import ModelPool
+
+    monkeypatch.setenv("RAG_API_MAX_TOKENS", "default=321")
+    pool = ModelPool(CONFIG)
+    assert pool.options["default"].max_new_tokens == 321
+    assert CONFIG.generation.max_new_tokens != 321  # a copy, not the config
+
+
+def test_a_pinned_domain_joins_every_filter(client: TestClient) -> None:
+    service = client.app.state.service  # type: ignore[attr-defined]
+    service.config = CONFIG.model_copy(deep=True)
+    service.config.sources["vllm"].pinned = True
+    for domains in (["cv"], ["vllm"], None):
+        client.post("/chat", json={"message": "q", "agent": False,
+                                   "domains": domains})
+    # Added to a filter (once); no filter still means every domain.
+    assert service.tools.pipeline.calls == [["cv", "vllm"], ["vllm"], None]
+
+
+def test_config_marks_pinned_domains(client: TestClient) -> None:
+    [domain] = client.get("/config").json()["domains"]
+    assert domain["name"] == "cv" and domain["pinned"] is False
