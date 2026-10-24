@@ -6,7 +6,7 @@ LABEL     ?= run
 
 VLLM_DIR  := data/raw/vllm-0.10.1
 VLLM_URL  := https://github.com/vllm-project/vllm/archive/refs/tags/v0.10.1.zip
-DATASETS  := data/datasets
+DATASETS  := bench/datasets/public
 SEARCH    := data/output/search_results
 
 # On 42 clusters the home quota is tiny: redirect every cache to goinfre.
@@ -52,7 +52,7 @@ data: data-vllm data-xquad
 
 # vLLM 0.10.1 from the official GitHub tag: the only vLLM download (the
 # 42 attachment had the same files and offsets, checked in Phase 0). The
-# public 42 datasets are versioned in data/datasets.
+# public 42 datasets are versioned in bench/datasets/public.
 data-vllm:
 	@mkdir -p data/raw data/processed data/output
 	@if [ ! -d "$(VLLM_DIR)" ]; then \
@@ -90,6 +90,48 @@ web: db-up
 web-stop:
 	@echo "Closing web."
 	@pkill -f "streamlit run" || true
+
+# ── Phase 6: API + React web + deployment ───────────────────────────────
+# API (FastAPI) on http://127.0.0.1:8000; it also serves web/dist if built.
+api: db-up
+	$(ENV) $(UV) run --project . $(PY) -m src.api
+
+# React web in development (Vite, http://localhost:5173, talks to make api).
+web-dev:
+	cd web && npm install && npm run dev
+
+web-build:
+	cd web && npm ci && npm run build
+
+# Prebuilt index for the deployment (Qdrant snapshots + BM25), git-ignored:
+# it holds raw CV text and must stay private (docs/decisions.md).
+BUNDLE    ?= deploy/bundle
+bundle: db-up
+	$(RUN) bundle_export --out_dir $(BUNDLE)
+
+# Hugging Face Space image, and a local run of it with the bundle mounted
+# (http://localhost:7860, same as the Space).
+SPACE_IMAGE ?= rag-space
+space-build: web-build
+	docker build -f deploy/space/Dockerfile -t $(SPACE_IMAGE) .
+
+space-run:
+	docker run --rm -p 7860:7860 -v "$(CURDIR)/$(BUNDLE):/home/user/app/bundle:ro" $(SPACE_IMAGE)
+
+# The Space repository content (a Space needs its Dockerfile at the root):
+# deploy/stage/ mirrors the paths the Dockerfile copies. Push it to the
+# Space's git (deploy/README.md). No data and no bundle inside.
+STAGE     := deploy/stage
+space-stage: web-build
+	@rm -rf $(STAGE) && mkdir -p $(STAGE)/deploy/space $(STAGE)/bench $(STAGE)/web
+	@cp -r src llm_sdk rag.toml pyproject.toml uv.lock $(STAGE)/
+	@cp -r bench/results $(STAGE)/bench/
+	@cp -r web/dist $(STAGE)/web/
+	@cp deploy/space/entrypoint.sh $(STAGE)/deploy/space/
+	@cp deploy/space/Dockerfile $(STAGE)/Dockerfile
+	@cp deploy/space/README.md $(STAGE)/README.md
+	@find $(STAGE) -name "__pycache__" -type d -exec rm -rf {} +
+	@echo "Space content ready in $(STAGE)"
 
 # Every source in rag.toml, or only one with SOURCE=<name>.
 SOURCE    ?=
@@ -173,4 +215,5 @@ meme:
 	@echo "Web running at http://localhost:8501"
 
 .PHONY: install data data-vllm data-xquad db-up db-down db-reset run web web-stop index search-docs search-code \
-        eval-docs eval-code bench route-bench agent-bench gen-bench judge mcp test lint clean meme
+        eval-docs eval-code bench route-bench agent-bench gen-bench judge mcp test lint clean meme \
+        api web-dev web-build bundle space-build space-run

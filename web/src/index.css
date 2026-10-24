@@ -1,0 +1,313 @@
+/* Same look as the Streamlit web (src/web.py, D5): #0a0a0a background,
+   #ff3b3b accent, JetBrains Mono + Inter, source cards, recall bars. */
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600&display=swap");
+
+:root {
+  --bg: #0a0a0a;
+  --panel: #111;
+  --card: #0f0f0f;
+  --line: #1a1a1a;
+  --line-strong: #222;
+  --text: #e0e0e0;
+  --text-answer: #d0d0d0;
+  --muted: #555;
+  --dim: #444;
+  --faint: #333;
+  --accent: #ff3b3b;
+  --accent-hover: #cc2f2f;
+  --ok: #2ecc71;
+  --mono: "JetBrains Mono", monospace;
+  --sans: "Inter", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+}
+
+/* Like the AI chat apps: the page fits the window and only the
+   conversation scrolls, with the composer always at the bottom. */
+.page {
+  max-width: 1280px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 1.2rem 1.5rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.rag-title {
+  font-family: var(--mono);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+  margin-bottom: 0.2rem;
+}
+
+.rag-subtitle {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 1.2rem;
+}
+
+.columns { flex: 1; min-height: 0; display: grid; grid-template-columns: 3fr 1fr; gap: 2.5rem; }
+.col-main { display: flex; flex-direction: column; min-height: 0; }
+.col-right { overflow-y: auto; min-height: 0; padding-right: 0.3rem; }
+@media (max-width: 860px) {
+  .page { height: auto; }
+  .columns { display: block; }
+  .conversation { overflow: visible; }
+  .composer { position: sticky; bottom: 0; }
+}
+
+/* Domain filters and agent switch */
+.controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+
+.switch { display: inline-flex; align-items: center; gap: 0.6rem; margin-left: auto; cursor: pointer; font-family: var(--mono); font-size: 0.75rem; color: #888; }
+.switch-label { text-align: right; }
+.switch input { display: none; }
+.switch-track { width: 34px; height: 18px; border-radius: 9px; background: var(--line-strong); position: relative; transition: background 0.15s; }
+.switch-thumb { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #888; transition: left 0.15s, background 0.15s; }
+.switch input:checked + .switch-track { background: #3a1414; }
+.switch input:checked + .switch-track .switch-thumb { left: 18px; background: var(--accent); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chip {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+}
+.chip.on { color: var(--accent); border-color: var(--accent); }
+
+.notice { font-family: var(--mono); font-size: 0.75rem; color: #888; border: 1px dashed var(--line-strong); border-radius: 4px; padding: 0.7rem 1rem; margin-top: 1rem; }
+
+/* Conversation */
+.conversation { flex: 1; min-height: 0; overflow-y: auto; margin: 1rem 0 0.6rem; padding-right: 0.5rem; }
+.empty-state { color: #777; font-size: 0.9rem; line-height: 1.7; max-width: 560px; margin: 18vh auto 0; text-align: center; }
+.turn { margin-bottom: 1.6rem; }
+.question { font-family: var(--mono); font-size: 0.85rem; color: var(--text); margin-bottom: 0.6rem; }
+
+.answer-box {
+  background: var(--panel);
+  border: 1px solid #1e1e1e;
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 1.2rem 1.4rem;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--text-answer);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.trace { font-family: var(--mono); font-size: 0.65rem; color: var(--dim); margin-top: 0.4rem; }
+
+/* Retrievals: one block per searched domain, one source at a time */
+.retrievals { margin-top: 0.4rem; }
+.retrieval { border: 1px solid var(--line); border-radius: 4px; padding: 0.6rem 0.8rem 0.2rem; margin-bottom: 0.6rem; background: #0c0c0c; }
+.retrieval.used { border-left: 3px solid var(--accent); }
+.retrieval-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; font-family: var(--mono); font-size: 0.68rem; color: var(--dim); margin-bottom: 0.5rem; }
+.retrieval-domain { color: var(--text); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.retrieval.used .retrieval-domain { color: var(--accent); }
+.retrieval-badge { color: var(--muted); }
+.carousel { margin-left: auto; display: inline-flex; align-items: center; gap: 0.5rem; color: #888; }
+.carousel button {
+  background: var(--panel);
+  color: #888;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1;
+  width: 1.8rem;
+  height: 1.6rem;
+  cursor: pointer;
+}
+.carousel button:hover { color: var(--accent); border-color: var(--accent); }
+.source-empty { font-family: var(--mono); font-size: 0.7rem; color: var(--dim); padding: 0.4rem 0 0.8rem; }
+
+.source-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+.source-path { color: var(--accent); font-weight: 700; margin-bottom: 0.3rem; word-break: break-all; }
+.source-meta { color: var(--dim); margin-bottom: 0.4rem; }
+.source-text {
+  color: #666;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  border-top: 1px solid var(--line);
+  padding-top: 0.4rem;
+  margin-top: 0.4rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.link-button { background: none; border: none; color: var(--muted); font-family: var(--mono); font-size: 0.65rem; padding: 0.4rem 0 0; cursor: pointer; text-decoration: underline; }
+
+/* Composer: the input with the model and depth pickers below it */
+.composer {
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem 0.5rem;
+}
+.composer:focus-within { border-color: #3a3a3a; }
+.composer textarea {
+  width: 100%;
+  resize: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  padding: 0.2rem 0.3rem;
+  max-height: 200px;
+}
+.composer textarea::placeholder { color: var(--faint); }
+.composer-bar { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; }
+.composer-spacer { flex: 1; }
+.composer-new {
+  background: transparent;
+  color: #888;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+.composer-new:hover:not(:disabled) { color: var(--text); border-color: #444; }
+.composer-send {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-weight: 700;
+  width: 2.2rem;
+  height: 2rem;
+  cursor: pointer;
+}
+.composer-send:hover:not(:disabled) { background: var(--accent-hover); }
+button:disabled { opacity: 0.4; cursor: default; }
+
+/* Pickers (model, depth): a menu that opens upwards */
+.picker { position: relative; }
+.picker-button {
+  background: transparent;
+  color: #999;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+}
+.picker-button:hover, .picker-button[aria-expanded="true"] { background: #181818; border-color: var(--line-strong); color: var(--text); }
+.picker-caret { font-size: 0.6rem; color: var(--muted); margin-left: 0.2rem; }
+.picker-menu {
+  position: absolute;
+  bottom: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 10;
+  min-width: 250px;
+  background: #141414;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 0.35rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+.picker-title { font-family: var(--mono); font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; padding: 0.35rem 0.6rem 0.25rem; }
+.picker-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  cursor: pointer;
+  text-align: left;
+}
+.picker-option:hover { background: #1d1d1d; }
+.picker-option.selected .picker-option-label { color: var(--accent); }
+.picker-option-label { font-family: var(--mono); font-size: 0.78rem; color: var(--text); }
+.picker-option-note { font-family: var(--sans); font-size: 0.7rem; color: var(--muted); }
+
+/* Right column */
+.section-label {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.8rem;
+  margin-top: 1.2rem;
+}
+.metric-card { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 1rem; margin-bottom: 0.8rem; }
+.metric-label { font-family: var(--mono); font-size: 0.65rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.6rem; }
+.recall-row { display: flex; align-items: center; margin-bottom: 0.4rem; gap: 0.6rem; }
+.recall-label { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); width: 70px; flex-shrink: 0; }
+.recall-bar-bg { flex: 1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.recall-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+.recall-value { font-family: var(--mono); font-size: 0.7rem; color: #888; width: 36px; text-align: right; flex-shrink: 0; }
+.status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); margin-right: 0.4rem; }
+.status-line { font-family: var(--mono); font-size: 0.7rem; color: var(--dim); margin-bottom: 0.3rem; }
+
+footer { margin-top: 1.2rem; border-top: 1px solid var(--line); padding-top: 0.8rem; font-family: var(--mono); font-size: 0.62rem; color: var(--dim); line-height: 1.8; }
+footer a { color: #888; }
+
+/* Recall cards: one per domain, its sets behind the arrows */
+.metric-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; }
+.metric-head .metric-label { margin-bottom: 0; }
+.metric-part { color: #888; }
+.metric-head .carousel { margin-left: 0; font-family: var(--mono); font-size: 0.65rem; }
+
+/* Example questions: off by default, shown above the composer */
+.examples-bar { display: flex; justify-content: flex-end; margin-bottom: 0.4rem; }
+.switch.small { font-size: 0.68rem; }
+.examples { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+.example {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: #888;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+  text-align: left;
+}
+.example:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.examples-empty { font-family: var(--mono); font-size: 0.68rem; color: var(--dim); }
+
+/* Dark scrollbars (provisional, until the final style is chosen) */
+* { scrollbar-width: thin; scrollbar-color: #2a2a2a transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--accent); }
