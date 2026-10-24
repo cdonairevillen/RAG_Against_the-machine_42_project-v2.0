@@ -278,3 +278,74 @@ Corpus: CV (`.docx`, inglés), perfil de LinkedIn (`.pdf`, español) y biografí
 - **Umbral del filtro fuera de dominio:** −3.0. Pasa el 93 % de las válidas (EN/ES) y ninguna pregunta fuera de dominio.
 - **Router con 3 dominios** (`46-router-cv`): el 100 % de las preguntas de 42 y del CV llegan a su dominio; XQuAD, el 98 %.
 - **Las mayores ganancias vienen de los datos** (la versión en inglés) y del **tamaño del chunk** (menos mezcla de trabajos). Las reglas de prompt arreglan casos concretos (el mundo secreto, el contacto), pero con un modelo de 0.6B cada regla de más puede costar aciertos (`36`).
+
+---
+
+## 8. Agente frente a acceso directo (Fase 5)
+
+`make agent-bench` (`src/evaluation/agent_bench.py`): cada pregunta se responde con el agente y con el flujo directo, con el mismo LLM (el del perfil) y `k = 5`. Sets:
+- **Conversaciones:** 12 diálogos (12 primeras preguntas + 18 seguimientos que dependen de los turnos anteriores).
+- **CV:** 30 + 30 (EN/ES).
+- **XQuAD:** 50 + 50, muestra fija.
+- **vLLM:** 25 docs + 25 code.
+
+En vLLM la métrica útil es el F1 (las respuestas de 42 son frases largas, así que "contiene la respuesta" sale ~0 en los dos modos).
+
+**Dos rondas:**
+- **`01-agent-*`:** el agente tal como salió del diseño (§4 de `changelog/FASE_5.md`).
+- **`02-agent-nets-*`:** con las dos redes de seguridad (`docs/decisions.md`, DEC-03):
+  1. Si las consultas del modelo no encuentran nada, se busca la pregunta original.
+  2. Si el modelo restringió dominios y no encontró nada, se repite dentro del filtro del usuario (sin filtro, en todos), nunca fuera.
+
+### 8.1 Contiene la respuesta, agente / directo
+
+| Set | 0.6B r1 | **0.6B r2** | 1.7B r1 | 1.7B r2 | 4B r1 | 4B r2 | Phi-4-mini r1 | Phi-4-mini r2 |
+|---|---|---|---|---|---|---|---|---|
+| Conversaciones: 1.ª pregunta | 1.00 / 1.00 | **1.00 / 1.00** | 0.83 / 0.92 | 0.92 / 0.92 | 0.92 / 0.92 | 0.92 / 0.92 | 0.83 / 0.92 | 0.83 / 0.92 |
+| **Conversaciones: seguimientos** | 0.44 / 0.33 | **0.78 / 0.33** | 0.28 / 0.33 | **0.83** / 0.33 | 0.89 / 0.39 | **1.00** / 0.39 | 0.78 / 0.33 | 0.78 / 0.33 |
+| CV EN | 0.70 / 0.73 | 0.70 / 0.73 | 0.80 / 0.90 | 0.90 / 0.90 | 0.80 / 0.90 | 0.87 / 0.90 | 0.83 / 0.87 | 0.83 / 0.87 |
+| CV ES | 0.80 / 0.80 | 0.80 / 0.80 | 0.73 / 0.90 | 0.87 / 0.90 | 0.87 / 0.93 | 0.90 / 0.93 | 0.90 / 0.90 | 0.90 / 0.90 |
+| XQuAD EN | 0.50 / 0.62 | 0.58 / 0.62 | 0.46 / 0.78 | 0.76 / 0.78 | 0.80 / 0.78 | 0.80 / 0.78 | 0.72 / 0.74 | 0.74 / 0.74 |
+| XQuAD ES | 0.64 / 0.70 | **0.70 / 0.70** | 0.50 / 0.70 | 0.68 / 0.70 | 0.86 / 0.88 | 0.88 / 0.88 | 0.60 / 0.68 | 0.64 / 0.68 |
+| vLLM docs (F1) | 0.52 / 0.52 | 0.52 / 0.52 | 0.51 / 0.51 | 0.51 / 0.51 | 0.58 / 0.57 | 0.58 / 0.57 | 0.43 / 0.46 | 0.45 / 0.46 |
+| vLLM code (F1) | 0.43 / 0.44 | 0.43 / 0.44 | 0.51 / 0.51 | 0.51 / 0.51 | 0.50 / 0.50 | 0.50 / 0.50 | 0.45 / 0.42 | 0.45 / 0.42 |
+
+Los valores del modo directo no cambian entre rondas (el flujo directo no se ha tocado), lo que confirma que la comparación es justa.
+
+### 8.2 "No encontrado", latencia y uso de las redes (ronda 2)
+
+| Modelo | "No encontrado" en seguimientos, agente / directo | s/respuesta, agente / directo (1.ª preg. · seguim. · XQuAD EN) | Redes usadas (seguim. · XQuAD EN · CV EN) |
+|---|---|---|---|
+| **Qwen3-0.6B** | **0.11 / 0.50** | 3.4/1.6 · 4.3/1.0 · 3.5/1.6 | 39 % · 24 % · 7 % |
+| Qwen3-1.7B | 0.06 / 0.50 | 3.1/1.5 · 4.1/1.3 · 3.2/1.5 | 56 % · 42 % · 17 % |
+| Qwen3-4B | 0.00 / 0.44 | 6.0/3.5 · 7.2/3.6 · 6.7/4.1 | 11 % · 8 % · 10 % |
+| Phi-4-mini | 0.17 / 0.50 | 3.4/2.5 · 5.7/1.7 · 5.3/2.3 | 6 % · 12 % · 3 % |
+
+Tiempos en la 3080 Ti; en la CPU del Space serán varias veces mayores.
+
+⚠️ **La columna "tool calls" de la tabla de consola cambia de significado en la ronda 2.** En la ronda 1 contaba las respuestas con al menos una llamada válida a la herramienta. En la ronda 2 cuenta las que **no** acabaron en el plan B determinista, que ahora también se usa cuando las búsquedas del modelo y la red 1 no encuentran nada. Por eso baja (0.6B: de 1.00 a 0.67 en seguimientos) sin que el modelo llame peor a la herramienta. La métrica que mide las redes es `safety_net_rate` (en los JSON).
+
+### 8.3 Lectura
+
+- **El agente gana donde tiene que ganar: en los seguimientos.** Sin memoria, "¿Y en qué año?" no se puede responder (directo: 0.33, con un 50 % de "no encontrado"). Con el agente, Qwen3-0.6B llega a **0.78** y Qwen3-4B, a **1.00**.
+- **Las redes de seguridad arreglan lo que el agente perdía en preguntas sueltas.** En la ronda 1, el 0.6B y el 1.7B perdían en XQuAD (hasta −0.32 con el 1.7B) porque sus reescrituras en palabras sueltas no pasaban el filtro de relevancia, o porque restringían mal el dominio. En la ronda 2 el agente queda **a la par del directo (±0.04)** en todos los sets de preguntas sueltas con los cuatro modelos. Con el 1.7B, los seguimientos pasan de 0.28 a 0.83.
+- **El filtro del usuario se respeta siempre** (test `test_user_filter_is_never_exceeded`): los reintentos de la red 2 nunca salen de él.
+- **vLLM:** el agente no aporta ni quita (F1 igual); son preguntas autocontenidas.
+- **Coste:** el agente añade 1–3 s por respuesta con los modelos pequeños (una llamada de planificación y otra para decir DONE) y ~3 s con el 4B.
+- **Qué modelo desplegar** (propuesta, a decidir contigo):
+  - **Qwen3-0.6B**, la base (`PLANING.md`): con las redes, el agente ya no pierde frente al directo, mejora mucho los seguimientos y es el más ligero para la CPU gratuita del Space.
+  - **Qwen3-1.7B** es el candidato claro si la CPU lo aguanta: misma latencia en GPU y mejor en CV (0.90 / 0.87 frente a 0.70 / 0.80) y XQuAD EN (0.76 frente a 0.58). Su latencia en la CPU del Space **no está medida**.
+  - **Qwen3-4B** es el mejor agente (1.00 en seguimientos), pero tarda ~2× en GPU. En CPU previsiblemente sería demasiado lento para una web (sin medir).
+  - **Phi-4-mini** no compensa: llamadas a la herramienta menos fiables (44 % en XQuAD ES) y peor F1 en vLLM docs.
+
+### 8.4 Latencia en la CPU del despliegue (Fase 6)
+
+Imagen del Space en local con los límites del plan gratuito simulados (`docker run --cpus=2 --memory=16g`), Qwen3-0.6B y 4 preguntas (CV, seguimiento, vLLM y XQuAD). Detalle en `changelog/FASE_6.md` §6.
+
+| Modo | Primer token | Respuesta completa |
+|---|---|---|
+| Directo | 9.6–17.5 s | 14.3–24.0 s |
+| Agente | 18.2–27.5 s | 22.0–31.7 s |
+
+- **Con los hilos de torch sin ajustar** (12 hilos sobre 2 vCPU), todo era ~3.5× más lento: 48–88 s directo y 84–123 s con el agente. Se ajustan en `entrypoint.sh` (DEC-17).
+- **En CPU, el agente cuesta ~8 s más por respuesta.** En la 3080 Ti eran ~2 s.

@@ -7,13 +7,10 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 
-# Data: only the public 42 datasets are versioned
-data/*
-!data/datasets/
-data/datasets/private/
+# Data: local corpora, indices and outputs (regenerable). Versioned
+# datasets and results live in bench/.
+data/
 
-# Bench outputs (results/ is versioned on purpose)
-data/output/
 
 # Local config / secrets
 .streamlit/
@@ -28,3 +25,7 @@ Thumbs.db
 
 # Personal data (CV mode sources) must never be committed
 /cv/
+
+# Deployment index bundle: raw CV text, never commit (docs/decisions.md)
+deploy/bundle/
+deploy/stage/

@@ -76,12 +76,12 @@ uv run python -m src index
 uv run python -m src search "How to configure OpenAI server?" --k 10
 uv run python -m src answer "How to configure OpenAI server?" --k 10
 uv run python -m src search_dataset \
-    --dataset_path data/datasets/UnansweredQuestions/dataset_docs_public.json
+    --dataset_path bench/datasets/public/UnansweredQuestions/dataset_docs_public.json
 uv run python -m src answer_dataset \
-    --dataset_path data/datasets/UnansweredQuestions/dataset_docs_public.json
+    --dataset_path bench/datasets/public/UnansweredQuestions/dataset_docs_public.json
 uv run python -m src evaluate \
     --student_answer_path data/output/search_results/dataset_docs_public.json \
-    --dataset_path data/datasets/AnsweredQuestions/dataset_docs_public.json
+    --dataset_path bench/datasets/public/AnsweredQuestions/dataset_docs_public.json
 ```
 
 ---

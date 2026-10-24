@@ -311,6 +311,13 @@ No deben empeorar los resultados obtenidos durante la evaluación.
   - Servidor MCP (`src/server/mcp_server.py`; FastMCP se llama `MCPServer` en `mcp` 2.x) sobre esas herramientas. ✅ Hecho: `make mcp`.
   - Agente en `src/agent/`: reescribe la pregunta con el historial, decide las búsquedas con el formato nativo de llamadas a herramientas del modelo (máximo 3 pasos) y da la respuesta final con el generador y las reglas de dominio actuales. Si falla, usa el flujo directo. ✅ Hecho: `answer` (agente por defecto), `chat` (con `/agent` para alternar) y `make agent-bench`.
 
+> ✅ **Completada (2026-10-24)**, pendiente de tu revisión. Detalle en `changelog/FASE_5.md` y `BENCHMARK_REPORT.md` §8.
+> - **Redes de seguridad** (DEC-03 en `docs/decisions.md`): si la reescritura no encuentra nada, se busca la pregunta original; si el dominio elegido por el modelo no tiene nada, se repite dentro del filtro del usuario, **nunca fuera**.
+> - **Agente frente a directo** (Qwen3-0.6B): seguimientos **0.78 frente a 0.33**; en preguntas sueltas queda a ±0.04 del directo con los cuatro modelos. Qwen3-4B llega a 1.00 en seguimientos.
+> - **Recall de 42:** sin cambios. Los datasets de 42 pasan a `bench/datasets/public/` y el recall sale idéntico (`61-datasets-moved`).
+> - **Pendiente de decidir:** qué LLM se despliega (propuesta: Qwen3-0.6B; Qwen3-1.7B si la CPU del Space lo aguanta).
+> - **No hecho, a propósito:** memoria semántica en Qdrant (D7: solo de sesión).
+
 ## Fase 6 — Web deploy
 
 **Objetivo:** una web pública para LinkedIn con los modos **CV** y **Demostración**.
@@ -333,6 +340,13 @@ No deben empeorar los resultados obtenidos durante la evaluación.
   - **Datos en Hugging Face (a explorar, P10):** usar datasets de Hugging Face como fuente de la ingesta (por ejemplo, XQuAD) y, si se puede, alojar allí los nuestros: los de 42, los derivados de Gulliver y quizá el índice preconstruido.
 - **README final**: se reescribe al terminar la mejora completa del proyecto.
 
+> 🟡 **Preparada hasta el punto de despliegue (2026-10-24)**, pendiente de tu revisión. Detalle en `changelog/FASE_6.md`, guía en `deploy/README.md` y decisiones en `docs/decisions.md` (DEC-04 a DEC-16).
+> - **API FastAPI** (`src/api`): `/chat` (SSE, con `agent: true|false` y `mode: demo|cv`), `/search`, `/sources/{id}`, `/metrics`, `/config` y `/health`. Probada con el índice real: 0 fugas.
+> - **Web React** (`web/`) con la estética de `src/web.py`, el interruptor de agente, los modos *Demo*/*CV* y las barras de recall. La API la sirve en `/`.
+> - **Despliegue:** Space de HF (Docker, CPU) con Qdrant dentro; índice en un bundle (`make bundle`, SHA256) en un **dataset privado** (el índice contiene el texto en bruto del CV); Pages con un workflow manual.
+> - **Queda en tus manos:** crear el dataset y el Space, poner los secretos y decidir el LLM, la estrategia de privacidad (DEC-09) y si se borra Streamlit (DEC-13).
+> - **P4 (modularización):** la web expone el modo, el agente sí/no y el filtro de dominios. El selector de modelo **no** se expone: en la CPU gratuita solo cabe uno cargado.
+
 ---
 
 # Decisiones pendientes #
@@ -345,9 +359,9 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 | P8 | ~~¿`bge-m3` por defecto aunque indexar en CPU lleve ~2 h?~~ → resuelto: `bge-m3` en la base y perfil `cpu-light` (`e5-small`) | Hecho |
 | P9 | ~~`bge-reranker-v2-m3`~~ → resuelto: perfil opcional `gpu-quality` | Hecho |
 | P3 | ~~Dominios nuevos~~ → resuelto: XQuAD (cultura general, en/es) y después MLQA | Hecho |
-| P4 | Modularización: qué opciones se exponen en la web y cómo se navega | Antes de la Fase 6 |
+| P4 | Modularización: qué opciones se exponen en la web y cómo se navega. **Propuesta aplicada (2026-10-24), a revisar:** modo *Demo*/*CV*, interruptor de agente y filtro de dominios; sin selector de modelo (en la CPU gratuita solo cabe uno) | Al revisar la Fase 6 |
 | P5 | ~~GPU de los ordenadores de 42~~ → resuelto: no aceptan CUDA (vLLM tarda ~10 h en indexarse). Se descarta indexar en 42 y el proyecto se sirve en línea | Hecho |
-| P10 | Hugging Face Datasets: usarlos como fuente de la ingesta y alojar allí los nuestros (los de 42, los derivados multimedia y quizá el índice). Falta revisar si la licencia de los datasets de 42 permite publicarlos | A desarrollar; antes de la Fase 6 (despliegue) o de la 4c si se retoma |
+| P10 | Hugging Face Datasets: usarlos como fuente de la ingesta y alojar allí los nuestros (los de 42, los derivados multimedia y quizá el índice). Falta revisar si la licencia de los datasets de 42 permite publicarlos. **Avance (2026-10-24):** el índice preconstruido va en un dataset **privado** de HF (DEC-09). Publicar los datasets de 42 sigue sin hacerse: la licencia no está revisada | A desarrollar; antes de la Fase 6 (despliegue) o de la 4c si se retoma |
 | P6 | Proveedor de la key gratuita para el juez LLM | Antes de la Fase 3 |
 
 ---
@@ -388,4 +402,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-23**: `src/` reorganizado en `rag/` (el RAG), `server/` (herramientas y MCP) y `agent/` (el agente), sin cambios de lógica. Ver `changelog/FASE_5.md`.
 - **2026-10-23**: **D7 decidido** y Fase 5 iniciada: agente por defecto (como un RAG real), todos los modelos pueden ser agente, memoria solo de sesión y acceso directo como opción. El campo `lang` sale del plan: las respuestas ya siguen el idioma de la pregunta (90–100 %).
 - **2026-10-23**: **4c (multimedia, Gulliver) aplazada** como posible fase final. La Fase 4 se cierra con 4a y 4b. MLQA, también opcional, se queda para el final.
+- **2026-10-23**: datasets de 42 movidos de `data/datasets/` a `bench/datasets/public/`: `bench/` queda para lo versionado y `data/` para lo local (DEC-01). El evaluador de 42 se conserva como métrica de referencia.
+- **2026-10-24**: redes de seguridad del agente (DEC-03) y benchmark de agente frente a directo con cuatro modelos (`BENCHMARK_REPORT.md` §8). Fase 5 completada, pendiente de revisión.
+- **2026-10-24**: Fase 6 preparada hasta el punto de despliegue (API, web React, bundle del índice, imagen del Space, workflow de Pages), sin commits ni publicación. Decisiones tomadas por necesidad en `docs/decisions.md`.
 - **2026-10-23**: biografía del modo CV, borrador v1 en `data/raw/cv/autobiography.md` (ignorado por git), con los datos pendientes marcados. Notas originales en `data/private_notes/`.

@@ -1,0 +1,14 @@
+# Build context for deploy/space/Dockerfile (BuildKit reads
+# <Dockerfile>.dockerignore). Allowlist: only what the image copies, so
+# data/ (corpus, index, the private CV), .venv and node_modules never
+# leave the machine.
+*
+!pyproject.toml
+!uv.lock
+!llm_sdk/
+!src/
+!rag.toml
+!bench/results/
+!web/dist/
+!deploy/space/entrypoint.sh
+**/__pycache__

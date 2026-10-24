@@ -11,9 +11,9 @@ CV = SourceConfig(
 
 
 def test_phones_in_every_format_are_masked() -> None:
-    for text in ("(+34) 654705242 (Mobile)", "+34 654 70 52 42 |",
-                 "Tel: 654-70-52-42", "654705242"):
-        assert "654" not in redact(text, CV), text
+    for text in ("(+34) 612345678 (Mobile)", "+34 612 34 56 78 |",
+                 "Tel: 612-34-56-78", "612345678"):
+        assert "612" not in redact(text, CV), text
 
 
 def test_years_and_other_numbers_are_kept() -> None:
@@ -32,9 +32,9 @@ def test_rules_per_domain_and_not_found_message() -> None:
     rules = DomainRules(RagConfig(sources={
         "cv": CV, "vllm": SourceConfig(root="r", include=[".md"]),
     }))
-    assert rules.redact("call 654705242", "vllm") == "call 654705242"
-    assert rules.redact("call 654705242", "cv") == "call [private]"
-    assert rules.redact_all("call 654705242") == "call [private]"
+    assert rules.redact("call 612345678", "vllm") == "call 612345678"
+    assert rules.redact("call 612345678", "cv") == "call [private]"
+    assert rules.redact_all("call 612345678") == "call [private]"
     assert rules.not_found_message("cv", "¿Qué coche tiene?") == "No lo sé."
     assert rules.not_found_message("cv", "What car does he drive?") == (
         "I don't know."

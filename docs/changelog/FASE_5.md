@@ -89,6 +89,17 @@ Se inspira en AgentSmith: estructura del bucle, traza de pasos y plan B cuando e
 | En los seguimientos respondía "DONE" sin buscar ("la conversación ya lo dice") | Regla del prompt: "toda pregunta nueva necesita al menos una búsqueda"; DONE solo después de buscar |
 | El plan B encadenaba consultas ("¿Dónde nació…? ¿Y en qué año? ¿En qué barrio…?") y perdía el tema | El plan B usa la última consulta escrita por el **modelo**, no las de otros planes B |
 
+**Redes de seguridad** (tras la ronda 1 del benchmark; tu propuesta, acotada; `docs/decisions.md`, DEC-03):
+
+| Red | Cuándo actúa | Qué hace |
+|---|---|---|
+| **1. Pregunta original** | Ninguna búsqueda del modelo encontró fuentes (sus reescrituras en palabras sueltas no pasan el filtro de relevancia) | Busca la pregunta tal como la escribió el usuario, dentro de su filtro |
+| **2. Dominios** | El modelo restringió dominios, el usuario **no** puso filtro y no se encontró nada | Repite la misma consulta en todos los dominios (exactamente lo que busca el modo directo) |
+
+- **Nunca se sale del filtro del usuario:** con filtro, los dominios del modelo ya son ese filtro, y la red 2 no actúa. Lo garantiza `test_user_filter_is_never_exceeded`.
+- **Si las dos fallan**, se usa el plan B determinista de siempre.
+- **Cada uso queda en la traza** (`AgentAnswer.retries`: `"all-domains"`, `"original-question"`), visible en la web y en `chat`.
+
 Con esto, Qwen3-0.6B reescribe de verdad: "¿Y en qué año?" → "¿Y en qué año? Chrystian Donaire Villén nació en Madrid."; "¿En qué barrio creció?" → "¿En qué barrio creció Chrystian Donaire Villén?"; "And which one unloads it?" → "which endpoint unloads a LoRA adapter in vLLM" (con `domains: vllm`).
 
 **Uso:**
@@ -110,11 +121,18 @@ Con esto, Qwen3-0.6B reescribe de verdad: "¿Y en qué año?" → "¿Y en qué a
 | `make data` | Solo vLLM | **Todas las fuentes públicas:** `data-vllm` + `data-xquad` |
 | `make data-vllm` | — | vLLM 0.10.1 desde la etiqueta de GitHub (el antiguo `data`) |
 | `make data-xquad` | Igual | Igual |
-| `make data-42` | Descarga original de 42 (vLLM + datasets) | **Eliminado.** Era redundante: su vLLM es idéntico al de la etiqueta de GitHub (comprobado en la Fase 0), los datasets públicos ya están versionados en `data/datasets/` y el CDN de la intra da 403 sin sesión de 42. Se elimina también la variable `URL_42` |
+| `make data-42` | Descarga original de 42 (vLLM + datasets) | **Eliminado.** Era redundante: su vLLM es idéntico al de la etiqueta de GitHub (comprobado en la Fase 0), los datasets públicos ya están versionados (ahora en `bench/datasets/public/`, ver más abajo) y el CDN de la intra da 403 sin sesión de 42. Se elimina también la variable `URL_42` |
 | `make install` | Dependía de `data`, que corría antes de crear el venv | Crea el venv, instala y **después** ejecuta `data` (XQuAD se prepara con Python) |
 
 - **No se descargan:** el CV (material privado) y Gulliver (4c, aplazada).
 - **Comprobado:** `make data` regenera XQuAD idéntico (2 380 respuestas verificadas, los datasets versionados no cambian).
+
+**`data/` y `bench/` unificados** (petición tuya; elegí el sentido, `docs/decisions.md` DEC-01):
+- Los datasets públicos de 42 pasan de `data/datasets/` a **`bench/datasets/public/`** (`git mv`, sin cambiar los ficheros).
+- **Ahora:** `bench/` es lo versionado (datasets y resultados) y `data/` es lo local y regenerable (corpus, índices, salidas), ignorado entero por git sin excepciones.
+- **Rutas actualizadas:** `Makefile` (`DATASETS`), `SUITES` de `bench.py`, ejemplos de `cli.py`, el docstring del evaluador, `web.py` y el `README.md`.
+- **El evaluador de 42 se conserva:** es la métrica de referencia (D4) que usan todos los benchmarks; no es código legacy. Se añade una nota en su docstring.
+- **Comprobado:** `make bench` da lo mismo (`61-datasets-moved`: docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88).
 
 ## 6. Ficheros
 
@@ -132,4 +150,26 @@ Con esto, Qwen3-0.6B reescribe de verdad: "¿Y en qué año?" → "¿Y en qué a
 | `src/cli.py` | `answer` con agente por defecto (`--agent`), `chat` interactivo y `agent_bench`. |
 | `src/evaluation/agent_bench.py`, `bench/datasets/conversations/` | **Nuevos.** Benchmark de agente frente a acceso directo. |
 | `Makefile` | `make agent-bench` (`SETS=`, `PROFILE=`); `data` unificado (§5). |
-| `tests/test_agent.py` | **Nuevo.** Parser de cada convención, estilos, memoria y bucle del agente (llamada válida y plan B). |
+| `tests/test_agent.py` | **Nuevo.** Parser de cada convención, estilos, memoria y bucle del agente (llamada válida y plan B). Después, también las redes de seguridad y que el filtro del usuario nunca se supera. |
+| `src/agent/agent.py` | Redes de seguridad y `AgentAnswer.retries` (después del checkpoint `680f21a`). |
+| `src/evaluation/agent_bench.py` | `safety_net_rate`. |
+| `data/datasets/` → `bench/datasets/public/` | Movidos (§5). Rutas en `Makefile`, `bench.py`, `cli.py`, `evaluator.py`, `web.py` y `README.md`; `.gitignore` sin la excepción `!data/datasets/`. |
+| `docs/BENCHMARK_REPORT.md` | §8: agente frente a acceso directo. |
+
+## 7. Resultados y cierre
+
+Detalle completo en `BENCHMARK_REPORT.md` §8. Contiene la respuesta, agente / directo (ronda 2, con redes):
+
+| Modelo | Seguimientos | CV EN / ES | XQuAD EN / ES |
+|---|---|---|---|
+| **Qwen3-0.6B** | **0.78** / 0.33 | 0.70 / 0.80 (directo 0.73 / 0.80) | 0.58 / 0.70 (directo 0.62 / 0.70) |
+| Qwen3-1.7B | 0.83 / 0.33 | 0.90 / 0.87 | 0.76 / 0.68 |
+| Qwen3-4B | **1.00** / 0.39 | 0.87 / 0.90 | 0.80 / 0.88 |
+| Phi-4-mini | 0.78 / 0.33 | 0.83 / 0.90 | 0.74 / 0.64 |
+
+- **El agente resuelve los seguimientos** (el directo no puede) y, con las redes, queda **a la par del directo** (±0.04) en preguntas sueltas con los cuatro modelos. En la ronda 1, el 0.6B perdía 0.12 en XQuAD EN y el 1.7B, hasta 0.32.
+- **Recall de 42:** sin cambios (`61-datasets-moved`). El agente no toca el retrieval medido.
+- **Tests:** 94 pasan; flake8 y mypy limpios.
+- **Ronda 1** (`01-agent-*`) incluida en el commit de checkpoint; **ronda 2** (`02-agent-nets-*`) sin commitear.
+
+> ✅ **Fase 5 completada (2026-10-24)**, a falta de tu revisión: agente por defecto con memoria de sesión, servidor MCP, acceso directo como opción y benchmark. **Pendiente de decidir:** qué LLM se despliega (propuesta en `BENCHMARK_REPORT.md` §8.3: Qwen3-0.6B, con Qwen3-1.7B como candidato si la CPU del Space lo aguanta).

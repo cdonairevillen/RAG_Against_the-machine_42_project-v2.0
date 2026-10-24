@@ -132,3 +132,53 @@ def test_fallback_keeps_the_subject_of_the_last_model_query() -> None:
     assert tools.queries[-1] == "Where was Chrystian born? And in which year?"
     # The history reaches the planner inside the user turn.
     assert "Conversation so far:" in generator.prompts[-1]
+
+
+class PickyTools(FakeTools):
+    """Finds sources only for some queries and domains."""
+
+    def __init__(self, generator: FakeGenerator, found_query: str,
+                 found_domains: Any = "any") -> None:
+        super().__init__(generator)
+        self.found_query = found_query
+        self.found_domains = found_domains
+        self.calls: list[tuple[str, Any]] = []
+
+    def search(self, query: str, domains: Any, k: int) -> dict[str, Any]:
+        self.calls.append((query, domains))
+        hit = query == self.found_query and (
+            self.found_domains == "any" or domains == self.found_domains)
+        result = super().search(query, domains, k)
+        return result if hit else {**result, "sources": []}
+
+
+def model_call(query: str, domains: str = "") -> str:
+    extra = f', "domains": "{domains}"' if domains else ""
+    return ('<tool_call>{"name": "search", "arguments": {"query": "'
+            + query + '"' + extra + '}}</tool_call>')
+
+
+def test_rewrite_that_finds_nothing_falls_back_to_the_question() -> None:
+    generator = FakeGenerator([model_call("keywords only"), "DONE"])
+    tools = PickyTools(generator, found_query="What is it?")
+    answer = Agent(tools).ask("What is it?")  # type: ignore[arg-type]
+    assert answer.retries == ["original-question"]
+    assert not answer.not_found
+    assert [q for q, _ in tools.calls] == ["keywords only", "What is it?"]
+
+
+def test_model_domain_choice_is_a_hint_without_user_filter() -> None:
+    generator = FakeGenerator([model_call("Who?", "cv"), "DONE"])
+    tools = PickyTools(generator, found_query="Who?", found_domains=None)
+    answer = Agent(tools).ask("Who?")  # type: ignore[arg-type]
+    assert answer.retries == ["all-domains"]
+    assert tools.calls == [("Who?", ["cv"]), ("Who?", None)]
+
+
+def test_user_filter_is_never_exceeded() -> None:
+    # The model asks for another domain and nothing is found: every
+    # search, retries included, stays inside the user's "cv" filter.
+    generator = FakeGenerator([model_call("Who?", "vllm"), "DONE"])
+    tools = PickyTools(generator, found_query="nothing matches")
+    Agent(tools).ask("Who?", domains="cv")  # type: ignore[arg-type]
+    assert tools.calls and all(d == "cv" for _, d in tools.calls)
