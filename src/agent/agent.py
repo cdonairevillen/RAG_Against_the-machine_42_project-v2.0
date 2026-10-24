@@ -24,7 +24,9 @@ from typing import Any, Callable, Optional, Sequence
 from src.agent.memory import Session, Turn
 from src.agent.toolcalls import SEARCH_TOOL, parse_tool_calls, render
 from src.models import MinimalSource
-from src.rag.generator import NOT_FOUND_MESSAGE, clean_output, is_not_found
+from src.rag.generator import (
+    NOT_FOUND_MESSAGE, Generator, clean_output, is_not_found,
+)
 from src.rag.language import detect_language
 from src.rag.pipeline import build_context_blocks
 from src.rag.router import parse_domains
@@ -64,6 +66,9 @@ class AgentAnswer:
         steps: Planning calls to the LLM.
         fallback: True when the agent made no valid tool call and the
             original question was searched instead.
+        retries: Safety nets used: "all-domains" (the model's domain
+            choice found nothing, retried within the user's filter) and
+            "original-question" (its rewrite found nothing).
         raw_steps: The planner's raw outputs (for debugging).
         seconds_agent / seconds_generation: Planning+search time and
             final answer time.
@@ -80,6 +85,7 @@ class AgentAnswer:
     raw_steps: list[str] = field(default_factory=list)
     seconds_agent: float = 0.0
     seconds_generation: float = 0.0
+    retries: list[str] = field(default_factory=list)
 
 
 class Agent:
@@ -94,9 +100,12 @@ class Agent:
     """
 
     def __init__(self, tools: RagTools, max_steps: int = 3,
-                 k: int = 5) -> None:
+                 k: int = 5, generator: Optional[Generator] = None) -> None:
         self.tools = tools
-        self.generator = tools.get_pipeline().generator
+        # The LLM that plans and answers (default: the tools' one). The
+        # web's model selector swaps it between questions; the session's
+        # memory is kept.
+        self.generator = generator or tools.get_pipeline().generator
         self.max_steps = max_steps
         self.k = k
         self.session = Session()
@@ -116,11 +125,13 @@ class Agent:
 
     def plan(self, question: str,
              user_domains: Optional[str | Sequence[str]]
-             ) -> tuple[list[tuple[str, dict[str, Any]]], list[str], bool]:
+             ) -> tuple[list[tuple[str, dict[str, Any]]], list[str], bool,
+                        list[str]]:
         """Let the LLM search until it stops (or max_steps).
 
         Returns:
-            (searches as (query, result), raw outputs, fallback used).
+            (searches as (query, result), raw outputs, fallback used,
+            safety nets used: "all-domains", "original-question").
         """
         # The history goes inside the user turn, not as earlier chat
         # turns: with past answers as assistant messages, small models
@@ -137,6 +148,7 @@ class Agent:
         tokenizer = self.generator.tokenizer
         searches: list[tuple[str, dict[str, Any]]] = []
         raw: list[str] = []
+        retries: list[str] = []
         for _ in range(self.max_steps):
             output = self.generator.complete(
                 render(tokenizer, messages, [SEARCH_TOOL]), STEP_TOKENS
@@ -158,11 +170,28 @@ class Agent:
                     domains = [d for d in parse_domains(str(domains))
                                if d in known] or None
                 result = self.search(query, domains)
+                if not result["sources"] and domains and not user_domains:
+                    # Safety net 2: the domain the model picked is a hint.
+                    # Nothing there: retry the same query over every
+                    # domain the user allows (no filter = all, exactly
+                    # what direct mode searches). Never beyond a user
+                    # filter: with one, `domains` is that filter.
+                    retries.append("all-domains")
+                    result = self.search(query, user_domains)
                 searches.append((query, result))
                 messages.append({"role": "tool", "content":
                                  self.describe(result)})
+        if any(r["sources"] for _, r in searches):
+            return searches, raw, False, retries
         if searches:
-            return searches, raw, False
+            # Safety net 1: the model's rewrite found nothing (small
+            # models turn questions into keyword fragments the gate
+            # rejects). Search the question as the user asked it.
+            retries.append("original-question")
+            result = self.search(question, user_domains)
+            searches.append((question, result))
+            if result["sources"]:
+                return searches, raw, False, retries
         # Deterministic fallback: the question as asked, with the last
         # query the model itself wrote in front, so a follow-up keeps its
         # subject ("¿Dónde nació Chrystian? ¿Y en qué año?"). Earlier
@@ -170,7 +199,10 @@ class Agent:
         last = next((t.query for t in reversed(self.session.turns)
                      if not t.fallback), "")
         query = f"{last} {question}".strip()
-        return [(query, self.search(query, user_domains))], raw, True
+        if searches and query == question:
+            return searches, raw, True, retries
+        searches.append((query, self.search(query, user_domains)))
+        return searches, raw, True, retries
 
     @staticmethod
     def describe(result: dict[str, Any]) -> str:
@@ -198,7 +230,7 @@ class Agent:
             The answer, with the searches made and timings.
         """
         start = time.perf_counter()
-        searches, raw, fallback = self.plan(question, domains)
+        searches, raw, fallback, retries = self.plan(question, domains)
         seconds_agent = time.perf_counter() - start
 
         found = [(q, r) for q, r in searches if r["sources"]]
@@ -213,7 +245,7 @@ class Agent:
             return self.remember(AgentAnswer(
                 question, text, [], True, domain,
                 [q for q, _ in searches], len(raw), fallback, raw,
-                seconds_agent,
+                seconds_agent, retries=retries,
             ))
 
         query, first = found[0]
@@ -254,7 +286,7 @@ class Agent:
         return self.remember(AgentAnswer(
             question, text, sources, not_found, domain,
             [q for q, _ in searches], len(raw), fallback, raw,
-            seconds_agent, time.perf_counter() - start,
+            seconds_agent, time.perf_counter() - start, retries,
         ))
 
     def remember(self, answer: AgentAnswer) -> AgentAnswer:
@@ -272,4 +304,5 @@ class Agent:
         return json.dumps({
             "queries": answer.queries, "domain": answer.domain,
             "steps": answer.steps, "fallback": answer.fallback,
+            "retries": answer.retries,
         }, ensure_ascii=False)

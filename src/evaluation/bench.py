@@ -17,7 +17,7 @@ from src.rag.retriever import Retriever
 # translated questions) used to measure multilingual retrieval; "en" is
 # the same 20 questions in English, for a like-for-like comparison.
 SUITES = {
-    "public": ("data/datasets", "public"),
+    "public": ("bench/datasets/public", "public"),
     "es": ("bench/datasets/es", "es"),
     "en": ("bench/datasets/en", "en"),
     "xquad": ("bench/datasets/xquad", "xquad"),

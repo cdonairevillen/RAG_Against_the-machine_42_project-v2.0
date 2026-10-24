@@ -50,15 +50,15 @@ class CLI:
         uv run python -m src answer "How to configure OpenAI server?"
         uv run python -m src search_dataset \\
             --dataset_path \\
-            data/datasets/UnansweredQuestions/dataset_docs_public.json
+            bench/datasets/public/UnansweredQuestions/dataset_docs_public.json
         uv run python -m src answer_dataset \\
             --dataset_path \\
-            data/datasets/UnansweredQuestions/dataset_docs_public.json
+            bench/datasets/public/UnansweredQuestions/dataset_docs_public.json
         uv run python -m src evaluate \\
             --student_answer_path \\
             data/output/search_results/dataset_docs_public.json \\
             --dataset_path \\
-            data/datasets/AnsweredQuestions/dataset_docs_public.json
+            bench/datasets/public/AnsweredQuestions/dataset_docs_public.json
     """
 
     def __init__(self, domain: str = DEFAULT_DOMAIN,
@@ -735,6 +735,28 @@ class CLI:
                             config=self.config)
         except Exception as exc:
             print(f"Error during agent_bench: {exc}")
+
+    def bundle_export(self, out_dir: str = "deploy/bundle") -> None:
+        """Snapshot every indexed domain (Qdrant + BM25) into a bundle.
+
+        The bundle holds raw CV text: keep it private (see
+        docs/decisions.md). deploy/ is git-ignored.
+        """
+        from src.deploy.bundle import export_bundle
+
+        try:
+            export_bundle(out_dir, self.config)
+        except Exception as exc:
+            print(f"Error exporting the bundle: {exc}")
+
+    def bundle_restore(self, bundle_dir: str = "deploy/bundle") -> None:
+        """Load a bundle into Qdrant and data/processed (SHA256 checked)."""
+        from src.deploy.bundle import restore_bundle
+
+        try:
+            restore_bundle(bundle_dir, self.config)
+        except Exception as exc:
+            print(f"Error restoring the bundle: {exc}")
 
     def mcp(self, transport: str = "stdio", port: int = 8765) -> None:
         """Serve the RAG over MCP (tools: list_domains, search, answer).

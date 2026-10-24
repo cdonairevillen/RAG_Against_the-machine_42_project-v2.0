@@ -1,3 +1,7 @@
+"""
+<Legacy Code>
+"""
+
 import html
 import os
 import sys
@@ -11,8 +15,8 @@ sys.path.insert(
 XQUAD_PREFIX = "data/raw/xquad/"
 EVAL_DOCS = "data/output/search_results/dataset_docs_public.json"
 EVAL_CODE = "data/output/search_results/dataset_code_public.json"
-GT_DOCS = "data/datasets/AnsweredQuestions/dataset_docs_public.json"
-GT_CODE = "data/datasets/AnsweredQuestions/dataset_code_public.json"
+GT_DOCS = "bench/datasets/public/AnsweredQuestions/dataset_docs_public.json"
+GT_CODE = "bench/datasets/public/AnsweredQuestions/dataset_code_public.json"
 
 NOT_FOUND_MESSAGE = (
     "I've not found relevant information about this subject "

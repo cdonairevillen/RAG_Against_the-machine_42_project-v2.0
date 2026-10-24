@@ -25,7 +25,7 @@ class Evaluator:
         metrics = evaluator.compute_recall(
             student_path="data/output/search_results/dataset_docs_public.json",
             ground_truth_path=(
-                "data/datasets/AnsweredQuestions/dataset_docs_public.json"
+                "bench/datasets/public/AnsweredQuestions/dataset_docs_public.json"
             ),
             k=10,
         )

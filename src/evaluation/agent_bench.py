@@ -60,6 +60,7 @@ def ask(mode: str, agent: Agent, pipeline: RagPipeline, question: str,
         return {"answer": a.text, "not_found": a.not_found,
                 "domain": a.domain, "queries": a.queries,
                 "steps": a.steps, "fallback": a.fallback,
+                "retries": a.retries,
                 "seconds": time.perf_counter() - start}
     r = pipeline.answer(question, k=k)
     return {"answer": r.text, "not_found": r.not_found,
@@ -81,6 +82,8 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         out["tool_call_rate"] = round(
             sum(not r["fallback"] for r in rows) / n, 4)
         out["steps"] = round(sum(r["steps"] for r in rows) / n, 2)
+        out["safety_net_rate"] = round(
+            sum(bool(r.get("retries")) for r in rows) / n, 4)
     return out
 
 

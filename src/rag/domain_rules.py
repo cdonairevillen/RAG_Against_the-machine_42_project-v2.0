@@ -11,8 +11,8 @@ from src.config import RagConfig, SourceConfig
 from src.rag.language import detect_language
 
 # Spanish phone numbers: 9 digits starting with 6-9, optionally with the
-# +34 prefix and spaces, dots or dashes ("(+34) 654705242",
-# "+34 654 70 52 42"). Shorter or longer digit runs (years, sizes) do
+# +34 prefix and spaces, dots or dashes ("(+34) 612345678",
+# "+34 612 34 56 78"). Shorter or longer digit runs (years, sizes) do
 # not match.
 PHONE = re.compile(
     r"(?:\(?\+34\)?[\s.-]*)?(?<![\d+])[6-9](?:[\s.-]?\d){8}(?!\d)"

@@ -60,6 +60,10 @@ class DomainRouter:
             raise ValueError("DomainRouter needs at least one domain.")
         self.retrievers = retrievers
         self.last_route: list[tuple[str, float]] = []
+        # The last search's (domain, score, sources) of every selected
+        # domain, best first: the web shows each domain's results, not
+        # only the winner's. Bookkeeping only; routing is unchanged.
+        self.last_ranked: list[tuple[str, float, list[MinimalSource]]] = []
         self.parent_map: dict = {}
 
     @classmethod
@@ -170,6 +174,7 @@ class DomainRouter:
         # Stable sort: ties keep rag.toml order.
         ranked.sort(key=lambda item: -item[1])
         self.last_route = [(domain, score) for domain, score, _ in ranked]
+        self.last_ranked = ranked
         return ranked
 
     def search_smart(self, query: str, k: int = 10,
@@ -184,7 +189,9 @@ class DomainRouter:
         selected = self.selected(domains)
         if len(selected) == 1:
             self.last_route = [(selected[0], float("nan"))]
-            return self.retrievers[selected[0]].search_smart(query, k)
+            sources = self.retrievers[selected[0]].search_smart(query, k)
+            self.last_ranked = [(selected[0], float("nan"), sources)]
+            return sources
         ranked = self.route(query, k, selected)
         return ranked[0][2]
 
@@ -205,9 +212,11 @@ class DomainRouter:
         selected = self.selected(domains)
         if len(selected) == 1:
             self.last_route = [(selected[0], float("nan"))]
-            return self.retrievers[selected[0]].search_for_generation(
+            sources = self.retrievers[selected[0]].search_for_generation(
                 query, k
             )
+            self.last_ranked = [(selected[0], float("nan"), sources)]
+            return sources
         domain, score, sources = self.route(query, k, selected,
                                             for_answer=True)[0]
         threshold = self.retrievers[domain].settings.relevance_threshold
