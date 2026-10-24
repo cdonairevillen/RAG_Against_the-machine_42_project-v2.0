@@ -1,174 +1,176 @@
-# Decisiones tomadas por necesidad (sesión autónoma, 2026-10-23/24)
+# Decisions taken out of necessity (autonomous session, 2026-10-23/24)
 
-Encargo: cerrar las Fases 5 y 6 hasta el punto de despliegue mientras duermes. Este documento recoge las decisiones que he tomado sin consultarte, con las opciones que consideré y por qué elegí cada una, para revisarlas juntos.
+> English translation of [`es/decisions.md`](es/decisions.md), the working version. Updated at the end of each phase.
 
-**Cómo leerlo:**
-- **Elegida:** la opción aplicada.
-- **Reversible:** cuánto cuesta cambiarla.
-- Si una decisión te parece mal, el número (`DEC-nn`) sirve para referirse a ella.
+The brief: finish Phases 5 and 6 up to the point of deployment while the author was asleep. This document records the decisions taken without consulting him, with the options considered and why each one was chosen, so they could be reviewed together.
+
+**How to read it:**
+- **Chosen:** the option applied.
+- **Reversible:** how much it costs to change it.
+- The number (`DEC-nn`) is the way to refer to a decision.
 
 ---
 
-## DEC-01 — Dónde viven los datasets de evaluación
+## DEC-01 — Where the evaluation datasets live
 
-Tú propusiste unificar `data/` y `bench/`; decidí en qué sentido.
+The author proposed unifying `data/` and `bench/`; this decision chose the direction.
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **A. Todo en `bench/datasets/` (los de 42 en `bench/datasets/public/`)** ✅ | `bench/` = lo versionado (datasets y resultados); `data/` = lo local y regenerable (corpus, índices, salidas), ignorado entero sin excepciones | Cambian las rutas de ejemplo de los comandos de 42 (el comando no cambia: recibe la ruta por argumento) |
-| B. Todo en `data/datasets/` | Se mantiene la ruta histórica de 42 | Habría que meter excepciones en `.gitignore` para cada dataset nuevo; mezcla lo versionado con lo regenerable |
-| C. Dejarlo como estaba | Nada que cambiar | Dos sitios para lo mismo, que es lo que señalaste |
+| **A. Everything in `bench/datasets/` (the 42 ones in `bench/datasets/public/`)** ✅ | `bench/` = what is versioned (datasets and results); `data/` = what is local and can be regenerated (corpora, indices, outputs), ignored entirely with no exceptions | The example paths of the 42 commands change (the commands do not: they take the path as an argument) |
+| B. Everything in `data/datasets/` | Keeps the historical 42 path | Every new dataset would need an exception in `.gitignore`; it mixes versioned and regenerable content |
+| C. Leave it as it was | Nothing to change | Two places for the same thing, which is what the author pointed out |
 
-**Por qué A:** cada carpeta tiene un único significado y desaparece la excepción `!data/datasets/` del `.gitignore`. Comprobado: `make bench` da lo mismo (`61-datasets-moved`) y pasan los 84 tests. **Reversible:** sí, con un `git mv` y 6 rutas.
+**Why A:** each folder has a single meaning, and the `!data/datasets/` exception disappears from `.gitignore`. Checked: `make bench` gives the same results (`61-datasets-moved`) and the 84 tests pass. **Reversible:** yes, with a `git mv` and 6 paths.
 
-## DEC-02 — Contenido del commit "checkpoint"
+## DEC-02 — Content of the "checkpoint" commit
 
-| Opción | Elegida |
+| Option | Chosen |
 |---|---|
-| **Todo lo que había en el árbol al acabar el benchmark** (reorganización de `src/`, agente, MCP, `make data`, resultados de los 4 modelos, changelog) | ✅ |
-| Solo el código, sin los resultados del benchmark | |
+| **Everything in the tree when the benchmark finished** (the `src/` reorganisation, agent, MCP, `make data`, results of the 4 models, changelog) | ✅ |
+| Only the code, without the benchmark results | |
 
-**Por qué:** pediste el commit "cuando esto acabe", y los resultados son parte de lo que acababa (el proyecto versiona `bench/results/` a propósito). Comprobé antes del commit que no entraba ningún dato personal. Commit `680f21a`. **Después de ese commit no hay ninguno más:** todo lo demás queda sin commitear para revisarlo.
+**Why:** the author asked for the commit "when this finishes", and the results were part of what was finishing (the project versions `bench/results/` on purpose). Before the commit it was checked that no personal data went in. Commit `680f21a`. **No other commit was made after it:** everything else was left uncommitted for review.
 
-## DEC-03 — Redes de seguridad del agente (tus dos propuestas, acotadas)
+## DEC-03 — Safety nets for the agent (the author's two proposals, bounded)
 
-Tú aprobaste la primera ("si la reescritura no encuentra nada, buscar la pregunta original"). La segunda la acotaste: nunca salir del filtro que elige el usuario.
+The author approved the first one ("if the rewrite finds nothing, search the original question"). He bounded the second one: never go beyond the filter the user chooses.
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **A. Red 1: la pregunta original si la reescritura no encuentra nada. Red 2: si el modelo restringió dominios y no encontró nada, repetir dentro del filtro del usuario (sin filtro, en todos)** ✅ | Recupera los casos en que el 0.6B convierte la pregunta en palabras sueltas o elige mal el dominio; **nunca sale del filtro del usuario** | Una búsqueda más en esos casos (~50–100 ms) |
-| B. Solo la red 1 | Más simple | El 0.6B restringe mal los dominios (en `c11` mandó la pregunta de los Panthers al CV) |
-| C. Ignorar los dominios que elige el modelo | Nunca se equivoca de dominio | Desperdicia la información del modelo cuando acierta |
+| **A. Net 1: the original question if the rewrite finds nothing. Net 2: if the model restricted the domains and found nothing, retry within the user's filter (no filter: in all of them)** ✅ | Recovers the cases where the 0.6B turns the question into loose keywords or picks the wrong domain; **never goes beyond the user's filter** | One more search in those cases (~50–100 ms) |
+| B. Net 1 only | Simpler | The 0.6B restricts domains badly (in `c11` it sent the Panthers question to the CV) |
+| C. Ignore the domains the model picks | Never wrong about the domain | Wastes the model's information when it is right |
 
-**Por qué A:** hay un test que lo garantiza (`test_user_filter_is_never_exceeded`): con filtro de usuario, todas las búsquedas, reintentos incluidos, se quedan dentro. Sin filtro, la red 2 busca exactamente lo mismo que el modo directo. Cada uso queda en la traza (`retries`). **Reversible:** sí.
+**Why A:** a test guarantees it (`test_user_filter_is_never_exceeded`): with a user filter, every search, retries included, stays inside it. Without a filter, net 2 searches exactly what direct mode searches. Every use is recorded in the trace (`retries`). **Reversible:** yes.
 
-**Resultado medido** (`BENCHMARK_REPORT.md` §8): con Qwen3-0.6B, los seguimientos pasan de 0.44 a 0.78 y XQuAD ES de 0.64 a 0.70 (igual que el directo). Con Qwen3-1.7B, XQuAD EN pasa de 0.46 a 0.76. Las redes actúan en el 7–56 % de las preguntas según el modelo y el set, y el agente queda a ±0.04 del directo en todas las preguntas sueltas.
+**Measured result** (`BENCHMARK_REPORT.md` §8): with Qwen3-0.6B, follow-ups go from 0.44 to 0.78 and XQuAD ES from 0.64 to 0.70 (the same as direct mode). With Qwen3-1.7B, XQuAD EN goes from 0.46 to 0.76. The nets act on 7–56% of the questions depending on the model and the set, and the agent stays within ±0.04 of direct mode on every set of single questions.
 
-## DEC-04 — Transporte de la respuesta en la API: SSE sobre POST
+## DEC-04 — How the API sends the answer: SSE over POST
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **A. `POST /chat` que responde con Server-Sent Events** ✅ | *Streaming* de tokens con HTTP normal; atraviesa proxies (el de HF Spaces incluido); el roadmap pedía SSE | `EventSource` del navegador solo hace GET, así que el cliente lee el stream con `fetch` (30 líneas en `web/src/api.ts`) |
-| B. WebSocket | Bidireccional | Más infraestructura para un flujo pregunta → respuesta |
-| C. Sin *streaming* (respuesta entera) | Lo más simple | En CPU una respuesta tarda varios segundos: la web parecería colgada |
+| **A. `POST /chat` answering with Server-Sent Events** ✅ | Token *streaming* over plain HTTP; goes through proxies (including the HF Spaces one); the roadmap asked for SSE | The browser's `EventSource` only does GET, so the client reads the stream with `fetch` (30 lines in `web/src/api.ts`) |
+| B. WebSocket | Bidirectional | More infrastructure for a question → answer flow |
+| C. No *streaming* (the whole answer at once) | The simplest | On a CPU an answer takes several seconds: the web would look frozen |
 
-**Reversible:** sí, aunque el cliente y el servidor cambian a la vez.
+**Reversible:** yes, although client and server change together.
 
-## DEC-05 — Memoria de conversación en la API
+## DEC-05 — Conversation memory in the API
 
-| Opción | Elegida |
+| Option | Chosen |
 |---|---|
-| **En memoria del proceso, por `session_id` (generado por el servidor), con un máximo de 500 sesiones y 30 min de inactividad** | ✅ |
-| Guardada en Qdrant o en un fichero | ❌ D7: solo de sesión |
-| Historial enviado por el cliente en cada petición | ❌ El cliente podría inyectar un historial falso |
+| **In the process's memory, per `session_id` (generated by the server), with at most 500 sessions and 30 min of inactivity** | ✅ |
+| Stored in Qdrant or in a file | ❌ D7: session only |
+| History sent by the client with each request | ❌ The client could inject a fake history |
 
-**Por qué:** cumple D7 (no se guarda nada de los visitantes) y los límites impiden que una web pública llene la RAM. Al reiniciar el Space se pierden las conversaciones, que es lo esperado.
+**Why:** it meets D7 (nothing about visitors is stored) and the limits stop a public website from filling the RAM. Restarting the Space loses the conversations, which is expected.
 
-## DEC-06 — Una sola generación a la vez
+## DEC-06 — One generation at a time
 
-La API serializa la generación con un candado. Con un solo LLM en una CPU gratuita, generar dos respuestas en paralelo las haría lentas a las dos y podría quedarse sin memoria. Si llegan varias visitas a la vez, esperan su turno; el *streaming* empieza cuando les toca. **Alternativa descartada:** una cola con un worker propio, más infraestructura para el mismo resultado con un solo modelo.
+The API serialises generation with a lock. With a single LLM on a free CPU, generating two answers in parallel would make both slow and could run out of memory. If several visitors arrive at once, they wait for their turn; the *streaming* starts when it is their turn. **Alternative discarded:** a queue with its own worker, more infrastructure for the same result with a single model.
 
-## DEC-07 — Frontend: Vite + React + TypeScript, sin librería de componentes
+## DEC-07 — Frontend: Vite + React + TypeScript, no component library
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **A. Vite 6 + React 19 + TS y CSS propio** ✅ | El roadmap pedía React con Vite; el CSS copia tal cual la paleta, tipografías, tarjetas y barras de `src/web.py` (D5); 73 KB comprimido | Los componentes (switch, pestañas) se escriben a mano |
-| B. React + una librería de UI (MUI, Chakra…) | Componentes hechos | Tiene su propia estética: costaría más imitar la actual que escribirla |
-| C. Mantener Streamlit | Ya existe | No sirve como web pública (sin *streaming* fino ni control del diseño); el roadmap pide React |
+| **A. Vite 6 + React 19 + TS and hand-written CSS** ✅ | The roadmap asked for React with Vite; the CSS copies the palette, typefaces, cards and bars of `src/web.py` as they are (D5); 73 KB compressed | Components (switch, tabs) are written by hand |
+| B. React + a UI library (MUI, Chakra…) | Ready-made components | It has its own look: imitating the current one would cost more than writing it |
+| C. Keep Streamlit | Already exists | Not fit for a public website (no fine *streaming* or control over the design); the roadmap asks for React |
 
-**El idioma de la interfaz es el inglés**, como la web actual y el público de LinkedIn. Las respuestas siguen el idioma de la pregunta, y los ejemplos incluyen preguntas en español. **Reversible:** traducir la interfaz es solo cambiar textos.
+**The interface language is English**, like the current web and the LinkedIn audience. Answers follow the language of the question, and the examples include questions in Spanish. **Reversible:** translating the interface only means changing texts.
 
-## DEC-08 — Topología: el Space sirve la API y la web; GitHub Pages es opcional
+## DEC-08 — Topology: the Space serves the API and the web; GitHub Pages is optional
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **A. La API sirve también la web compilada (`web/dist`), y Pages queda como opción** ✅ | Una sola URL que funciona sola; sin CORS; si Pages no está configurado, la web existe igual | La web se sirve desde el Space (que se duerme si no hay uso) |
-| B. Solo Pages + API en el Space (lo del roadmap) | La web carga al instante aunque el Space esté dormido | Dos sitios que configurar y CORS |
+| **A. The API also serves the built web (`web/dist`), and Pages stays as an option** ✅ | A single URL that works on its own; no CORS; if Pages is not set up, the web still exists | The web is served from the Space (which goes to sleep when unused) |
+| B. Pages only + the API in the Space (the roadmap's plan) | The web loads instantly even if the Space is asleep | Two places to set up, and CORS |
 
-**Por qué A + B:** el roadmap pedía B, y queda lista (workflow `.github/workflows/pages.yml`). A es un respaldo que no cuesta nada. **El workflow de Pages es manual** (`workflow_dispatch`): nada se publica hasta que lo lances tú.
+**Why A + B:** the roadmap asked for B, and it is ready (workflow `.github/workflows/pages.yml`). A is a backup that costs nothing. **The Pages workflow is manual** (`workflow_dispatch`): nothing is published until the author runs it.
 
-## DEC-09 — Cómo llega el índice al despliegue (privacidad)
+## DEC-09 — How the index reaches the deployment (privacy)
 
-**Problema detectado:** el enmascarado de los datos de contacto privados se hace al responder, pero el índice (Qdrant + BM25) guarda el material del CV sin enmascarar. Cualquiera que pudiera descargar el índice los leería.
+**Problem found:** private contact data is masked at answer time, but the index (Qdrant + BM25) holds the CV material unmasked. Anyone who could download the index would read it.
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **A. Bundle (snapshots de Qdrant + BM25 con SHA256) en un dataset privado de HF; el Space lo descarga al arrancar con un token secreto** ✅ | El código es público y los datos no; se respeta tu decisión de indexar el material tal cual (sin manipularlo) | Un paso más al desplegar (crear el dataset y el secreto) |
-| B. Meter el índice en la imagen del Space | Arranque más simple | En un Space público, la imagen y sus ficheros se pueden descargar: **fuga de datos privados** |
-| C. Construir un índice "de despliegue" con el texto ya enmascarado | Nada sensible en ningún sitio | Contradice tu decisión de no manipular el material (BOM, "indexar tal cual") y obliga a mantener dos índices |
-| D. Indexar en el arranque del Space | Sin bundle | Horas en CPU con `bge-m3` |
+| **A. A bundle (Qdrant snapshots + BM25 with SHA256) in a private HF dataset; the Space downloads it at startup with a secret token** ✅ | The code is public and the data is not; it respects the author's decision to index the material as it is (without altering it) | One more step when deploying (creating the dataset and the secret) |
+| B. Put the index inside the Space image | Simpler startup | In a public Space, the image and its files can be downloaded: **a leak of private data** |
+| C. Build a "deployment" index with the text already masked | Nothing sensitive anywhere | Goes against the author's decision not to alter the material ("index it as it is") and means maintaining two indices |
+| D. Index when the Space starts | No bundle | Hours on a CPU with `bge-m3` |
 
-**Por qué A:** cumple a la vez la privacidad y tu criterio de reproducibilidad. Los ficheros llevan SHA256 y se comprueban al restaurar. `deploy/bundle/` está en `.gitignore`. **Pendiente de tu decisión:** si prefieres C (más paranoico), es un cambio acotado.
+**Why A:** it meets both privacy and the author's reproducibility criterion. The files carry SHA256 checksums, checked on restore. `deploy/bundle/` is in `.gitignore`. **Pending the author's decision:** if he prefers C (more cautious), it is a bounded change.
 
-## DEC-10 — Qdrant en el despliegue: servidor dentro del contenedor
+## DEC-10 — Qdrant in the deployment: a server inside the container
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **A. El binario oficial de Qdrant v1.19.1 (la misma versión que `docker-compose.yml`) dentro del contenedor del Space** ✅ | Mismo código y misma versión que en desarrollo; los snapshots se restauran por la API oficial | Dos procesos en un contenedor (`entrypoint.sh`) |
-| B. Qdrant en modo local (embebido) | Un solo proceso | En la Fase 1 se midió que era mucho más lento y obligaría a otro camino en `QdrantChunkStore` |
-| C. Qdrant Cloud (capa gratuita) | Sin gestionar Qdrant | Otra cuenta, y el índice con el CV fuera de tu control |
+| **A. The official Qdrant v1.19.1 binary (the same version as `docker-compose.yml`) inside the Space container** ✅ | The same code and version as in development; snapshots are restored through the official API | Two processes in one container (`entrypoint.sh`) |
+| B. Qdrant in local (embedded) mode | A single process | Phase 1 measured it as much slower, and it would need another path in `QdrantChunkStore` |
+| C. Qdrant Cloud (free tier) | No Qdrant to manage | Another account, and the index with the CV out of the author's control |
 
-## DEC-11 — torch con CUDA en una imagen de CPU
+## DEC-11 — torch with CUDA in a CPU image
 
-| Opción | Elegida |
+| Option | Chosen |
 |---|---|
-| **Usar el `uv.lock` tal cual (torch cu126, que funciona en CPU)** | ✅ |
-| Un lock aparte con torch CPU para el despliegue | |
+| **Use `uv.lock` as it is (torch cu126, which works on a CPU)** | ✅ |
+| A separate lock with CPU torch for the deployment | |
 
-**Por qué:** un solo lock, la misma versión de todo que en el benchmark (los resultados son comparables) y nada que mantener por duplicado. **Coste:** la imagen pesa ~2 GB más, cosa que el Space aguanta. Se puede optimizar después con un perfil de dependencias para el despliegue.
+**Why:** a single lock, the same version of everything as in the benchmarks (the results are comparable), and nothing to maintain twice. **Cost:** the image is ~2 GB bigger, which the Space can take. It can be optimised later with a dependency profile for the deployment.
 
-## DEC-12 — Modelos dentro de la imagen
+## DEC-12 — Models inside the image
 
-`bge-m3`, el reranker y Qwen3-0.6B se descargan **al construir** la imagen, no al arrancar. Así un arranque en frío no depende de Hugging Face Hub y es más rápido (el Space gratuito se duerme y se despierta a menudo). **Coste:** la imagen pesa más.
+`bge-m3`, the reranker and Qwen3-0.6B are downloaded **when the image is built**, not at startup. A cold start therefore does not depend on the Hugging Face Hub and is faster (the free Space goes to sleep and wakes up often). **Cost:** a bigger image.
 
-## DEC-13 — La web de Streamlit se queda como legacy
+## DEC-13 — The Streamlit web stays as legacy
 
-`src/web.py` y `make web` siguen funcionando: no los borro sin tu permiso. La web nueva es `make api` + `make web-dev` (o `make space-run`). Propuesta: borrar Streamlit cuando hayas revisado la nueva.
+`src/web.py` and `make web` still work: they are not deleted without the author's permission. The new web is `make api` + `make web-dev` (or `make space-run`). Proposal: delete Streamlit once the author has reviewed the new one.
 
-## DEC-14 — Sin licencia en la ficha del Space
+## DEC-14 — No license in the Space card
 
-El repo no tenía `LICENSE`. Había puesto `license: mit` en la ficha del Space y **lo quité**: elegir licencia es decisión tuya. Ojo: los datos de XQuAD son CC-BY-SA 4.0, y eso obliga a citar (ya se cita en la web y en la ficha) y a publicar los derivados con la misma licencia.
+The repo had no `LICENSE`. The Space card had `license: mit`, and **it was removed**: choosing a license is the author's decision. Note: the XQuAD data is CC-BY-SA 4.0, which requires attribution (already given in the web and in the card) and publishing derived works under the same license.
 
-**Resuelto (2026-10-24, Fase 7):** pediste crear la licencia.
-- **MIT** para el código y la documentación propios (`LICENSE`). La alternativa, Apache-2.0, solo añade una cláusula de patentes que no aporta nada a un portfolio.
-- **Lo de terceros queda fuera, y se dice en el README:** `bench/datasets/xquad/` (CC-BY-SA 4.0), los datasets de 42 (`public/`, y su subconjunto traducido en `en/` y `es/`) y `llm_sdk/`.
-- **La ficha del Space** vuelve a llevar `license: mit`, y `make space-stage` copia el `LICENSE`.
+**Resolved (2026-10-24, Phase 7):** the author asked for a license.
+- **MIT** for the project's own code and documentation (`LICENSE`). The alternative, Apache-2.0, only adds a patent clause that brings nothing to a portfolio.
+- **Third-party content is left out, as the README says:** `bench/datasets/xquad/` (CC-BY-SA 4.0), the 42 datasets (`public/`, and its translated subset in `en/` and `es/`) and `llm_sdk/`.
+- **The Space card** carries `license: mit` again, and `make space-stage` copies the `LICENSE`.
 
-## DEC-15 — FastAPI y uvicorn como dependencias normales
+## DEC-15 — FastAPI and uvicorn as regular dependencies
 
-| Opción | Elegida |
+| Option | Chosen |
 |---|---|
-| **En `dependencies` (como `streamlit` o `mcp`)** | ✅ |
-| En un grupo opcional (`[project.optional-dependencies] api`) | |
+| **In `dependencies` (like `streamlit` or `mcp`)** | ✅ |
+| In an optional group (`[project.optional-dependencies] api`) | |
 
-**Por qué:** el proyecto ya instala todo con un único `uv sync` (la web de Streamlit y el servidor MCP también son dependencias normales), y la imagen del Space usa ese mismo lock. Pesan poco (~2 MB). `httpx` entra solo en el grupo `dev`, porque solo lo usan los tests (`TestClient`). Las instalé **después** de que acabara el benchmark del agente, para no cambiar el entorno mientras se medía. **Reversible:** sí.
+**Why:** the project already installs everything with a single `uv sync` (the Streamlit web and the MCP server are regular dependencies too), and the Space image uses that same lock. They are small (~2 MB). `httpx` only goes into the `dev` group, because only the tests use it (`TestClient`). They were installed **after** the agent benchmark finished, so as not to change the environment while it was measuring. **Reversible:** yes.
 
-## DEC-16 — Contexto de `docker build` con lista blanca
+## DEC-16 — `docker build` context with an allowlist
 
-`docker build` se lanza desde la raíz del repo, que contiene `data/` (corpus, índice y **el CV privado**), `.venv` y `node_modules`. Aunque el Dockerfile solo copia lo que necesita, Docker enviaría todo eso como contexto de construcción.
+`docker build` runs from the repository root, which contains `data/` (corpora, index and **the private CV**), `.venv` and `node_modules`. Even though the Dockerfile only copies what it needs, Docker would send all of that as the build context.
 
-| Opción | Elegida |
+| Option | Chosen |
 |---|---|
-| **`deploy/space/Dockerfile.dockerignore` con lista blanca (`*` y solo lo que se copia)** | ✅ |
-| Un `.dockerignore` en la raíz | ❌ Afectaría también a `docker-compose.yml` y a cualquier otra imagen futura |
-| Construir solo desde `deploy/stage/` (`make space-stage`) | ❌ Obligaría a preparar el stage incluso para una prueba local |
+| **`deploy/space/Dockerfile.dockerignore` with an allowlist (`*` and only what is copied)** | ✅ |
+| A `.dockerignore` at the root | ❌ It would also affect `docker-compose.yml` and any future image |
+| Build only from `deploy/stage/` (`make space-stage`) | ❌ The stage would have to be prepared even for a local test |
 
-**Por qué:** BuildKit lee `<Dockerfile>.dockerignore` junto al Dockerfile, así que solo afecta a esta imagen. Con una lista blanca, un fichero nuevo nunca entra por accidente. `make space-stage` sigue copiando solo lo necesario para subir al Space.
+**Why:** BuildKit reads `<Dockerfile>.dockerignore` next to the Dockerfile, so it only affects this image. With an allowlist, a new file never gets in by accident. `make space-stage` still copies only what is needed to upload to the Space.
 
-## DEC-17 — Hilos de CPU según la cuota del contenedor
+## DEC-17 — CPU threads from the container's quota
 
-**Problema medido:** con el contenedor limitado a 2 vCPU (como el Space gratuito), torch veía los 24 núcleos del host y abría 12 hilos. Resultado: 48–88 s por respuesta directa y 84–123 s con el agente. Con 2 hilos, las mismas preguntas tardan **14–24 s y 22–32 s**, con respuestas idénticas.
+**Measured problem:** with the container limited to 2 vCPUs (like the free Space), torch saw the host's 24 cores and opened 12 threads. Result: 48–88 s per direct answer and 84–123 s with the agent. With 2 threads, the same questions take **14–24 s and 22–32 s**, with identical answers.
 
-| Opción | Pros | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **A. `entrypoint.sh` calcula los hilos con la cuota del cgroup (`/sys/fs/cgroup/cpu.max`), o con `nproc` si no hay cuota; un `OMP_NUM_THREADS` explícito manda** ✅ | Se adapta si cambias el hardware del Space; no toca el código del RAG | Depende de cgroup v2 (si no está, usa `nproc`) |
-| B. `ENV OMP_NUM_THREADS=2` fijo en el Dockerfile | Una línea | Infrautiliza un hardware mayor |
-| C. `torch.set_num_threads()` en `src/` | Funciona también fuera de Docker | Cambia el código del RAG por un problema del despliegue |
+| **A. `entrypoint.sh` computes the threads from the cgroup quota (`/sys/fs/cgroup/cpu.max`), or from `nproc` without a quota; an explicit `OMP_NUM_THREADS` wins** ✅ | Adapts if the Space hardware changes; does not touch the RAG code | Relies on cgroup v2 (falls back to `nproc`) |
+| B. A fixed `ENV OMP_NUM_THREADS=2` in the Dockerfile | One line | Underuses bigger hardware |
+| C. `torch.set_num_threads()` in `src/` | Also works outside Docker | Changes the RAG code for a deployment problem |
 
-**Además:** la API arranca con `HF_HUB_OFFLINE=1`. Los modelos están en la imagen (DEC-12), así que un arranque en frío no hace ninguna llamada al Hub. La descarga del bundle va antes y no se ve afectada.
+**Also:** the API starts with `HF_HUB_OFFLINE=1`. The models are inside the image (DEC-12), so a cold start makes no call to the Hub. The bundle download happens before and is not affected.
 
-**Ojo:** no sé si el Space gratuito limita la CPU con cgroup o con una VM. La opción A cubre los dos casos, pero solo lo he probado con `docker run --cpus=2` en local.
+**Note:** it is unknown whether the free Space limits the CPU with a cgroup or with a VM. Option A covers both, but it was only tested with `docker run --cpus=2` locally.
 
-## DEC-18 — Datos de ejemplo ficticios
+## DEC-18 — Fictitious example data
 
-Los ejemplos de los tests y de los comentarios del enmascarado (`src/rag/domain_rules.py`, `tests/test_domain_rules.py`, `tests/test_api.py`) usan datos ficticios. El patrón de enmascarado es genérico, así que el comportamiento no cambia. Comprobado: ni el código ni `deploy/stage/` (lo que se sube al Space) contienen datos personales.
+The examples in the tests and in the masking comments (`src/rag/domain_rules.py`, `tests/test_domain_rules.py`, `tests/test_api.py`) use fictitious data. The masking pattern is generic, so the behaviour does not change. Checked: neither the code nor `deploy/stage/` (what is uploaded to the Space) contains personal data.

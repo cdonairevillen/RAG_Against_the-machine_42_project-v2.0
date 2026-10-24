@@ -129,7 +129,12 @@ class SourceConfig(BaseModel):
     # What the domain contains, for the agent and MCP clients choosing
     # where to search (list_domains).
     description: str = ""
+    # Names skipped anywhere in a path (a directory or a file name).
     exclude_dirs: list[str] = Field(default_factory=list)
+    # Paths relative to root (a directory or a file) skipped entirely,
+    # for one folder whose name exists elsewhere too (deploy/stage but
+    # not src/deploy).
+    exclude_paths: list[str] = Field(default_factory=list)
     code_extensions: list[str] = Field(default_factory=list)
     chunkers: dict[str, str] = Field(default_factory=dict)
     default_chunker: str = "size"

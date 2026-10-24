@@ -140,6 +140,28 @@ child_size = 400
 es = "No dispongo de esa información, ¡pero puedes preguntárselo tú! cdonairevillen@gmail.com"
 en = "I don't have that information, but you can ask him yourself! cdonairevillen@gmail.com"
 
+# About (Phase 7a): the project explaining itself, from its own README,
+# working docs and source code, read live from the repository (no copy:
+# `make index SOURCE=about` after editing them). Left out: the data, the
+# benchmarks, the web, the tests, the course SDK, the deployment bundle
+# and stage (a copy of src/), and the initial planning documents.
+[sources.about]
+description = "This project itself, RAG against the Machine v2.0: what it is, how it works (ingestion, hybrid retrieval, router, generation, agent, MCP, web), its models, benchmarks, design decisions and history, and its source code."
+root = "."
+include = [".md", ".py"]
+exclude_dirs = [
+    "data", "bench", "web", "tests", "llm_sdk", "__pycache__",
+    "node_modules", "PLANING.md", "RESPUESTA.md", "Elements_frontend.md",
+    "CLAUDE.md",
+]
+exclude_paths = ["deploy/stage", "deploy/bundle"]
+code_extensions = [".py"]
+default_chunker = "markdown_headers_packed"
+
+[sources.about.chunkers]
+".py" = "python_ast"
+".md" = "markdown_headers_packed"
+
 # Optional profiles: extra models as explicit options on top of the
 # stable base above (which is what the official benchmark uses and gives
 # the same results on any machine). Select with --profile <name>,

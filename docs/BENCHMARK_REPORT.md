@@ -1,195 +1,197 @@
 # BENCHMARK REPORT — RAG Against the Machine v2.0
 
-Comparativa de modelos y configuraciones del pipeline, con las mismas reglas en todas las mediciones:
+> English translation of [`es/BENCHMARK_REPORT.md`](es/BENCHMARK_REPORT.md), the working version. Updated at the end of each phase.
 
-- **Recall oficial:** datasets públicos de 42 (100 preguntas docs + 100 code), `k = 10`, evaluador original, ruta `search_smart` (`search_dataset`).
-- **Prioridad de métricas:** R@5 > R@10 > R@3 > R@1.
-- **Set complementario multilingüe:** 20 preguntas de los datasets públicos (una de cada diez: 10 docs y 10 code), en inglés (`--suite en`) y traducidas al español (`--suite es`) con el mismo ground truth. Cada pregunta vale 0.10. Sirve para medir lo que el benchmark de 42 no puede ver; **no sustituye a los recalls oficiales**.
-- **Hardware:** NVIDIA RTX 3080 Ti (12 GB) y una CPU de 24 núcleos. Los tiempos en CPU de los ordenadores de 42 serán probablemente peores.
-- Cada ejecución está en `bench/results/` con su configuración completa (chunking, recuperación, dispositivo).
+Comparison of models and pipeline configurations, with the same rules in every measurement:
+
+- **Official recall:** the public 42 datasets (100 docs questions + 100 code questions), `k = 10`, the original evaluator, the `search_smart` path (`search_dataset`).
+- **Metric priority:** R@5 > R@10 > R@3 > R@1.
+- **Complementary multilingual set:** 20 questions from the public datasets (one in ten: 10 docs and 10 code), in English (`--suite en`) and translated into Spanish (`--suite es`) with the same ground truth. Each question is worth 0.10. It measures what the 42 benchmark cannot see; **it does not replace the official recall**.
+- **Hardware:** NVIDIA RTX 3080 Ti (12 GB) and a 24-core CPU. CPU times on the 42 machines will probably be worse.
+- Every run is in `bench/results/` with its full configuration (chunking, retrieval, device).
 
 ---
 
-## 1. Embeddings (Fase 2, paso 3)
+## 1. Embeddings (Phase 2, step 3)
 
-Configuración común:
-- Tokenización `code_aware_tokens = "code"`.
-- Fusión RRF del reranker y reranker `ms-marco-MiniLM-L-6-v2`.
-- Embeddings en las dos ramas.
-- Se embeben los 37 381 chunks hijo (ruta + texto); la consulta, sin expandir y con el prefijo de cada modelo.
+Common configuration:
+- Tokenisation `code_aware_tokens = "code"`.
+- RRF fusion of the reranker, and the `ms-marco-MiniLM-L-6-v2` reranker.
+- Embeddings in both branches.
+- The 37,381 child chunks are embedded (path + text); the query, unexpanded and with each model's prefix.
 
-### 1.1 Recall oficial (datasets públicos de 42)
+### 1.1 Official recall (public 42 datasets)
 
-| Modelo | Parámetros | Dim. | Licencia | Docs R@1/@3/@5/@10 | Code R@1/@3/@5/@10 |
+| Model | Parameters | Dim. | License | Docs R@1/@3/@5/@10 | Code R@1/@3/@5/@10 |
 |---|---|---|---|---|---|
-| Sin embeddings (`36`) | — | — | — | 0.72 / 0.91 / **0.93** / 0.94 | 0.49 / 0.70 / 0.75 / 0.83 |
+| No embeddings (`36`) | — | — | — | 0.72 / 0.91 / **0.93** / 0.94 | 0.49 / 0.70 / 0.75 / 0.83 |
 | `intfloat/multilingual-e5-small` (`37`) | 118M | 384 | MIT | 0.70 / 0.89 / 0.92 / 0.93 | 0.48 / 0.70 / **0.79** / 0.84 |
 | **`BAAI/bge-m3`** (`40`) | 568M | 1024 | MIT | **0.75 / 0.92** / 0.92 / **0.94** | 0.52 / **0.71 / 0.79 / 0.86** |
 | `Qwen/Qwen3-Embedding-0.6B` (`41`) | 596M | 1024 | Apache 2.0 | 0.71 / 0.90 / 0.92 / 0.94 | **0.55** / 0.66 / **0.79** / 0.83 |
 
-**Variante `bge-m3` solo en la rama de code** (`42-bge-m3-code-branch-only`): docs 0.72 / 0.91 / 0.93 / 0.94 (igual que sin embeddings) y code igual que con embeddings en las dos ramas. Es decir, en docs los vectores cambian −0.01 de R@5 por +0.03 de R@1 y +0.01 de R@3. **Decisión (tuya): embeddings en las dos ramas**, por su valor multilingüe (§1.2).
+**Variant with `bge-m3` only in the code branch** (`42-bge-m3-code-branch-only`): docs 0.72 / 0.91 / 0.93 / 0.94 (the same as without embeddings), and code the same as with embeddings in both branches. In other words, on docs the vectors trade −0.01 of R@5 for +0.03 of R@1 and +0.01 of R@3. **Decision (the author's): embeddings in both branches**, for their multilingual value (§1.2).
 
-### 1.2 Multilingüe (20 preguntas, inglés frente a español)
+### 1.2 Multilingual (20 questions, English vs Spanish)
 
-| Modelo | Docs EN | **Docs ES** | Code EN | Code ES |
+| Model | Docs EN | **Docs ES** | Code EN | Code ES |
 |---|---|---|---|---|
-| Sin embeddings | 0.80 / 0.90 / 1.00 / 1.00 | **0.30 / 0.50 / 0.50 / 0.50** | 0.50 / 0.80 / 0.90 / 0.90 | 0.60 / 0.80 / 0.80 / 0.90 |
+| No embeddings | 0.80 / 0.90 / 1.00 / 1.00 | **0.30 / 0.50 / 0.50 / 0.50** | 0.50 / 0.80 / 0.90 / 0.90 | 0.60 / 0.80 / 0.80 / 0.90 |
 | `e5-small` | 0.90 / 0.90 / 1.00 / 1.00 | 0.40 / 0.60 / 0.70 / 0.70 | 0.40 / 0.80 / 0.90 / 0.90 | 0.50 / 0.80 / 0.80 / 0.90 |
 | `bge-m3` | 0.80 / 0.90 / 0.90 / 1.00 | 0.30 / 0.60 / 0.70 / **0.90** | 0.60 / 0.90 / 0.90 / 0.90 | 0.60 / 0.80 / 0.80 / 0.90 |
 | `Qwen3-Embedding-0.6B` | 0.70 / 0.90 / 0.90 / 1.00 | 0.30 / 0.70 / 0.80 / 0.90 | 0.70 / 0.80 / 0.90 / 0.90 | 0.70 / 0.80 / 0.80 / 0.80 |
 
-(Formato R@1 / R@3 / R@5 / R@10; ejecuciones `43-ml-*`.)
+(Format R@1 / R@3 / R@5 / R@10; runs `43-ml-*`.)
 
-- **Sin embeddings, una pregunta de docs en español pierde la mitad de los aciertos** (R@10: 1.00 → 0.50): BM25 compara palabras, y "adaptador" no coincide con "adapter".
-- Con `bge-m3` o Qwen3, docs en español vuelve a R@10 = 0.90.
-- Code apenas cambia con el idioma: las preguntas conservan los identificadores (`get_num_new_matched_tokens`…), que BM25 sigue encontrando.
-- Con 10 preguntas por set, una diferencia de 0.10 es **una sola pregunta**: Qwen3 y `bge-m3` están empatados en español.
+- **Without embeddings, a docs question in Spanish loses half of its hits** (R@10: 1.00 → 0.50): BM25 compares words, and "adaptador" does not match "adapter".
+- With `bge-m3` or Qwen3, docs in Spanish goes back to R@10 = 0.90.
+- Code barely changes with the language: the questions keep their identifiers (`get_num_new_matched_tokens`…), which BM25 still finds.
+- With 10 questions per set, a difference of 0.10 is **a single question**: Qwen3 and `bge-m3` are tied in Spanish.
 
-### 1.3 Velocidad
+### 1.3 Speed
 
-| Modelo | Embeber el corpus en **GPU** (medido) | Embeber en **CPU** (hijos/s) | Corpus en CPU (estimado) | Consulta en CPU |
+| Model | Embedding the corpus on **GPU** (measured) | Embedding on **CPU** (children/s) | Corpus on CPU (estimated) | Query on CPU |
 |---|---|---|---|---|
 | `e5-small` | 45 s | 47.9 | ~13 min | 17 ms |
 | `bge-m3` | 354 s | 5.0 | **~2 h** | 141 ms |
 | `Qwen3-Embedding-0.6B` | 222 s | 0.6 | **~19 h** | 797 ms |
 
-(CPU: muestra de 512 hijos reales; el corpus completo se extrapola a partir de ella.)
+(CPU: a sample of 512 real children; the full corpus is extrapolated from it.)
 
-### 1.4 Decisión
+### 1.4 Decision
 
-**`BAAI/bge-m3` por defecto.**
-- Es el mejor en el benchmark oficial con tu prioridad: code R@5 empata con los demás (0.79) y gana en R@10 (0.86 frente a 0.84 y 0.83), y docs tiene el mejor R@3.
-- Es multilingüe, con docs en español a 0.90 en R@10.
-- En CPU responde rápido (141 ms por consulta).
-- **Su coste:** indexar sin GPU lleva unas 2 h. Para máquinas sin GPU (42) existe el perfil opcional **`cpu-light`** (`e5-small`, ~13 min en CPU: `make index PROFILE=cpu-light`), o se puede indexar en una máquina con GPU y llevar el índice ya hecho (ver *Posibilidades*).
-- **Qwen3-Embedding-0.6B descartado:** no mejora a `bge-m3` en el benchmark oficial, empata en español y en CPU es inviable (19 h de indexado y 0,8 s por consulta).
+**`BAAI/bge-m3` by default.**
+- It is the best on the official benchmark with the project's priority: code R@5 ties with the others (0.79) and it wins on R@10 (0.86 vs 0.84 and 0.83), and docs has the best R@3.
+- It is multilingual, with Spanish docs at 0.90 R@10.
+- It answers quickly on a CPU (141 ms per query).
+- **Its cost:** indexing without a GPU takes about 2 h. For machines without a GPU (42) there is the optional **`cpu-light`** profile (`e5-small`, ~13 min on CPU: `make index PROFILE=cpu-light`), or the index can be built on a machine with a GPU and shipped ready-made.
+- **Qwen3-Embedding-0.6B discarded:** it does not beat `bge-m3` on the official benchmark, ties in Spanish, and is unworkable on a CPU (19 h of indexing and 0.8 s per query).
 
 ---
 
-## 2. Rerankers (Fase 2, paso 4)
+## 2. Rerankers (Phase 2, step 4)
 
-### 2.1 Latencia (34 candidatos reales por consulta)
+### 2.1 Latency (34 real candidates per query)
 
-| Reranker | Parámetros | Licencia | Multilingüe | GPU | CPU |
+| Reranker | Parameters | License | Multilingual | GPU | CPU |
 |---|---|---|---|---|---|
-| `cross-encoder/ms-marco-MiniLM-L-6-v2` (v1) | 23M | Apache 2.0 | no | 57 ms | 0,9 s |
-| `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | 118M | Apache 2.0 | sí | 97 ms | 1,8 s |
-| `BAAI/bge-reranker-v2-m3` | 568M | Apache 2.0 | sí | 1,1 s | **23 s** |
+| `cross-encoder/ms-marco-MiniLM-L-6-v2` (v1) | 23M | Apache 2.0 | no | 57 ms | 0.9 s |
+| `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | 118M | Apache 2.0 | yes | 97 ms | 1.8 s |
+| `BAAI/bge-reranker-v2-m3` | 568M | Apache 2.0 | yes | 1.1 s | **23 s** |
 
-- `jinaai/jina-reranker-v2-base-multilingual` se descarta por licencia (**CC-BY-NC-4.0**, no comercial).
-- `Qwen3-Reranker-0.6B` no se mide: necesita un adaptador propio (se usa como LM causal), es más pesado en CPU y solo compensaría con un beneficio muy alto. Queda en *Posibilidades*.
+- `jinaai/jina-reranker-v2-base-multilingual` is discarded for its license (**CC-BY-NC-4.0**, non-commercial).
+- `Qwen3-Reranker-0.6B` is not measured: it needs its own adapter (it is used as a causal LM), is heavier on a CPU, and would only pay off with a very large gain. It stays as a possibility.
 
-### 2.2 Recall oficial (con `bge-m3`, fusión RRF)
+### 2.2 Official recall (with `bge-m3`, RRF fusion)
 
-| Reranker | Rerank también en la rama de docs | Docs R@1/@3/@5/@10 | Code R@1/@3/@5/@10 |
+| Reranker | Also reranks the docs branch | Docs R@1/@3/@5/@10 | Code R@1/@3/@5/@10 |
 |---|---|---|---|
 | `ms-marco-MiniLM-L-6-v2` | no | 0.75 / **0.92 / 0.92** / 0.94 | 0.52 / 0.71 / 0.79 / 0.86 |
-| `ms-marco-MiniLM-L-6-v2` | sí | 0.71 / 0.89 / 0.91 / 0.92 | 0.52 / 0.71 / 0.79 / 0.86 |
+| `ms-marco-MiniLM-L-6-v2` | yes | 0.71 / 0.89 / 0.91 / 0.92 | 0.52 / 0.71 / 0.79 / 0.86 |
 | **`mmarco-mMiniLMv2-L12`** | no | 0.75 / 0.90 / 0.91 / 0.94 | 0.51 / **0.72 / 0.80 / 0.88** |
-| `mmarco-mMiniLMv2-L12` | sí | 0.70 / 0.88 / 0.90 / 0.93 | 0.51 / 0.72 / 0.80 / 0.88 |
-| `bge-reranker-v2-m3` (`46`, medido después) | no | **0.78 / 0.92** / 0.92 / 0.94 | 0.52 / **0.83 / 0.86** / 0.87 |
+| `mmarco-mMiniLMv2-L12` | yes | 0.70 / 0.88 / 0.90 / 0.93 | 0.51 / 0.72 / 0.80 / 0.88 |
+| `bge-reranker-v2-m3` (`46`, measured later) | no | **0.78 / 0.92** / 0.92 / 0.94 | 0.52 / **0.83 / 0.86** / 0.87 |
 
-- **Reranquear la rama de docs sigue perjudicando** con los dos rerankers (−0.01 a −0.02 en R@5), así que se queda desactivado (`rerank_doc_branch = false`), como en la v1.
-- **`bge-reranker-v2-m3`:** la primera medición se detuvo por falta de memoria del sistema (Claude Code paró el proceso con la sesión inactiva). **Relanzada a petición tuya, en primer plano:**
-  - **Resultado:** code R@5 +0.06 (0.80 → 0.86) y R@3 +0.11, con R@10 −0.01; docs R@1 +0.02 y R@3 +0.01.
-  - **Coste:** 439 s el dataset de code (~4,4 s por pregunta en GPU), frente a 15 s con `mmarco`; ~23 s por consulta en CPU.
-  - **Memoria:** pico de memoria comprometida de 39,1 GB sobre 67,9 GB; no estuvo cerca del límite. El proceso añade unos 16 GB a la carga del sistema.
-  - **Decisión:** disponible como perfil opcional `gpu-quality` (`make bench PROFILE=gpu-quality`); la base sigue con `mmarco`.
+- **Reranking the docs branch still hurts** with both rerankers (−0.01 to −0.02 on R@5), so it stays disabled (`rerank_doc_branch = false`), as in v1.
+- **`bge-reranker-v2-m3`:** the first measurement stopped because the system ran out of memory (Claude Code stopped the process while the session was idle). **Relaunched at the author's request, in the foreground:**
+  - **Result:** code R@5 +0.06 (0.80 → 0.86) and R@3 +0.11, with R@10 −0.01; docs R@1 +0.02 and R@3 +0.01.
+  - **Cost:** 439 s for the code dataset (~4.4 s per question on GPU), against 15 s with `mmarco`; ~23 s per query on CPU.
+  - **Memory:** a peak of 39.1 GB of committed memory out of 67.9 GB; it was not close to the limit. The process adds about 16 GB to the system load.
+  - **Decision:** available as the optional `gpu-quality` profile (`make bench PROFILE=gpu-quality`); the base stays with `mmarco`.
 
-### 2.3 Multilingüe (20 preguntas, con `bge-m3`)
+### 2.3 Multilingual (20 questions, with `bge-m3`)
 
 | Reranker | Docs ES | Code ES | Docs EN | Code EN |
 |---|---|---|---|---|
-| `ms-marco` (solo inglés) | 0.30 / 0.60 / 0.70 / 0.90 | 0.60 / 0.80 / 0.80 / 0.90 | 0.80 / 0.90 / 0.90 / 1.00 | 0.60 / 0.90 / 0.90 / 0.90 |
-| **`mmarco` (multilingüe)** | **0.60 / 0.90 / 0.90 / 0.90** | 0.50 / 0.70 / 0.80 / 0.90 | 0.80 / 0.90 / 0.90 / 1.00 | 0.50 / 0.70 / 0.80 / 0.90 |
+| `ms-marco` (English only) | 0.30 / 0.60 / 0.70 / 0.90 | 0.60 / 0.80 / 0.80 / 0.90 | 0.80 / 0.90 / 0.90 / 1.00 | 0.60 / 0.90 / 0.90 / 0.90 |
+| **`mmarco` (multilingual)** | **0.60 / 0.90 / 0.90 / 0.90** | 0.50 / 0.70 / 0.80 / 0.90 | 0.80 / 0.90 / 0.90 / 1.00 | 0.50 / 0.70 / 0.80 / 0.90 |
 
-**Hallazgo:** la rama de docs no usa reranker, así que si el reranker cambia docs en español es porque **esas preguntas se enviaban a la rama de code** (ver §3).
+**Finding:** the docs branch uses no reranker, so if the reranker changes docs in Spanish, it is because **those questions were being sent to the code branch** (see §3).
 
-### 2.4 Decisión
+### 2.4 Decision
 
-**`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` por defecto.**
-- En el benchmark oficial empata con `ms-marco` en R@5 (+0.01 en code, −0.01 en docs) y gana en R@10 (code +0.02). Pierde 0.02 en R@3 de docs.
-- En español mejora mucho docs (R@5 0.70 → 0.90).
-- Cuesta el doble que `ms-marco` (97 ms frente a 57 ms en GPU, 1,8 s frente a 0,9 s en CPU), y sigue siendo viable en CPU.
+**`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` by default.**
+- On the official benchmark it ties with `ms-marco` on R@5 (+0.01 on code, −0.01 on docs) and wins on R@10 (code +0.02). It loses 0.02 on docs R@3.
+- In Spanish it improves docs a lot (R@5 0.70 → 0.90).
+- It costs twice as much as `ms-marco` (97 ms vs 57 ms on GPU, 1.8 s vs 0.9 s on CPU), and is still workable on a CPU.
 
 ---
 
-## 3. Clasificador doc/code (Fase 2, paso 5)
+## 3. Docs/code classifier (Phase 2, step 5)
 
-El clasificador léxico decide la rama (docs o code) comparando las puntuaciones BM25 de los dos índices más unas señales de vocabulario.
+The lexical classifier picks the branch (docs or code) by comparing the BM25 scores of the two indices plus some vocabulary signals.
 
-### 3.1 Errores de enrutado
+### 3.1 Routing errors
 
-| Configuración | Docs oficial → code | Code oficial → docs | Docs ES → code | Code ES → docs |
+| Configuration | Official docs → code | Official code → docs | Docs ES → code | Code ES → docs |
 |---|---|---|---|---|
-| v1 (señales solo en inglés, sin limpiar puntuación) | 25/100 | 1/100 | **10/10** | 0/10 |
-| + limpieza de puntuación (incl. `¿¡`) | 23/100 | 1/100 | 10/10 | 0/10 |
-| **+ señales en español** (por defecto) | **23/100** | **1/100** | **8/10** | **0/10** |
-| señales de docs ×2 (peso 1.0) | 18/100 | 7/100 | 7/10 | 1/10 |
-| señales de docs ×3 (peso 1.5) | 11/100 | 17/100 | 5/10 | 1/10 |
-| señales ×2 + margen 1.5 | 8/100 | 19/100 | 5/10 | 1/10 |
+| v1 (English-only signals, punctuation not stripped) | 25/100 | 1/100 | **10/10** | 0/10 |
+| + punctuation stripping (incl. `¿¡`) | 23/100 | 1/100 | 10/10 | 0/10 |
+| **+ Spanish signals** (default) | **23/100** | **1/100** | **8/10** | **0/10** |
+| docs signals ×2 (weight 1.0) | 18/100 | 7/100 | 7/10 | 1/10 |
+| docs signals ×3 (weight 1.5) | 11/100 | 17/100 | 5/10 | 1/10 |
+| signals ×2 + margin 1.5 | 8/100 | 19/100 | 5/10 | 1/10 |
 
-### 3.2 Recall oficial
+### 3.2 Official recall
 
-| Configuración | Docs R@1/@3/@5/@10 | Code R@1/@3/@5/@10 |
+| Configuration | Docs R@1/@3/@5/@10 | Code R@1/@3/@5/@10 |
 |---|---|---|
 | v1 (`47-defaults`) | 0.75 / 0.90 / 0.91 / 0.94 | 0.51 / 0.72 / 0.80 / 0.88 |
-| **+ español + puntuación** (`48-cls-w0.5-m0.5`) | **0.76 / 0.91 / 0.92** / 0.94 | 0.51 / 0.72 / 0.80 / 0.88 |
-| señales ×2 (`48-cls-w1.0-m0.5`) | 0.76 / 0.91 / 0.92 / 0.94 | 0.47 / 0.68 / 0.76 / 0.84 |
-| señales ×3 (`48-cls-w1.5-m0.5`) | 0.77 / 0.91 / 0.93 / 0.95 | 0.42 / 0.61 / 0.68 / 0.75 |
-| señales ×2 + margen 1.5 (`48-cls-w1.0-m1.5`) | 0.77 / 0.91 / 0.93 / 0.95 | 0.41 / 0.59 / 0.66 / 0.73 |
+| **+ Spanish + punctuation** (`48-cls-w0.5-m0.5`) | **0.76 / 0.91 / 0.92** / 0.94 | 0.51 / 0.72 / 0.80 / 0.88 |
+| signals ×2 (`48-cls-w1.0-m0.5`) | 0.76 / 0.91 / 0.92 / 0.94 | 0.47 / 0.68 / 0.76 / 0.84 |
+| signals ×3 (`48-cls-w1.5-m0.5`) | 0.77 / 0.91 / 0.93 / 0.95 | 0.42 / 0.61 / 0.68 / 0.75 |
+| signals ×2 + margin 1.5 (`48-cls-w1.0-m1.5`) | 0.77 / 0.91 / 0.93 / 0.95 | 0.41 / 0.59 / 0.66 / 0.73 |
 
-### 3.3 Decisión
+### 3.3 Decision
 
-- **Señales en español + limpieza de puntuación: adoptadas.** Son una mejora estricta en el benchmark oficial (docs +0.01 en R@1, R@3 y R@5; code idéntico).
-- **Pesos y margen: sin cambios.** Cada pregunta de docs que se deja de mandar a code se paga con preguntas de code mal enrutadas, y code se hunde (R@5 hasta 0.66).
-- ⚠️ **En el set en español**, docs pierde una pregunta en R@3 y R@5 (0.90 → 0.80): las señales mandan dos preguntas a la rama de docs, que no tiene reranker, y una sale peor allí. El benchmark de referencia es el oficial (D4).
-- El clasificador léxico está en su límite. Un clasificador semántico (por ejemplo, con los embeddings ya calculados) queda como mejora futura.
+- **Spanish signals + punctuation stripping: adopted.** They are a strict improvement on the official benchmark (docs +0.01 on R@1, R@3 and R@5; code identical).
+- **Weights and margin: unchanged.** Every docs question no longer sent to code is paid for with misrouted code questions, and code collapses (R@5 down to 0.66).
+- ⚠️ **On the Spanish set**, docs loses one question on R@3 and R@5 (0.90 → 0.80): the signals send two questions to the docs branch, which has no reranker, and one does worse there. The reference benchmark is the official one (D4).
+- The lexical classifier is at its limit. A semantic classifier (for example, with the embeddings already computed) remains a future improvement.
 
 ---
 
-## 4. Estado final de la Fase 2 (`49-fase2-final`)
+## 4. Final state of Phase 2 (`49-fase2-final`)
 
 | Set | Docs R@1/@3/@5/@10 | Code R@1/@3/@5/@10 |
 |---|---|---|
-| **Oficial (42), ruta smart** | **0.76 / 0.91 / 0.92 / 0.94** | **0.51 / 0.72 / 0.80 / 0.88** |
-| Oficial, ruta generation (web) | 0.76 / 0.91 / 0.92 / 0.94 | 0.51 / 0.72 / 0.80 / 0.88 |
-| Inglés (20) | 0.80 / 0.90 / 0.90 / 1.00 | 0.50 / 0.70 / 0.80 / 0.90 |
-| Español (20) | 0.60 / 0.80 / 0.80 / 0.90 | 0.50 / 0.70 / 0.80 / 0.90 |
+| **Official (42), smart path** | **0.76 / 0.91 / 0.92 / 0.94** | **0.51 / 0.72 / 0.80 / 0.88** |
+| Official, generation path (web) | 0.76 / 0.91 / 0.92 / 0.94 | 0.51 / 0.72 / 0.80 / 0.88 |
+| English (20) | 0.80 / 0.90 / 0.90 / 1.00 | 0.50 / 0.70 / 0.80 / 0.90 |
+| Spanish (20) | 0.60 / 0.80 / 0.80 / 0.90 | 0.50 / 0.70 / 0.80 / 0.90 |
 
-**Evolución en la ruta oficial:**
+**Evolution on the official path:**
 
 | | Docs R@5 | Docs R@10 | Code R@5 | Code R@10 |
 |---|---|---|---|---|
-| v1 (Fase 0, línea base) | 0.85 | 0.85 | 0.64 | 0.72 |
-| Fin de la Fase 1 | 0.87 | 0.89 | 0.64 | 0.71 |
-| **Fin de la Fase 2** | **0.92** | **0.94** | **0.80** | **0.88** |
+| v1 (Phase 0, baseline) | 0.85 | 0.85 | 0.64 | 0.72 |
+| End of Phase 1 | 0.87 | 0.89 | 0.64 | 0.71 |
+| **End of Phase 2** | **0.92** | **0.94** | **0.80** | **0.88** |
 
-**Configuración por defecto:** BM25 code-aware (`code`) + `bge-m3` (en las dos ramas) + reranker `mmarco-mMiniLMv2-L12` con fusión RRF, el reranker siempre activo en la rama de code y clasificador con señales en inglés y español.
+**Default configuration:** code-aware BM25 (`code`) + `bge-m3` (in both branches) + the `mmarco-mMiniLMv2-L12` reranker with RRF fusion, the reranker always on in the code branch, and a classifier with English and Spanish signals.
 
 ---
 
-## 5. Generación: comparativa de LLMs (Fase 3)
+## 5. Generation: comparison of LLMs (Phase 3)
 
-**Condiciones comunes:**
-- La recuperación por defecto (`bge-m3` + `mmarco` + filtro de relevancia) y el mismo prompt (v3a), k = 5, decodificación greedy y 150 tokens de salida.
-- **`gen-bench` con 25 preguntas** de cada dataset oficial, las 20 del set en español y las 40 fuera de dominio.
-- **Juez:** `openai/gpt-oss-120b` vía Groq, nota 0–2 frente a la respuesta de referencia de 42, sobre **10 respuestas por set**. Cada respuesta mueve la media del set en 0.1–0.2: solo las diferencias grandes son fiables.
-- Ejecuciones `10-llm-*` en `bench/results/gen/` y `bench/results/judge/`.
+**Common conditions:**
+- The default retrieval (`bge-m3` + `mmarco` + relevance gate) and the same prompt (v3a), k = 5, greedy decoding and 150 output tokens.
+- **`gen-bench` with 25 questions** from each official dataset, the 20 of the Spanish set and the 40 out-of-domain ones.
+- **Judge:** `openai/gpt-oss-120b` through Groq, a 0–2 score against the 42 reference answer, on **10 answers per set**. Each answer moves the set's average by 0.1–0.2: only large differences are reliable.
+- Runs `10-llm-*` in `bench/results/gen/` and `bench/results/judge/`.
 
-| Modelo | Juez (media 0–2) | F1 docs / code | Falsos "no encontrado" en code | s/respuesta (docs / code, GPU) | Descarga | Licencia |
+| Model | Judge (mean 0–2) | F1 docs / code | False "not found" on code | s/answer (docs / code, GPU) | Download | License |
 |---|---|---|---|---|---|---|
 | **Qwen3-0.6B** (base) | 1.25 | 0.471 / 0.450 | 0.12 | 3.9 / 2.7 | ~1.2 GB | Apache 2.0 |
 | Qwen3-1.7B | 1.53 | 0.497 / 0.494 | 0.08 | 4.0 / 3.1 | ~4 GB | Apache 2.0 |
 | Qwen3-4B | **1.60** | **0.575 / 0.498** | **0.04** | 5.1 / 4.8 * | ~8 GB | Apache 2.0 |
 | Phi-4-mini (3.8B) | 1.45 | 0.492 / 0.426 | 0.12 | 3.8 / 2.7 | ~7.7 GB | MIT |
-| SmolLM3-3B (descartado) | 1.45 | 0.368 / 0.353 | 0.24 | 5.4 / 3.0 | ~6 GB | Apache 2.0 |
+| SmolLM3-3B (discarded) | 1.45 | 0.368 / 0.353 | 0.24 | 5.4 / 3.0 | ~6 GB | Apache 2.0 |
 
-\* Qwen3-4B no cabe en 12 GB de GPU junto con `bge-m3` y el reranker: su perfil ejecuta la recuperación en CPU (mismos resultados, más latencia).
+\* Qwen3-4B does not fit in a 12 GB GPU together with `bge-m3` and the reranker: its profile runs retrieval on the CPU (same results, more latency).
 
-**Juez por set (0–2):**
+**Judge per set (0–2):**
 
-| Modelo | Docs EN | Code EN | Docs ES | Code ES |
+| Model | Docs EN | Code EN | Docs ES | Code ES |
 |---|---|---|---|---|
 | Qwen3-0.6B | 1.00 | 1.20 | 1.70 | 1.10 |
 | Qwen3-1.7B | 1.30 | 1.30 | 1.90 | 1.60 |
@@ -197,112 +199,112 @@ El clasificador léxico decide la rama (docs o code) comparando las puntuaciones
 | Phi-4-mini | 1.40 | 1.20 | 1.80 | 1.40 |
 | SmolLM3-3B | 1.10 | 1.30 | 1.60 | 1.80 |
 
-**Otros resultados:**
-- Todos responden en el idioma de la pregunta (90–100 %) y rechazan el 100 % de las preguntas claramente ajenas (el filtro va antes del LLM).
-- En las "casi del dominio" en español, Qwen3-4B (0.90) y Phi-4-mini (0.80) rechazan mejor que la base (0.70).
+**Other results:**
+- All of them answer in the language of the question (90–100%) and reject 100% of the clearly unrelated questions (the gate runs before the LLM).
+- On the "almost in-domain" questions in Spanish, Qwen3-4B (0.90) and Phi-4-mini (0.80) reject better than the base (0.70).
 
-**Decisión (tuya):**
-- **Familia Qwen3 completa:** 0.6B (base, obligatoria), y 1.7B y 4B como perfiles.
-- **Phi-4-mini** como alternativa de otra familia.
-- **SmolLM3-3B descartado:** el F1 más bajo y el doble de falsos rechazos en code que la base.
-- **Qué modelo se recomienda en la web:** se decide en la Fase 6.
-- **Velocidad en CPU de los opcionales: no medida.** Por tamaño, los de 3–4B serán bastante más lentos sin GPU.
+**Decision (the author's):**
+- **The whole Qwen3 family:** 0.6B (the base, mandatory), and 1.7B and 4B as profiles.
+- **Phi-4-mini** as an alternative from another family.
+- **SmolLM3-3B discarded:** the lowest F1 and twice as many false rejections on code as the base.
+- **Which model the web recommends:** decided in Phase 6.
+- **CPU speed of the optional models: not measured.** Given their size, the 3–4B ones will be much slower without a GPU.
 
 ---
 
-## 6. Cultura general: XQuAD en/es (Fase 4a)
+## 6. General knowledge: XQuAD en/es (Phase 4a)
 
-Las mismas 1 190 preguntas, en inglés y en español, sobre un dominio mixto (`xquad`: 48 artículos de Wikipedia × 2 idiomas, indexados juntos). La fuente correcta es el fragmento exacto de la respuesta en el fichero del idioma de la pregunta. `search_smart`, k = 10.
+The same 1,190 questions, in English and in Spanish, over a mixed domain (`xquad`: 48 Wikipedia articles × 2 languages, indexed together). The correct source is the exact answer span in the file of the question's language. `search_smart`, k = 10.
 
-| Configuración | EN @1/@3/@5/@10 | ES @1/@3/@5/@10 | Tiempo EN/ES (s) |
+| Configuration | EN @1/@3/@5/@10 | ES @1/@3/@5/@10 | Time EN/ES (s) |
 |---|---|---|---|
-| BM25 solo | 0.92 / 0.97 / 0.98 / 0.99 | 0.88 / 0.97 / 0.98 / 0.99 | 0 / 0 |
+| BM25 only | 0.92 / 0.97 / 0.98 / 0.99 | 0.88 / 0.97 / 0.98 / 0.99 | 0 / 0 |
 | **Base (BM25 + `bge-m3`)** | **0.95 / 0.99 / 0.99 / 1.00** | **0.92 / 0.99 / 0.99 / 1.00** | 42 / 49 |
-| Base + reranker en la rama doc | 0.95 / 0.99 / 1.00 / 1.00 | 0.94 / 0.99 / 1.00 / 1.00 | 189 / 194 |
+| Base + reranker in the doc branch | 0.95 / 0.99 / 1.00 / 1.00 | 0.94 / 0.99 / 1.00 / 1.00 | 189 / 194 |
 
-**Lectura:**
-- **Corpus casi saturado:** a partir de R@3 todas las configuraciones superan 0.97. XQuAD sirve para medir el multilingüismo, no para elegir entre configuraciones (para eso, MLQA).
-- **Diferencia EN–ES de ~3 puntos en R@1:** en 32 preguntas en español el primer resultado es el mismo artículo en inglés (en 14 en el caso contrario). Es una respuesta correcta en el idioma equivocado.
-- **El reranker en la rama doc no se adopta:** +0.02 en R@1 en español a cambio de 4× más tiempo, y en vLLM empeoraba los docs.
+**Reading:**
+- **A nearly saturated corpus:** from R@3 on, every configuration is above 0.97. XQuAD measures multilinguality, not which configuration to choose (MLQA would be for that).
+- **A ~3-point EN–ES gap on R@1:** for 32 Spanish questions the first result is the same article in English (14 the other way round). It is a correct answer in the wrong language.
+- **The reranker in the doc branch is not adopted:** +0.02 on R@1 in Spanish for 4× the time, and on vLLM it made docs worse.
 
-### 6.1 Router sin filtro (`44-router-base`)
+### 6.1 Router without a filter (`44-router-base`)
 
-Cada pregunta se busca en **todos** los dominios indexados (`vllm`, `xquad`). Gana el dominio cuya mejor fuente (entre sus 5 primeras) tiene la puntuación más alta del cross-encoder, que es la misma señal que el filtro fuera de dominio (B15).
+Every question is searched in **all** the indexed domains (`vllm`, `xquad`). The winning domain is the one whose best source (among its top 5) gets the highest cross-encoder score, the same signal as the out-of-domain gate (B15).
 
-| Set | Preguntas | Al dominio correcto | Recall @1/@3/@5/@10 con el router |
+| Set | Questions | To the right domain | Recall @1/@3/@5/@10 with the router |
 |---|---|---|---|
-| 42 docs | 100 | **1.000** | 0.76 / 0.91 / 0.92 / 0.94 (igual que con el dominio fijado) |
-| 42 code | 100 | **1.000** | 0.51 / 0.72 / 0.80 / 0.88 (igual) |
-| Complemento ES docs / code | 10 / 10 | 1.000 / 1.000 | 0.60 / 0.80 / 0.80 / 0.90 · 0.50 / 0.70 / 0.80 / 0.90 |
-| XQuAD EN | 1 190 | **0.982** | 0.94 / 0.97 / 0.98 / 0.98 (frente a 0.95 / 0.99 / 0.99 / 1.00) |
-| XQuAD ES | 1 190 | **0.978** | 0.91 / 0.97 / 0.97 / 0.98 (frente a 0.92 / 0.99 / 0.99 / 1.00) |
+| 42 docs | 100 | **1.000** | 0.76 / 0.91 / 0.92 / 0.94 (the same as with the domain fixed) |
+| 42 code | 100 | **1.000** | 0.51 / 0.72 / 0.80 / 0.88 (the same) |
+| Complementary ES docs / code | 10 / 10 | 1.000 / 1.000 | 0.60 / 0.80 / 0.80 / 0.90 · 0.50 / 0.70 / 0.80 / 0.90 |
+| XQuAD EN | 1,190 | **0.982** | 0.94 / 0.97 / 0.98 / 0.98 (vs 0.95 / 0.99 / 0.99 / 1.00) |
+| XQuAD ES | 1,190 | **0.978** | 0.91 / 0.97 / 0.97 / 0.98 (vs 0.92 / 0.99 / 0.99 / 1.00) |
 
-**Lectura:**
-- **Ninguna pregunta de 42 se desvía.** El benchmark oficial sigue fijando `vllm`, así que sus cifras no dependen del router.
-- **El 2 % de XQuAD que acaba en vLLM** son preguntas que, fuera de contexto, son ambiguas o suenan técnicas. Por ejemplo, *"In the article's title, what did the machine hope to end?"*, *"What is one way in which graphs can be encoded?"* o *"What are stators attached to?"*. Es el coste de no filtrar; con el filtro del dominio, el recall vuelve al de §6.
-- **Coste:** cada pregunta se busca en los dos dominios y se puntúan 10 pares con el cross-encoder.
+**Reading:**
+- **No 42 question goes astray.** The official benchmark still fixes `vllm`, so its numbers do not depend on the router.
+- **The 2% of XQuAD that ends up in vLLM** are questions that, out of context, are ambiguous or sound technical. For example, *"In the article's title, what did the machine hope to end?"*, *"What is one way in which graphs can be encoded?"* or *"What are stators attached to?"*. That is the cost of not filtering; with the domain filter, recall goes back to that of §6.
+- **Cost:** every question is searched in both domains and 10 pairs are scored with the cross-encoder.
 
-### 6.2 Generación sobre XQuAD (Qwen3-0.6B, k = 5, 1 190 preguntas por idioma)
+### 6.2 Generation over XQuAD (Qwen3-0.6B, k = 5, 1,190 questions per language)
 
-Las respuestas de referencia de XQuAD son fragmentos cortos (por ejemplo, "308") y el modelo contesta con frases completas, así que el F1 penaliza cada palabra de más. La métrica principal es **"contiene la respuesta"**: si la referencia normalizada aparece dentro de la respuesta.
+XQuAD's reference answers are short spans (for example, "308") and the model answers with full sentences, so F1 penalises every extra word. The main metric is **"contains the answer"**: whether the normalised reference appears inside the answer.
 
-| Configuración | Contiene EN / ES | "No encontrado" EN / ES | Descartadas por el filtro EN / ES | F1 EN / ES |
+| Configuration | Contains EN / ES | "Not found" EN / ES | Dropped by the gate EN / ES | F1 EN / ES |
 |---|---|---|---|---|
-| Umbral global 0.0 (`20-xquad-base`) | 0.59 / 0.51 | 0.22 / 0.19 | 0.17 / 0.19 | 0.152 / 0.149 |
-| **Umbral propio −2.0 (`22-xquad-gate-2`)** | **0.65 / 0.57** | **0.13 / 0.08** | **0.07 / 0.07** | 0.167 / 0.169 |
+| Global threshold 0.0 (`20-xquad-base`) | 0.59 / 0.51 | 0.22 / 0.19 | 0.17 / 0.19 | 0.152 / 0.149 |
+| **Own threshold −2.0 (`22-xquad-gate-2`)** | **0.65 / 0.57** | **0.13 / 0.08** | **0.07 / 0.07** | 0.167 / 0.169 |
 
-- **El filtro fuera de dominio estaba calibrado solo para vLLM.** Con el umbral propio de XQuAD (calibrado con `gate_scores`; caso completo en `changelog/FASE_4.md` §1.2) se recuperan 6 puntos sin dejar pasar ninguna pregunta ajena.
-- **Citas e idioma:** cita la fuente correcta en el 99 % de las respuestas y contesta en el idioma de la pregunta en el 98–99 %.
-- **Lo que falta es de generación:**
-  - En inglés, un 6 % de rechazos con la respuesta en el contexto.
-  - En español, la respuesta se recoge peor (0.62 frente a 0.74 entre las que contesta).
-- **Tiempo:** 1.4–2.5 s por respuesta, el 96 % en generación. Las iteraciones usan un subconjunto fijo de 300 preguntas por idioma (~20 min, ±2 puntos frente al completo).
+- **The out-of-domain gate was calibrated for vLLM only.** With XQuAD's own threshold (calibrated with `gate_scores`; the full case is in `changelog/FASE_4.md` §1.2), 6 points are recovered without letting any unrelated question through.
+- **Citations and language:** the right source is cited in 99% of the answers, and they are in the question's language in 98–99%.
+- **What is missing is on the generation side:**
+  - In English, 6% of refusals with the answer in the context.
+  - In Spanish, the answer is picked up less well (0.62 vs 0.74 among the questions it answers).
+- **Time:** 1.4–2.5 s per answer, 96% of it in generation. Iterations use a fixed subset of 300 questions per language (~20 min, ±2 points against the full set).
 
 ---
 
-## 7. Modo CV (Fase 4b)
+## 7. CV mode (Phase 4b)
 
-Corpus: CV (`.docx`, inglés), perfil de LinkedIn (`.pdf`, español) y biografía (español + versión en inglés). Benchmark propio: 30 preguntas iguales en inglés y en español, más 10 sobre ti sin respuesta en los datos (contacto privado, temas reservados, datos que faltan). Qwen3-0.6B.
+Corpus: the CV (`.docx`, English), the LinkedIn profile (`.pdf`, Spanish) and the biography (Spanish + an English version). Own benchmark: the same 30 questions in English and Spanish, plus 10 about the author with no answer in the data (private contact, reserved topics, missing data). Qwen3-0.6B.
 
-| Ejecución | Cambio | Contiene EN / ES | Cita la correcta EN / ES | Sin dato bien resuelto EN / ES | Fugas |
+| Run | Change | Contains EN / ES | Cites the right one EN / ES | Missing data handled well EN / ES | Leaks |
 |---|---|---|---|---|---|
-| `30-cv-base` | primera versión | 0.50 / 0.57 | 0.57 / 0.88 | 9/10 · 7/10 | 0 |
-| `31`–`31b` | prompt del CV + patrones de "no encontrado" | 0.40 / 0.67 | 0.30 / 0.77 | — | 0 |
-| `32-cv-k8` | 8 fuentes | 0.53 / 0.57 | 0.38 / 0.77 | 10/10 · 9/10 | 0 |
-| `33-cv-chunks800` | chunks de 800 / 400 | 0.50 / 0.67 | 0.64 / 0.96 | 9/10 · 9/10 | 0 |
-| `34` | umbral −3.0 | 0.57 / 0.70 | 0.62 / 0.92 | 9/10 · 9/10 | 0 |
-| **`35-cv-bio-en`** | **biografía en inglés + regla de contacto** | **0.73 / 0.80** | 0.73 / 0.89 | **10/10 · 9/10** | **0** |
-| `36` (descartado) | regla "no respondas sí/no" | 0.60 / 0.73 | 0.74 / 0.89 | 10/10 · 9/10 | 0 |
+| `30-cv-base` | first version | 0.50 / 0.57 | 0.57 / 0.88 | 9/10 · 7/10 | 0 |
+| `31`–`31b` | CV prompt + "not found" patterns | 0.40 / 0.67 | 0.30 / 0.77 | — | 0 |
+| `32-cv-k8` | 8 sources | 0.53 / 0.57 | 0.38 / 0.77 | 10/10 · 9/10 | 0 |
+| `33-cv-chunks800` | chunks of 800 / 400 | 0.50 / 0.67 | 0.64 / 0.96 | 9/10 · 9/10 | 0 |
+| `34` | threshold −3.0 | 0.57 / 0.70 | 0.62 / 0.92 | 9/10 · 9/10 | 0 |
+| **`35-cv-bio-en`** | **English biography + contact rule** | **0.73 / 0.80** | 0.73 / 0.89 | **10/10 · 9/10** | **0** |
+| `36` (discarded) | "do not answer yes/no" rule | 0.60 / 0.73 | 0.74 / 0.89 | 10/10 · 9/10 | 0 |
 
-- **Recuperación EN con la biografía en inglés:** de 0.13 / 0.43 / 0.57 / 0.70 a **0.47 / 0.80 / 0.93 / 0.97**. ES: 0.70 / 0.83 / 0.97 / 1.00.
-- **Umbral del filtro fuera de dominio:** −3.0. Pasa el 93 % de las válidas (EN/ES) y ninguna pregunta fuera de dominio.
-- **Router con 3 dominios** (`46-router-cv`): el 100 % de las preguntas de 42 y del CV llegan a su dominio; XQuAD, el 98 %.
-- **Las mayores ganancias vienen de los datos** (la versión en inglés) y del **tamaño del chunk** (menos mezcla de trabajos). Las reglas de prompt arreglan casos concretos (los temas reservados, el contacto), pero con un modelo de 0.6B cada regla de más puede costar aciertos (`36`).
+- **EN retrieval with the English biography:** from 0.13 / 0.43 / 0.57 / 0.70 to **0.47 / 0.80 / 0.93 / 0.97**. ES: 0.70 / 0.83 / 0.97 / 1.00.
+- **Out-of-domain gate threshold:** −3.0. It lets 93% of the valid questions through (EN/ES) and no out-of-domain question.
+- **Router with 3 domains** (`46-router-cv`): 100% of the 42 and CV questions reach their domain; XQuAD, 98%.
+- **The biggest gains come from the data** (the English version) and from the **chunk size** (less mixing of jobs). Prompt rules fix specific cases (reserved topics, the contact), but with a 0.6B model every extra rule can cost correct answers (`36`).
 
 ---
 
-## 8. Agente frente a acceso directo (Fase 5)
+## 8. Agent vs direct access (Phase 5)
 
-`make agent-bench` (`src/evaluation/agent_bench.py`): cada pregunta se responde con el agente y con el flujo directo, con el mismo LLM (el del perfil) y `k = 5`. Sets:
-- **Conversaciones:** 12 diálogos (12 primeras preguntas + 18 seguimientos que dependen de los turnos anteriores).
+`make agent-bench` (`src/evaluation/agent_bench.py`): every question is answered with the agent and with the direct pipeline, with the same LLM (the profile's) and `k = 5`. Sets:
+- **Conversations:** 12 dialogues (12 first questions + 18 follow-ups that depend on the earlier turns).
 - **CV:** 30 + 30 (EN/ES).
-- **XQuAD:** 50 + 50, muestra fija.
+- **XQuAD:** 50 + 50, a fixed sample.
 - **vLLM:** 25 docs + 25 code.
 
-En vLLM la métrica útil es el F1 (las respuestas de 42 son frases largas, así que "contiene la respuesta" sale ~0 en los dos modos).
+On vLLM the useful metric is F1 (the 42 answers are long sentences, so "contains the answer" is ~0 in both modes).
 
-**Dos rondas:**
-- **`01-agent-*`:** el agente tal como salió del diseño (§4 de `changelog/FASE_5.md`).
-- **`02-agent-nets-*`:** con las dos redes de seguridad (`docs/decisions.md`, DEC-03):
-  1. Si las consultas del modelo no encuentran nada, se busca la pregunta original.
-  2. Si el modelo restringió dominios y no encontró nada, se repite dentro del filtro del usuario (sin filtro, en todos), nunca fuera.
+**Two rounds:**
+- **`01-agent-*`:** the agent as it came out of the design (§4 of `changelog/FASE_5.md`).
+- **`02-agent-nets-*`:** with the two safety nets (`decisions.md`, DEC-03):
+  1. If the model's queries find nothing, the original question is searched.
+  2. If the model restricted the domains and found nothing, the search is repeated within the user's filter (no filter: in all of them), never outside it.
 
-### 8.1 Contiene la respuesta, agente / directo
+### 8.1 Contains the answer, agent / direct
 
 | Set | 0.6B r1 | **0.6B r2** | 1.7B r1 | 1.7B r2 | 4B r1 | 4B r2 | Phi-4-mini r1 | Phi-4-mini r2 |
 |---|---|---|---|---|---|---|---|---|
-| Conversaciones: 1.ª pregunta | 1.00 / 1.00 | **1.00 / 1.00** | 0.83 / 0.92 | 0.92 / 0.92 | 0.92 / 0.92 | 0.92 / 0.92 | 0.83 / 0.92 | 0.83 / 0.92 |
-| **Conversaciones: seguimientos** | 0.44 / 0.33 | **0.78 / 0.33** | 0.28 / 0.33 | **0.83** / 0.33 | 0.89 / 0.39 | **1.00** / 0.39 | 0.78 / 0.33 | 0.78 / 0.33 |
+| Conversations: 1st question | 1.00 / 1.00 | **1.00 / 1.00** | 0.83 / 0.92 | 0.92 / 0.92 | 0.92 / 0.92 | 0.92 / 0.92 | 0.83 / 0.92 | 0.83 / 0.92 |
+| **Conversations: follow-ups** | 0.44 / 0.33 | **0.78 / 0.33** | 0.28 / 0.33 | **0.83** / 0.33 | 0.89 / 0.39 | **1.00** / 0.39 | 0.78 / 0.33 | 0.78 / 0.33 |
 | CV EN | 0.70 / 0.73 | 0.70 / 0.73 | 0.80 / 0.90 | 0.90 / 0.90 | 0.80 / 0.90 | 0.87 / 0.90 | 0.83 / 0.87 | 0.83 / 0.87 |
 | CV ES | 0.80 / 0.80 | 0.80 / 0.80 | 0.73 / 0.90 | 0.87 / 0.90 | 0.87 / 0.93 | 0.90 / 0.93 | 0.90 / 0.90 | 0.90 / 0.90 |
 | XQuAD EN | 0.50 / 0.62 | 0.58 / 0.62 | 0.46 / 0.78 | 0.76 / 0.78 | 0.80 / 0.78 | 0.80 / 0.78 | 0.72 / 0.74 | 0.74 / 0.74 |
@@ -310,42 +312,42 @@ En vLLM la métrica útil es el F1 (las respuestas de 42 son frases largas, así
 | vLLM docs (F1) | 0.52 / 0.52 | 0.52 / 0.52 | 0.51 / 0.51 | 0.51 / 0.51 | 0.58 / 0.57 | 0.58 / 0.57 | 0.43 / 0.46 | 0.45 / 0.46 |
 | vLLM code (F1) | 0.43 / 0.44 | 0.43 / 0.44 | 0.51 / 0.51 | 0.51 / 0.51 | 0.50 / 0.50 | 0.50 / 0.50 | 0.45 / 0.42 | 0.45 / 0.42 |
 
-Los valores del modo directo no cambian entre rondas (el flujo directo no se ha tocado), lo que confirma que la comparación es justa.
+The direct-mode values do not change between rounds (the direct pipeline was not touched), which confirms that the comparison is fair.
 
-### 8.2 "No encontrado", latencia y uso de las redes (ronda 2)
+### 8.2 "Not found", latency and use of the nets (round 2)
 
-| Modelo | "No encontrado" en seguimientos, agente / directo | s/respuesta, agente / directo (1.ª preg. · seguim. · XQuAD EN) | Redes usadas (seguim. · XQuAD EN · CV EN) |
+| Model | "Not found" on follow-ups, agent / direct | s/answer, agent / direct (1st q. · follow-ups · XQuAD EN) | Nets used (follow-ups · XQuAD EN · CV EN) |
 |---|---|---|---|
-| **Qwen3-0.6B** | **0.11 / 0.50** | 3.4/1.6 · 4.3/1.0 · 3.5/1.6 | 39 % · 24 % · 7 % |
-| Qwen3-1.7B | 0.06 / 0.50 | 3.1/1.5 · 4.1/1.3 · 3.2/1.5 | 56 % · 42 % · 17 % |
-| Qwen3-4B | 0.00 / 0.44 | 6.0/3.5 · 7.2/3.6 · 6.7/4.1 | 11 % · 8 % · 10 % |
-| Phi-4-mini | 0.17 / 0.50 | 3.4/2.5 · 5.7/1.7 · 5.3/2.3 | 6 % · 12 % · 3 % |
+| **Qwen3-0.6B** | **0.11 / 0.50** | 3.4/1.6 · 4.3/1.0 · 3.5/1.6 | 39% · 24% · 7% |
+| Qwen3-1.7B | 0.06 / 0.50 | 3.1/1.5 · 4.1/1.3 · 3.2/1.5 | 56% · 42% · 17% |
+| Qwen3-4B | 0.00 / 0.44 | 6.0/3.5 · 7.2/3.6 · 6.7/4.1 | 11% · 8% · 10% |
+| Phi-4-mini | 0.17 / 0.50 | 3.4/2.5 · 5.7/1.7 · 5.3/2.3 | 6% · 12% · 3% |
 
-Tiempos en la 3080 Ti; en la CPU del Space serán varias veces mayores.
+Times on the 3080 Ti; on the Space's CPU they will be several times longer.
 
-⚠️ **La columna "tool calls" de la tabla de consola cambia de significado en la ronda 2.** En la ronda 1 contaba las respuestas con al menos una llamada válida a la herramienta. En la ronda 2 cuenta las que **no** acabaron en el plan B determinista, que ahora también se usa cuando las búsquedas del modelo y la red 1 no encuentran nada. Por eso baja (0.6B: de 1.00 a 0.67 en seguimientos) sin que el modelo llame peor a la herramienta. La métrica que mide las redes es `safety_net_rate` (en los JSON).
+⚠️ **The "tool calls" column of the console table changes meaning in round 2.** In round 1 it counted the answers with at least one valid tool call. In round 2 it counts those that did **not** end in the deterministic fallback, which is now also used when the model's searches and net 1 find nothing. That is why it drops (0.6B: from 1.00 to 0.67 on follow-ups) without the model calling the tool any worse. The metric that measures the nets is `safety_net_rate` (in the JSON files).
 
-### 8.3 Lectura
+### 8.3 Reading
 
-- **El agente gana donde tiene que ganar: en los seguimientos.** Sin memoria, "¿Y en qué año?" no se puede responder (directo: 0.33, con un 50 % de "no encontrado"). Con el agente, Qwen3-0.6B llega a **0.78** y Qwen3-4B, a **1.00**.
-- **Las redes de seguridad arreglan lo que el agente perdía en preguntas sueltas.** En la ronda 1, el 0.6B y el 1.7B perdían en XQuAD (hasta −0.32 con el 1.7B) porque sus reescrituras en palabras sueltas no pasaban el filtro de relevancia, o porque restringían mal el dominio. En la ronda 2 el agente queda **a la par del directo (±0.04)** en todos los sets de preguntas sueltas con los cuatro modelos. Con el 1.7B, los seguimientos pasan de 0.28 a 0.83.
-- **El filtro del usuario se respeta siempre** (test `test_user_filter_is_never_exceeded`): los reintentos de la red 2 nunca salen de él.
-- **vLLM:** el agente no aporta ni quita (F1 igual); son preguntas autocontenidas.
-- **Coste:** el agente añade 1–3 s por respuesta con los modelos pequeños (una llamada de planificación y otra para decir DONE) y ~3 s con el 4B.
-- **Qué modelo desplegar** (propuesta, a decidir contigo):
-  - **Qwen3-0.6B**, la base (`PLANING.md`): con las redes, el agente ya no pierde frente al directo, mejora mucho los seguimientos y es el más ligero para la CPU gratuita del Space.
-  - **Qwen3-1.7B** es el candidato claro si la CPU lo aguanta: misma latencia en GPU y mejor en CV (0.90 / 0.87 frente a 0.70 / 0.80) y XQuAD EN (0.76 frente a 0.58). Su latencia en la CPU del Space **no está medida**.
-  - **Qwen3-4B** es el mejor agente (1.00 en seguimientos), pero tarda ~2× en GPU. En CPU previsiblemente sería demasiado lento para una web (sin medir).
-  - **Phi-4-mini** no compensa: llamadas a la herramienta menos fiables (44 % en XQuAD ES) y peor F1 en vLLM docs.
+- **The agent wins where it has to win: on follow-ups.** Without memory, "And in which year?" cannot be answered (direct: 0.33, with 50% "not found"). With the agent, Qwen3-0.6B reaches **0.78** and Qwen3-4B, **1.00**.
+- **The safety nets fix what the agent was losing on single questions.** In round 1, the 0.6B and the 1.7B lost on XQuAD (up to −0.32 with the 1.7B), because their keyword-style rewrites did not pass the relevance gate or because they restricted the domain wrongly. In round 2 the agent is **on a par with direct mode (±0.04)** on every set of single questions with all four models. With the 1.7B, follow-ups go from 0.28 to 0.83.
+- **The user's filter is always respected** (test `test_user_filter_is_never_exceeded`): net 2's retries never go beyond it.
+- **vLLM:** the agent neither adds nor takes away (same F1); these are self-contained questions.
+- **Cost:** the agent adds 1–3 s per answer with the small models (one planning call and another to say DONE) and ~3 s with the 4B.
+- **Which model to deploy** (proposal, to be decided with the author):
+  - **Qwen3-0.6B**, the base (`PLANING.md`): with the nets, the agent no longer loses against direct mode, it improves follow-ups a lot, and it is the lightest for the Space's free CPU.
+  - **Qwen3-1.7B** is the clear candidate if the CPU can take it: the same latency on GPU and better on the CV (0.90 / 0.87 vs 0.70 / 0.80) and XQuAD EN (0.76 vs 0.58). Its latency on the Space's CPU **has not been measured**.
+  - **Qwen3-4B** is the best agent (1.00 on follow-ups), but takes ~2× on GPU. On a CPU it would foreseeably be too slow for a website (not measured).
+  - **Phi-4-mini** is not worth it: less reliable tool calls (44% on XQuAD ES) and a worse F1 on vLLM docs.
 
-### 8.4 Latencia en la CPU del despliegue (Fase 6)
+### 8.4 Latency on the deployment CPU (Phase 6)
 
-Imagen del Space en local con los límites del plan gratuito simulados (`docker run --cpus=2 --memory=16g`), Qwen3-0.6B y 4 preguntas (CV, seguimiento, vLLM y XQuAD). Detalle en `changelog/FASE_6.md` §6.
+The Space image run locally with the free tier's limits simulated (`docker run --cpus=2 --memory=16g`), Qwen3-0.6B and 4 questions (CV, a follow-up, vLLM and XQuAD). Details in `changelog/FASE_6.md` §6.
 
-| Modo | Primer token | Respuesta completa |
+| Mode | First token | Full answer |
 |---|---|---|
-| Directo | 9.6–17.5 s | 14.3–24.0 s |
-| Agente | 18.2–27.5 s | 22.0–31.7 s |
+| Direct | 9.6–17.5 s | 14.3–24.0 s |
+| Agent | 18.2–27.5 s | 22.0–31.7 s |
 
-- **Con los hilos de torch sin ajustar** (12 hilos sobre 2 vCPU), todo era ~3.5× más lento: 48–88 s directo y 84–123 s con el agente. Se ajustan en `entrypoint.sh` (DEC-17).
-- **En CPU, el agente cuesta ~8 s más por respuesta.** En la 3080 Ti eran ~2 s.
+- **With torch's threads left unadjusted** (12 threads on 2 vCPUs), everything was ~3.5× slower: 48–88 s direct and 84–123 s with the agent. They are adjusted in `entrypoint.sh` (DEC-17).
+- **On a CPU, the agent costs ~8 s more per answer.** On the 3080 Ti it was ~2 s.

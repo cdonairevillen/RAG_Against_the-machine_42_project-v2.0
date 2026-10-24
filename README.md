@@ -98,7 +98,7 @@ question ──► agent (optional) ──► router ──► per-domain retrie
 
 ### Agent and MCP
 
-- **The agent is the default path**, as in production RAG systems; the direct pipeline is one switch away.
+- **The agent is the default path in the CLI**, as in production RAG systems. In the web it is opt-in for now (marked as work in progress), because with small models its conversation memory can mix in earlier topics.
   - It keeps a **session-only memory** of the conversation (nothing is stored).
   - It rewrites follow-up questions into complete ones and searches with **native tool calls**: Qwen's `<tool_call>` format, Phi-4-mini's tools in the system message, or a prompt format for other models. Up to 3 searches per question.
   - **Safety nets:** if the rewrite finds nothing, it searches the original question; if the model's domain choice finds nothing, it retries within the user's filter, never outside it. A deterministic fallback covers models that do not call the tool.
@@ -112,7 +112,7 @@ question ──► agent (optional) ──► router ──► per-domain retrie
 FastAPI backend and React (Vite + TypeScript) frontend, in the visual style of the original Streamlit app:
 
 - **Chat** with streaming answers. Only the conversation scrolls, and a **Stop** button really stops the generation on the server.
-- **Domain filters** (`vllm`, `xquad`, `cv`), an **agent / direct** switch, and pickers for the **model** and the **depth** (how many sources the LLM reads: 3, 5 or 10).
+- **Domain filters** (`vllm`, `xquad`, `cv`), an **agent / direct** switch (direct by default; the agent is a work in progress), and pickers for the **model** and the **depth** (how many sources the LLM reads: 3, 5 or 10).
 - **Sources:** the domain that answered, with its sources in a carousel and the full masked text on demand; the other searched domains are folded in one line, with their router scores.
 - **Retrieval metrics** read from the latest benchmark runs.
 - Optional **example questions** for the active filters.
@@ -163,7 +163,7 @@ Optional models: `PROFILE=llm-qwen3-1.7b` (or `llm-qwen3-4b`, `llm-phi4-mini`) f
 
 ```bash
 make bench                     # official 42 recall (docs and code)
-make bench SUITE=xquad         # other suites: xquad, cv, en, es
+make bench SUITE=xquad         # other suites: xquad, cv, en, es, about
 make gen-bench SUITE=xquad     # answer quality (fixed 300-question subset; FULL=1 for all)
 make agent-bench               # agent vs direct
 make route-bench               # router accuracy
@@ -204,7 +204,8 @@ src/
 web/            React frontend
 deploy/space/   Hugging Face Space image
 bench/          versioned datasets and every benchmark result
-docs/           roadmap, phase changelogs, benchmark report, decisions
+docs/           roadmap, phase changelogs, benchmark report, decisions (English)
+docs/es/        the same documents in Spanish, the working version, plus this README
 rag.toml        configuration: sources, models and optional profiles
 ```
 
@@ -219,6 +220,8 @@ Every pipeline piece (chunker, embeddings, reranker, LLM, agent on or off) is ch
 - [`docs/changelog/`](docs/changelog/): what changed in each phase, why, and what it affects.
 - [`docs/decisions.md`](docs/decisions.md): decisions taken along the way, with the options considered.
 
+The documents were written in Spanish while the project was built; the originals are in [`docs/es/`](docs/es/), and the English versions are updated at the end of each phase. Spanish version of this README: [`docs/es/README.md`](docs/es/README.md).
+
 ---
 
 ## Credits
@@ -230,7 +233,7 @@ Every pipeline piece (chunker, embeddings, reranker, LLM, agent on or off) is ch
 
 ### AI usage
 
-Version 2.0 was updated together with Claude (Anthropic), and reviewed and designed by hand by Chrystian. The project rules are in [`docs/PLANING.md`](docs/PLANING.md): measure every change, document every phase, and leave every decision to the author.
+Version 2.0 was updated together with Claude (Anthropic), and reviewed and designed by hand by Chrystian. The project rules are in [`docs/es/PLANING.md`](docs/es/PLANING.md) (in Spanish): measure every change, document every phase, and leave every decision to the author.
 
 ---
 

@@ -101,8 +101,11 @@ API_MODELS ?= default,llm-qwen3-1.7b,llm-phi4-mini
 # tokens, so 1024 is only a safety net against loops; the Stop button cuts
 # them and a capped answer is trimmed at its last sentence.
 API_MAX_TOKENS ?= 1024
+# API_DOMAINS: the domains the web serves (empty: every indexed one).
+# "about" (Phase 7a) stays out until its threshold and routing are checked.
+API_DOMAINS ?= vllm,xquad,cv
 api: db-up
-	RAG_API_MODELS=$(API_MODELS) RAG_GENERATION_MAX_NEW_TOKENS=$(API_MAX_TOKENS) \
+	RAG_API_DOMAINS=$(API_DOMAINS) RAG_API_MODELS=$(API_MODELS) RAG_GENERATION_MAX_NEW_TOKENS=$(API_MAX_TOKENS) \
 		$(ENV) $(UV) run --project . $(PY) -m src.api
 
 # React web in development (Vite, http://localhost:5173, talks to make api).

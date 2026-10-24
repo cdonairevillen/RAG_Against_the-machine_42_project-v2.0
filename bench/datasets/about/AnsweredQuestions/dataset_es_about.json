@@ -1,0 +1,220 @@
+{
+  "rag_questions": [
+    {
+      "question_id": "about-01",
+      "question": "¿Qué es RAG against the Machine?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 315,
+          "last_character_index": 441
+        }
+      ],
+      "answer": "Retrieval-Augmented Generation"
+    },
+    {
+      "question_id": "about-02",
+      "question": "¿Qué modelo de lenguaje usa el proyecto por defecto?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 887,
+          "last_character_index": 963
+        }
+      ],
+      "answer": "Qwen3-0.6B"
+    },
+    {
+      "question_id": "about-03",
+      "question": "¿Qué modelo de embeddings usa la recuperación?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 5318,
+          "last_character_index": 5481
+        }
+      ],
+      "answer": "bge-m3"
+    },
+    {
+      "question_id": "about-04",
+      "question": "¿Qué reranker usa el proyecto?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 5514,
+          "last_character_index": 5619
+        }
+      ],
+      "answer": "mmarco-mMiniLMv2-L12-H384-v1"
+    },
+    {
+      "question_id": "about-05",
+      "question": "¿Qué base de datos guarda los chunks y sus vectores?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 4883,
+          "last_character_index": 4980
+        }
+      ],
+      "answer": "Qdrant"
+    },
+    {
+      "question_id": "about-06",
+      "question": "¿Cómo elige el router qué dominio responde una pregunta?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 5904,
+          "last_character_index": 6035
+        }
+      ],
+      "answer": "cross-encoder"
+    },
+    {
+      "question_id": "about-07",
+      "question": "¿Cuánto mejoró el recall en el benchmark oficial de 42?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 2286,
+          "last_character_index": 2335
+        }
+      ],
+      "answer": "0.17"
+    },
+    {
+      "question_id": "about-08",
+      "question": "¿Recuerda el agente la conversación?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 7370,
+          "last_character_index": 7449
+        }
+      ],
+      "answer": "sesión"
+    },
+    {
+      "question_id": "about-09",
+      "question": "¿Cómo se divide el código Python en chunks?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 4536,
+          "last_character_index": 4597
+        }
+      ],
+      "answer": "ast"
+    },
+    {
+      "question_id": "about-10",
+      "question": "¿Qué herramientas expone el servidor MCP?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 8155,
+          "last_character_index": 8224
+        }
+      ],
+      "answer": "list_domains"
+    },
+    {
+      "question_id": "about-11",
+      "question": "¿Dónde se despliega el proyecto?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 11548,
+          "last_character_index": 11640
+        }
+      ],
+      "answer": "Hugging Face"
+    },
+    {
+      "question_id": "about-12",
+      "question": "¿Bajo qué licencia se publica el proyecto?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 14826,
+          "last_character_index": 14925
+        }
+      ],
+      "answer": "MIT"
+    },
+    {
+      "question_id": "about-13",
+      "question": "¿Cuándo cuenta como acierto una fuente recuperada en la evaluación de 42?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 1862,
+          "last_character_index": 1969
+        }
+      ],
+      "answer": "5%"
+    },
+    {
+      "question_id": "about-14",
+      "question": "¿Qué bases de datos se compararon antes de elegir Qdrant?",
+      "sources": [
+        {
+          "file_path": "docs/es/ROADMAP.md",
+          "first_character_index": 39605,
+          "last_character_index": 39693
+        }
+      ],
+      "answer": "pgvector"
+    },
+    {
+      "question_id": "about-15",
+      "question": "¿Por qué la rama de documentación no usa el reranker?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 5686,
+          "last_character_index": 5804
+        }
+      ],
+      "answer": "empeor"
+    },
+    {
+      "question_id": "about-16",
+      "question": "¿Qué función lista los ficheros de una fuente antes de indexarlos?",
+      "sources": [
+        {
+          "file_path": "src/rag/ingestion/pipeline.py",
+          "first_character_index": 600,
+          "last_character_index": 655
+        }
+      ],
+      "answer": "walk_source"
+    },
+    {
+      "question_id": "about-17",
+      "question": "¿Cómo detiene la generación el botón Stop de la web?",
+      "sources": [
+        {
+          "file_path": "src/rag/generator.py",
+          "first_character_index": 14228,
+          "last_character_index": 14263
+        }
+      ],
+      "answer": "cancel"
+    },
+    {
+      "question_id": "about-18",
+      "question": "¿Qué hace el agente si su consulta reescrita no encuentra nada?",
+      "sources": [
+        {
+          "file_path": "docs/es/README.md",
+          "first_character_index": 7764,
+          "last_character_index": 7827
+        }
+      ],
+      "answer": "pregunta original"
+    }
+  ]
+}

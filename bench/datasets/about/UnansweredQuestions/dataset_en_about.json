@@ -1,0 +1,76 @@
+{
+  "rag_questions": [
+    {
+      "question_id": "about-01",
+      "question": "What is RAG against the Machine?"
+    },
+    {
+      "question_id": "about-02",
+      "question": "Which language model does the project use by default?"
+    },
+    {
+      "question_id": "about-03",
+      "question": "Which embedding model does the retrieval use?"
+    },
+    {
+      "question_id": "about-04",
+      "question": "Which reranker does the project use?"
+    },
+    {
+      "question_id": "about-05",
+      "question": "Which database stores the chunks and their vectors?"
+    },
+    {
+      "question_id": "about-06",
+      "question": "How does the router choose which domain answers a question?"
+    },
+    {
+      "question_id": "about-07",
+      "question": "How much did recall improve on the official 42 benchmark?"
+    },
+    {
+      "question_id": "about-08",
+      "question": "Does the agent remember the conversation?"
+    },
+    {
+      "question_id": "about-09",
+      "question": "How is the Python code split into chunks?"
+    },
+    {
+      "question_id": "about-10",
+      "question": "Which tools does the MCP server expose?"
+    },
+    {
+      "question_id": "about-11",
+      "question": "Where is the project deployed?"
+    },
+    {
+      "question_id": "about-12",
+      "question": "Under which license is the project released?"
+    },
+    {
+      "question_id": "about-13",
+      "question": "When does a retrieved source count as a hit in the 42 evaluation?"
+    },
+    {
+      "question_id": "about-14",
+      "question": "Which databases were compared before choosing Qdrant?"
+    },
+    {
+      "question_id": "about-15",
+      "question": "Why does the docs branch skip the reranker?"
+    },
+    {
+      "question_id": "about-16",
+      "question": "Which function lists the files of a source before indexing them?"
+    },
+    {
+      "question_id": "about-17",
+      "question": "How does the web's Stop button stop the generation?"
+    },
+    {
+      "question_id": "about-18",
+      "question": "What does the agent do if its rewritten query finds nothing?"
+    }
+  ]
+}

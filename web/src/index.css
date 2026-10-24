@@ -343,3 +343,22 @@ footer a { color: #888; }
 /* Recall cards: a soft red glow on the left edge, only to lift them off
    the background. */
 .col-right .metric-card { border-left-color: rgba(255, 59, 59, 0.35); box-shadow: -4px 0 12px -6px rgba(255, 59, 59, 0.45); }
+
+/* Agent switch: a work-in-progress note floats under it */
+.agent-toggle { position: relative; margin-left: auto; }
+.agent-toggle .switch { margin-left: 0; }
+.wip-note {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 5;
+  width: 280px;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  line-height: 1.5;
+  color: #d9a441;
+  background: #17130a;
+  border: 1px solid #3d3215;
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+}

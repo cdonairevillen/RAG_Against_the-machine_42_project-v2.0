@@ -32,6 +32,12 @@ def walk_source(source: SourceConfig) -> Iterator[str]:
     """
     include = set(source.include)
     exclude = set(source.exclude_dirs)
+    excluded_paths = [p.strip("/") for p in source.exclude_paths]
+
+    def excluded(rel_path: str) -> bool:
+        return any(rel_path == p or rel_path.startswith(p + "/")
+                   for p in excluded_paths)
+
     for dirpath, dirnames, filenames in os.walk(source.root):
         dirnames[:] = [
             d for d in dirnames
@@ -42,12 +48,10 @@ def walk_source(source: SourceConfig) -> Iterator[str]:
             if ext not in include:
                 continue
             abs_path = os.path.join(dirpath, filename)
-            rel_parts = set(
-                os.path.relpath(abs_path, source.root)
-                .replace("\\", "/")
-                .split("/")
-            )
-            if not rel_parts.intersection(exclude):
+            rel_path = (os.path.relpath(abs_path, source.root)
+                        .replace("\\", "/"))
+            if not set(rel_path.split("/")).intersection(exclude) \
+                    and not excluded(rel_path):
                 yield abs_path
 
 

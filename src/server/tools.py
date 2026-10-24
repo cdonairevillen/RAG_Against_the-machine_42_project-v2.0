@@ -38,10 +38,12 @@ class RagTools:
 
     @classmethod
     def load(cls, config: Optional[RagConfig] = None,
-             generator: Optional[Generator] = None) -> "RagTools":
-        """Load the router over every indexed domain (with reranker)."""
+             generator: Optional[Generator] = None,
+             domains: Optional[str | Sequence[str]] = None) -> "RagTools":
+        """Load the router (with reranker) over the given domains, or
+        over every indexed domain."""
         config = config or get_config()
-        return cls(DomainRouter.from_store(config=config), config,
+        return cls(DomainRouter.from_store(domains, config=config), config,
                    generator)
 
     def get_pipeline(self) -> RagPipeline:

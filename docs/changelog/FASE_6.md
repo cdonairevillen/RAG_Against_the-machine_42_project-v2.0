@@ -1,307 +1,308 @@
-# CHANGELOG — Fase 6: Web y despliegue
+# CHANGELOG — Phase 6: Web and deployment
 
-**Estado:** preparada y probada en local **hasta el punto de despliegue** (tu encargo). Falta lo que depende de tus cuentas: crear el dataset privado y el Space en Hugging Face, poner los secretos y, si quieres, lanzar GitHub Pages. Los pasos están en `deploy/README.md`.
+> English translation of [`../es/changelog/FASE_6.md`](../es/changelog/FASE_6.md), the working version.
 
-Hecho de forma autónoma durante la noche del 2026-10-23/24. Las decisiones que tomé sin consultarte están en **`docs/decisions.md`** (DEC-04 a DEC-16), con las opciones y por qué elegí cada una.
+**Status:** prepared and tested locally **up to the point of deployment** (the author's brief). What depends on the author's accounts is left: creating the private dataset and the Space on Hugging Face, setting the secrets and, optionally, launching GitHub Pages. The steps are in `deploy/README.md`.
 
-**Sin commitear.** El último commit es el checkpoint `680f21a`.
+Done autonomously during the night of 2026-10-23/24. The decisions taken without consulting the author are in **`decisions.md`** (DEC-04 to DEC-16), with the options and why each one was chosen.
+
+**Commit:** `3378494` ("Phase 6: Frontend and deployment"), after the reviews in §6b–6g. Deployment on Hugging Face is pending the author's accounts.
 
 ---
 
-## 1. Arquitectura
+## 1. Architecture
 
 ```
-navegador ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) ──► router + retrievers + generador
+browser ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) ──► router + retrievers + generator
    │              │                         ▲
-   │              ├── /chat ── Agent (src/agent) por sesión ─┘   (o flujo directo)
-   │              └── sirve web/dist (React) en "/"
-   └── React (web/), la misma estética que src/web.py
+   │              ├── /chat ── Agent (src/agent) per session ─┘   (or the direct pipeline)
+   │              └── serves web/dist (React) at "/"
+   └── React (web/), the same look as src/web.py
 ```
 
-- **La API es una capa fina sobre las mismas herramientas** que usan la CLI y el servidor MCP (`RagTools`). No hay lógica de RAG nueva: el agente y el flujo directo son los de la Fase 5.
-- **Una sola URL:** la API sirve también la web compilada. GitHub Pages queda como opción (DEC-08).
-- **Despliegue:** un Hugging Face Space (Docker, CPU gratuito) con Qdrant dentro del contenedor. El índice llega en un bundle desde un dataset **privado** de HF (DEC-09, por privacidad).
+- **The API is a thin layer over the same tools** the CLI and the MCP server use (`RagTools`). There is no new RAG logic: the agent and the direct pipeline are Phase 5's.
+- **A single URL:** the API also serves the built web. GitHub Pages stays as an option (DEC-08).
+- **Deployment:** a Hugging Face Space (Docker, free CPU) with Qdrant inside the container. The index arrives in a bundle from a **private** HF dataset (DEC-09, for privacy).
 
 ## 2. Backend: `src/api/`
 
-| Endpoint | Qué hace |
+| Endpoint | What it does |
 |---|---|
-| `GET /health` | `{"status": "ok", "loaded": bool}`. Los modelos se cargan en segundo plano al arrancar, así que la web puede mostrar "cargando" en vez de colgarse. |
-| `GET /config` | Modelo, perfil, dominios (con descripción y número de chunks), modos (`demo`, `cv`), agente por defecto y `k`. |
-| `POST /chat` | **Streaming SSE** (DEC-04). Eventos: `token` (cada trozo de texto), `done` (respuesta, fuentes, `session_id`, dominio y traza) y `error`. |
-| `POST /chat/reset` | Olvida la conversación de una sesión. |
-| `POST /search` | Búsqueda sin generación (la herramienta `search` del MCP). |
-| `GET /sources/{chunk_id}` | El texto completo de una fuente, **enmascarado**. 404 si no existe. |
-| `GET /metrics` | Recalls del último `bench` de cada suite y el último `agent-bench`, leídos de `bench/results/` (para las barras de la web). |
+| `GET /health` | `{"status": "ok", "loaded": bool}`. The models are loaded in the background at startup, so the web can show "loading" instead of hanging. |
+| `GET /config` | Model, profile, domains (with description and number of chunks), modes (`demo`, `cv`), the agent default and `k`. |
+| `POST /chat` | **SSE streaming** (DEC-04). Events: `token` (each piece of text), `done` (answer, sources, `session_id`, domain and trace) and `error`. |
+| `POST /chat/reset` | Forgets a session's conversation. |
+| `POST /search` | Search without generation (the MCP `search` tool). |
+| `GET /sources/{chunk_id}` | The full text of a source, **masked**. 404 if it does not exist. |
+| `GET /metrics` | The recall of the latest `bench` of each suite and the latest `agent-bench`, read from `bench/results/` (for the web's bars). |
 
-**Petición de `/chat`:**
+**`/chat` request:**
 ```json
-{"message": "...", "session_id": "opcional", "agent": true, "mode": "demo|cv", "domains": ["vllm"]}
+{"message": "...", "session_id": "optional", "agent": true, "mode": "demo|cv", "domains": ["vllm"]}
 ```
-- **`agent`** es el interruptor "With agent / Direct RAG" (petición tuya). Por defecto, `true` (D7).
-- **`mode: "cv"`** fija el filtro en `["cv"]`. En `demo`, `domains` filtra (los desconocidos se ignoran); sin filtro, busca en todos.
-- **`message`**: de 1 a 1 000 caracteres (422 fuera de ese rango).
+- **`agent`** is the "With agent / Direct RAG" switch (the author's request). By default, `true` (D7).
+- **`mode: "cv"`** fixes the filter to `["cv"]`. In `demo`, `domains` filters (unknown ones are ignored); without a filter, it searches all of them.
+- **`message`**: from 1 to 1,000 characters (422 outside that range).
 
-**Detalles:**
-- **Sesiones** (DEC-05): un `Agent` por `session_id` (lo genera el servidor), en memoria, con un máximo de 500 sesiones y 30 min de inactividad. No se guarda nada en disco.
-- **Una generación a la vez** (DEC-06): un candado serializa las llamadas al LLM.
-- **Fuentes:** índice `[n]`, dominio, ruta corta (`docs/x.md` en vez de `data/raw/vllm-0.10.1/docs/x.md`), offsets, una vista previa enmascarada de 400 caracteres y el **crédito CC-BY-SA** en las de XQuAD.
-- **CORS:** `RAG_ALLOWED_ORIGINS` (por ejemplo, la URL de Pages). Sin la variable, se permite cualquier origen.
-- **Ejecución:** `make api` (`python -m src.api`, uvicorn en `127.0.0.1:8000`).
+**Details:**
+- **Sessions** (DEC-05): one `Agent` per `session_id` (generated by the server), in memory, with at most 500 sessions and 30 min of inactivity. Nothing is stored on disk.
+- **One generation at a time** (DEC-06): a lock serialises the calls to the LLM.
+- **Sources:** `[n]` index, domain, a short path (`docs/x.md` instead of `data/raw/vllm-0.10.1/docs/x.md`), offsets, a masked 400-character preview, and the **CC-BY-SA credit** on the XQuAD ones.
+- **CORS:** `RAG_ALLOWED_ORIGINS` (for example, the Pages URL). Without the variable, any origin is allowed.
+- **Running it:** `make api` (`python -m src.api`, uvicorn on `127.0.0.1:8000`).
 
 ## 3. Frontend: `web/` (Vite 6 + React 19 + TypeScript)
 
-- **La misma estética que `src/web.py`** (D5): fondo `#0a0a0a`, acento `#ff3b3b`, JetBrains Mono + Inter, tarjetas de fuentes y barras de recall. CSS propio, sin librería de componentes (DEC-07).
-- **Pestañas de modo:** *Demo* (todos los dominios, con chips para filtrar) y *CV* (solo el CV).
-- **Interruptor** "With agent (memory)" / "Direct RAG".
-- **Conversación** con *streaming*. Cada respuesta muestra:
-  - Una línea de traza: dominio y modo, más las consultas reescritas y las redes usadas en modo agente.
-  - Tarjetas de fuentes plegables, con "show full source" (`/sources/{id}`).
-- **Panel de métricas** con los recalls de `/metrics`. Un indicador de estado consulta `/health` mientras cargan los modelos.
-- **Pie:** GitHub, el correo público (`cdonairevillen@gmail.com`, el único contacto que se muestra) y el crédito de XQuAD.
-- **Interfaz en inglés** (DEC-07); las respuestas siguen el idioma de la pregunta.
-- **URL de la API:** `VITE_API_URL`. En desarrollo, `http://127.0.0.1:8000`; compilada, la misma URL que la sirve.
-- **Comandos:** `make web-dev` (Vite en `:5173`) y `make web-build` (`web/dist`, 232 KB de JS / 73 KB comprimido). `npm run lint` pasa.
+- **The same look as `src/web.py`** (D5): `#0a0a0a` background, `#ff3b3b` accent, JetBrains Mono + Inter, source cards and recall bars. Hand-written CSS, no component library (DEC-07).
+- **Mode tabs:** *Demo* (every domain, with chips to filter) and *CV* (the CV only).
+- **Switch** "With agent (memory)" / "Direct RAG".
+- **Conversation** with *streaming*. Each answer shows:
+  - A trace line: domain and mode, plus the rewritten queries and the nets used in agent mode.
+  - Foldable source cards, with "show full source" (`/sources/{id}`).
+- **Metrics panel** with the recall from `/metrics`. A status indicator polls `/health` while the models load.
+- **Footer:** GitHub, the public email (`cdonairevillen@gmail.com`, the only contact shown) and the XQuAD credit.
+- **English interface** (DEC-07); answers follow the question's language.
+- **API URL:** `VITE_API_URL`. In development, `http://127.0.0.1:8000`; built, the same URL that serves it.
+- **Commands:** `make web-dev` (Vite on `:5173`) and `make web-build` (`web/dist`, 232 KB of JS / 73 KB compressed). `npm run lint` passes.
 
-## 4. Despliegue
+## 4. Deployment
 
-| Pieza | Fichero | Qué hace |
+| Piece | File | What it does |
 |---|---|---|
-| **Bundle del índice** | `src/deploy/bundle.py` (`make bundle`) | **Export:** snapshot de cada colección por la API HTTP de Qdrant (crear, descargar y borrar del servidor), más una copia de `data/processed/<dominio>` (BM25 y chunks) y un `bundle.json` con el SHA256 de cada fichero. **Restore** (`bundle_restore`): comprueba los SHA256, sube cada snapshot a `/collections/{c}/snapshots/upload` y copia BM25. |
-| **Imagen del Space** | `deploy/space/Dockerfile` | Binario de Qdrant v1.19.1 (la misma versión que `docker-compose.yml`, DEC-10), `python:3.12-slim`, `uv sync --frozen --no-dev` (DEC-11), modelos descargados al construir (DEC-12), usuario uid 1000 y puerto 7860. |
-| **Contexto de build** | `deploy/space/Dockerfile.dockerignore` | Lista blanca: `data/` (con el CV), `.venv` y `node_modules` nunca salen de la máquina (DEC-16). |
-| **Arranque** | `deploy/space/entrypoint.sh` | Qdrant (almacenamiento en `/tmp`), el bundle (montado en local o descargado de `RAG_BUNDLE_REPO` con `HF_TOKEN`), `bundle_restore` y la API. |
-| **Ficha del Space** | `deploy/space/README.md` | Metadatos del Space (Docker, puerto 7860) y descripción. Sin licencia (DEC-14). |
-| **Contenido del Space** | `make space-stage` | `deploy/stage/`: el Dockerfile en la raíz y solo el código necesario, listo para hacer `push` al git del Space. |
-| **Prueba local** | `make space-build`, `make space-run` | La imagen, y su ejecución en `:7860` con `deploy/bundle` montado. |
-| **GitHub Pages** | `.github/workflows/pages.yml` | **Manual** (`workflow_dispatch`): compila la web con `VITE_API_URL = vars.RAG_API_URL` y la publica. |
-| **Guía** | `deploy/README.md` | Paso a paso, en español. |
+| **Index bundle** | `src/deploy/bundle.py` (`make bundle`) | **Export:** a snapshot of each collection through Qdrant's HTTP API (create, download and delete it from the server), plus a copy of `data/processed/<domain>` (BM25 and chunks) and a `bundle.json` with the SHA256 of every file. **Restore** (`bundle_restore`): checks the SHA256s, uploads each snapshot to `/collections/{c}/snapshots/upload` and copies BM25. |
+| **Space image** | `deploy/space/Dockerfile` | The Qdrant v1.19.1 binary (the same version as `docker-compose.yml`, DEC-10), `python:3.12-slim`, `uv sync --frozen --no-dev` (DEC-11), models downloaded at build time (DEC-12), user uid 1000 and port 7860. |
+| **Build context** | `deploy/space/Dockerfile.dockerignore` | An allowlist: `data/` (with the CV), `.venv` and `node_modules` never leave the machine (DEC-16). |
+| **Startup** | `deploy/space/entrypoint.sh` | Qdrant (storage in `/tmp`), the bundle (mounted locally or downloaded from `RAG_BUNDLE_REPO` with `HF_TOKEN`), `bundle_restore` and the API. |
+| **Space card** | `deploy/space/README.md` | The Space's metadata (Docker, port 7860) and description. No license (DEC-14). |
+| **Space content** | `make space-stage` | `deploy/stage/`: the Dockerfile at the root and only the code needed, ready to `push` to the Space's git. |
+| **Local test** | `make space-build`, `make space-run` | The image, and running it on `:7860` with `deploy/bundle` mounted. |
+| **GitHub Pages** | `.github/workflows/pages.yml` | **Manual** (`workflow_dispatch`): builds the web with `VITE_API_URL = vars.RAG_API_URL` and publishes it. |
+| **Guide** | `deploy/README.md` | Step by step, in Spanish. |
 
-**Privacidad (DEC-09):** el enmascarado ocurre al responder, pero el índice guarda el material del CV sin enmascarar. Por eso:
-- El bundle va a un dataset **privado**, no a la imagen.
-- `deploy/bundle/` y `deploy/stage/` están en `.gitignore`.
-- El token del Space es un secreto de solo lectura.
+**Privacy (DEC-09):** masking happens at answer time, but the index holds the CV material unmasked. That is why:
+- The bundle goes to a **private** dataset, not into the image.
+- `deploy/bundle/` and `deploy/stage/` are in `.gitignore`.
+- The Space's token is a read-only secret.
 
-## 5. Pruebas
+## 5. Tests
 
-**Tests** (`tests/test_api.py`, 7 nuevos, con un RAG falso):
-- *Streaming* SSE (`token`… `done`).
-- El modo CV restringe al dominio `cv` y se ignoran los dominios desconocidos.
-- Las sesiones del agente conservan la memoria.
-- Fuentes enmascaradas y 404.
-- Límite de longitud del mensaje.
+**Tests** (`tests/test_api.py`, 7 new ones, with a fake RAG):
+- SSE *streaming* (`token`… `done`).
+- CV mode restricts to the `cv` domain, and unknown domains are ignored.
+- Agent sessions keep their memory.
+- Masked sources and 404.
+- Message length limit.
 - `short_path`.
 
-**Total:** 94 tests pasan; flake8 y mypy limpios.
+**Total:** 94 tests pass; flake8 and mypy clean.
 
-**Prueba de la API real** (índice completo, Qwen3-0.6B en la 3080 Ti):
+**Test of the real API** (full index, Qwen3-0.6B on the 3080 Ti):
 
-| Prueba | Resultado |
+| Test | Result |
 |---|---|
-| `/health` hasta `loaded: true`; `/config` | ✅ 3 dominios (vllm 37 381 chunks, xquad 1 217, cv 162) |
-| "¿Dónde nació Chrystian?" (CV, agente) | ✅ "…nació el 20 de enero de 1996 en Madrid. [3]", con 14 eventos de *streaming* y la cita en la biografía |
-| Seguimiento "¿Y en qué año?" con el mismo `session_id` | ✅ El agente reescribe la consulta ("¿Y en qué año? Chrystian Donaire Villén nació en Madrid.") y responde con el año |
-| Pregunta por un dato de contacto privado | ✅ "I don't have that information, but you can ask him yourself! cdonairevillen@gmail.com" |
-| **Fugas** en todas las respuestas, fuentes y vistas previas | ✅ **0** (la vista previa del CV muestra `[dato privado]`) |
-| "How do I enable prefix caching in vLLM?" (directo) | ✅ `enable_prefix_caching=True`, con 5 fuentes de vLLM (router: vllm 10.2, xquad −5.2, cv −5.9) |
-| "¿Quién ganó la Super Bowl 50?" (filtro `xquad`) | ✅ "…los Broncos", con el crédito CC-BY-SA en la fuente |
-| "What is the capital of France?" | ⚠️ Responde "Paris", citando `docs/serving/openai_compatible_server.md`: es el caso conocido de la Fase 3 (está en la documentación de vLLM como ejemplo de la API), no una alucinación |
-| `/search`, `/metrics` y `GET /` (la web compilada) | ✅ |
+| `/health` until `loaded: true`; `/config` | ✅ 3 domains (vllm 37,381 chunks, xquad 1,217, cv 162) |
+| "¿Dónde nació Chrystian?" (CV, agent) | ✅ "…nació el 20 de enero de 1996 en Madrid. [3]", with 14 *streaming* events and the citation in the biography |
+| Follow-up "¿Y en qué año?" with the same `session_id` | ✅ The agent rewrites the query ("¿Y en qué año? Chrystian Donaire Villén nació en Madrid.") and answers with the year |
+| A question about a private contact detail | ✅ "I don't have that information, but you can ask him yourself! cdonairevillen@gmail.com" |
+| **Leaks** in every answer, source and preview | ✅ **0** (the CV preview shows `[dato privado]`) |
+| "How do I enable prefix caching in vLLM?" (direct) | ✅ `enable_prefix_caching=True`, with 5 vLLM sources (router: vllm 10.2, xquad −5.2, cv −5.9) |
+| "¿Quién ganó la Super Bowl 50?" (`xquad` filter) | ✅ "…los Broncos", with the CC-BY-SA credit on the source |
+| "What is the capital of France?" | ⚠️ It answers "Paris", citing `docs/serving/openai_compatible_server.md`: it is the known Phase 3 case (it is in the vLLM documentation as an API example), not a hallucination |
+| `/search`, `/metrics` and `GET /` (the built web) | ✅ |
 
-**Nota:** con `curl` desde Git Bash en Windows, un JSON con tildes escrito en la propia línea de comandos llega mal codificado (400 "error parsing the body"). Es un problema de la consola, no de la API: el mismo cuerpo enviado desde un fichero UTF-8 funciona.
+**Note:** with `curl` from Git Bash on Windows, a JSON with accents written on the command line itself arrives badly encoded (400 "error parsing the body"). It is a console problem, not the API's: the same body sent from a UTF-8 file works.
 
-**Prueba del despliegue en local:** ver §6.
+**Local deployment test:** see §6.
 
-## 6. Prueba de la imagen del Space
+## 6. Test of the Space image
 
 **Bundle** (`make bundle`): 358 MB.
 - Snapshots: vllm 327 MB, xquad 16 MB, cv 3 MB.
-- Más BM25 y `bundle.json` con los SHA256.
+- Plus BM25 and `bundle.json` with the SHA256s.
 
-**Imagen** (`make space-build`):
-- Construye bien. El contexto enviado a Docker es de 2.17 MB gracias a la lista blanca (DEC-16).
-- **Tamaño real ~13.5 GB:**
-  - venv 7.3 GB, de los que 3.6 GB son librerías `nvidia-*` y 0.9 GB `triton`, por el torch con CUDA del lock (DEC-11).
-  - Modelos 6.2 GB. De ellos, bge-m3 ocupa 4.3 GB porque su caché tiene dos ficheros de pesos de 2.2 GB, y solo uno está en el snapshot que usa el modelo.
-  - `docker images` dice 23.1 GB porque cuenta también las capas comprimidas.
-- **Optimizable más adelante:** torch de CPU en un lock de despliegue (unos −4.5 GB) y descargar solo los ficheros de pesos que se usan (unos −2.2 GB). No lo he tocado: es un cambio de dependencias que conviene decidir contigo.
+**Image** (`make space-build`):
+- It builds fine. The context sent to Docker is 2.17 MB thanks to the allowlist (DEC-16).
+- **Real size ~13.5 GB:**
+  - venv 7.3 GB, of which 3.6 GB are `nvidia-*` libraries and 0.9 GB `triton`, because of the lock's CUDA torch (DEC-11).
+  - Models 6.2 GB. Of those, bge-m3 takes 4.3 GB because its cache has two 2.2 GB weight files, and only one is in the snapshot the model uses.
+  - `docker images` says 23.1 GB because it also counts the compressed layers.
+- **Can be optimised later:** CPU torch in a deployment lock (about −4.5 GB) and downloading only the weight files that are used (about −2.2 GB). Not touched: it is a dependency change worth deciding with the author.
 
-**Arranque** (`make space-run`, con el bundle montado):
-- Qdrant arranca y los SHA256 se comprueban. Se restauran las 3 colecciones, con los mismos chunks que en local (37 381 / 1 217 / 162).
-- La API está lista (`loaded: true`) en **33 s** sin límites y en **39–47 s** con 2 vCPU.
-- Memoria en uso: ~4–5.7 GB de 16 GB.
+**Startup** (`make space-run`, with the bundle mounted):
+- Qdrant starts and the SHA256s are checked. The 3 collections are restored, with the same chunks as locally (37,381 / 1,217 / 162).
+- The API is ready (`loaded: true`) in **33 s** without limits and in **39–47 s** with 2 vCPUs.
+- Memory in use: ~4–5.7 GB of 16 GB.
 
-**Mismas pruebas que con la API local**, ahora en CPU dentro del contenedor:
-- Las mismas respuestas que en GPU.
-- **0 fugas** en `/chat`, `/search` y `/sources`. Los chunks padre con datos privados salen enmascarados por `/sources`. Los hijos dan 404, porque `/sources` solo sirve los padres que citan las respuestas.
-- La web, en `GET /`.
+**The same tests as with the local API**, now on CPU inside the container:
+- The same answers as on GPU.
+- **0 leaks** in `/chat`, `/search` and `/sources`. The parent chunks with private data come out masked through `/sources`. The children give 404, because `/sources` only serves the parents the answers cite.
+- The web, at `GET /`.
 
-**Latencia con los límites del Space gratuito simulados** (`docker run --cpus=2 --memory=16g`). Primer token / respuesta completa, en segundos:
+**Latency with the free Space's limits simulated** (`docker run --cpus=2 --memory=16g`). First token / full answer, in seconds:
 
-| Pregunta | Directo (12 hilos) | Agente (12 hilos) | **Directo (2 hilos)** | **Agente (2 hilos)** |
+| Question | Direct (12 threads) | Agent (12 threads) | **Direct (2 threads)** | **Agent (2 threads)** |
 |---|---|---|---|---|
 | ¿Dónde nació Chrystian? (CV) | 25.1 / 47.9 | 61.3 / 84.2 | **10.6 / 14.4** | **18.2 / 22.0** |
-| ¿Y en qué año? (CV, seguimiento) | 24.4 / 53.2 | 67.8 / 90.9 | **9.6 / 14.3** | **19.8 / 23.6** |
+| ¿Y en qué año? (CV, follow-up) | 24.4 / 53.2 | 67.8 / 90.9 | **9.6 / 14.3** | **19.8 / 23.6** |
 | How do I enable prefix caching in vLLM? | 38.8 / 88.3 | 74.4 / 123.4 | **15.7 / 24.0** | **23.4 / 31.7** |
 | Who won Super Bowl 50? | 40.3 / 51.5 | 83.8 / 94.6 | **17.5 / 19.3** | **27.5 / 29.4** |
 
-- **Hallazgo:** torch abría 12 hilos con una cuota de 2 vCPU (veía los 24 núcleos del host). **Arreglado en `entrypoint.sh`** (DEC-17): los hilos salen de la cuota del cgroup. La columna "2 hilos" es la imagen ya arreglada, sin variables a mano (`CPU threads: 2` en el log).
-- La API arranca con `HF_HUB_OFFLINE=1`: 0 llamadas al Hub en el arranque.
-- **Lectura:**
-  - En el Space gratuito, una respuesta directa tarda ~15–25 s y una con agente ~22–32 s. Los primeros tokens llegan a los ~10–28 s.
-  - El agente añade ~8 s (su llamada de planificación al LLM).
-  - El directo, con la respuesta en su memoria, contesta mal al seguimiento ("En el año 2017, dejó su formación…"); el agente lo resuelve bien.
-  - **No he desglosado** cuánto de los ~10 s previos al primer token es búsqueda (embeddings y reranker) y cuánto la lectura del prompt por el LLM.
-- **Ojo:** es una simulación en mi máquina. La CPU real del Space puede ser más lenta o más rápida.
+- **Finding:** torch opened 12 threads with a 2-vCPU quota (it saw the host's 24 cores). **Fixed in `entrypoint.sh`** (DEC-17): the threads come from the cgroup quota. The "2 threads" column is the already fixed image, with no variables set by hand (`CPU threads: 2` in the log).
+- The API starts with `HF_HUB_OFFLINE=1`: 0 calls to the Hub at startup.
+- **Reading:**
+  - On the free Space, a direct answer takes ~15–25 s and one with the agent ~22–32 s. The first tokens arrive after ~10–28 s.
+  - The agent adds ~8 s (its planning call to the LLM).
+  - Direct mode, with the answer in its memory, answers the follow-up wrongly ("En el año 2017, dejó su formación…"); the agent gets it right.
+  - **Not broken down:** how much of the ~10 s before the first token is search (embeddings and reranker) and how much is the LLM reading the prompt.
+- **Note:** it is a simulation on the author's machine. The Space's real CPU may be slower or faster.
 
-## 6b. Cambios tras tu primera revisión de la web (2026-10-24)
+## 6b. Changes after the author's first review of the web (2026-10-24)
 
-| Petición tuya / fallo | Cambio |
+| The author's request / bug | Change |
 |---|---|
-| **La página se quedaba gris** con cualquier botón | `useEffect(() => bottom.current?.scrollIntoView(...))` devolvía el resultado de `scrollIntoView`, y los Chrome recientes devuelven ahí una Promise. React la tomaba como función de limpieza (`destroy is not a function`) y desmontaba la app entera. Arreglado poniendo el cuerpo del efecto entre llaves. |
-| Modos Demo/CV redundantes con los filtros | **Se quitan los modos** de la web y de la API (`mode` y `/config.modes`). Quedan solo los filtros de dominio. |
-| Poder apagar todos los filtros | Con todos apagados, la API responde sin buscar *"Activa alguno de los filtros para poder buscar en mi base de datos."* o *"Turn on at least one of the filters to search my database."*, según el idioma de la pregunta. En la API: `domains` omitido = todos; `[]` = ninguno. |
-| Retrievals poco estéticos | Un bloque por dominio buscado (máximo 3, uno encima de otro), con **flechas** para pasar sus fuentes una a una. Va primero el dominio con el que se ha respondido (borde rojo, "used in the answer", con las citas `[n]` de la respuesta) y después los demás ("not used"), con lo que encontraron. Solo aparecen los dominios con el filtro activo. |
-| Quitar las preguntas "Try" | Fuera de la página. Se conservan en `web/src/examples.ts` hasta decidir dónde van. |
-| (encontrado al probar) Con un solo filtro activo y el modo directo, la traza llevaba `NaN` | Python lo acepta, pero no es JSON válido y el navegador habría fallado. La puntuación de un dominio único sale ahora como `null`. |
+| **The page went grey** with any button | `useEffect(() => bottom.current?.scrollIntoView(...))` returned the result of `scrollIntoView`, and recent Chrome versions return a Promise there. React took it as a clean-up function (`destroy is not a function`) and unmounted the whole app. Fixed by putting the effect's body in braces. |
+| Demo/CV modes redundant with the filters | **The modes are removed** from the web and the API (`mode` and `/config.modes`). Only the domain filters remain. |
+| Being able to turn every filter off | With all of them off, the API answers without searching *"Activa alguno de los filtros para poder buscar en mi base de datos."* or *"Turn on at least one of the filters to search my database."*, depending on the question's language. In the API: `domains` omitted = all; `[]` = none. |
+| Retrievals not very nice to look at | One block per searched domain (at most 3, one on top of the other), with **arrows** to go through its sources one by one. The domain that answered goes first (red border, "used in the answer", with the answer's `[n]` citations) and then the others ("not used"), with what they found. Only the domains with an active filter appear. |
+| Remove the "Try" questions | Out of the page. Kept in `web/src/examples.ts` until it is decided where they go. |
+| (found while testing) With a single active filter and direct mode, the trace carried `NaN` | Python accepts it, but it is not valid JSON and the browser would have failed. A single domain's score now comes out as `null`. |
 
-- **Para el panel por dominio,** `DomainRouter` guarda en `last_ranked` lo que encontró cada dominio en la última búsqueda (antes solo se quedaba el ganador). Es solo registro: la búsqueda, el enrutado y lo que se mide no cambian.
-- **En modo agente,** los bloques son los de la última búsqueda del agente. Si el modelo restringe la búsqueda a un dominio, solo sale ese.
-- **Pruebas:** 95 tests (nuevos: los filtros, el mensaje sin filtros en ES/EN, `null` en lugar de `NaN` y los retrievals por dominio). Además, un recorrido en Chrome headless sin errores en la página: pregunta, seguimiento, flechas, "New", todos los filtros apagados y un solo filtro en directo.
-- **Ojo con preguntas muy cortas** ("hola"): no hay texto suficiente para detectar el idioma, así que el mensaje sin filtros sale en inglés.
+- **For the per-domain panel,** `DomainRouter` keeps in `last_ranked` what each domain found in the last search (before, only the winner was kept). It is bookkeeping only: search, routing and what is measured do not change.
+- **In agent mode,** the blocks are those of the agent's last search. If the model restricts the search to one domain, only that one shows.
+- **Tests:** 95 tests (new: the filters, the no-filter message in ES/EN, `null` instead of `NaN`, and per-domain retrievals). Also a headless Chrome walkthrough with no errors on the page: question, follow-up, arrows, "New", every filter off and a single filter in direct mode.
+- **Note on very short questions** ("hola"): there is not enough text to detect the language, so the no-filter message comes out in English.
 
-## 6c. Segunda revisión: chat a pantalla completa y selectores (2026-10-24)
+## 6c. Second review: full-screen chat and pickers (2026-10-24)
 
-**Por qué no veías los cambios:** la API (`:8000`) sirve la web **compilada** (`web/dist`), que era de la noche anterior. Los cambios solo se veían en el servidor de desarrollo (`:5173`), y además la API seguía con el código viejo, porque no se recarga sola. Ahora `web/dist` está recompilado, y la web tolera una API antigua (sin `retrievals`) en lugar de romperse.
+**Why the author could not see the changes:** the API (`:8000`) serves the **built** web (`web/dist`), which was from the night before. The changes were only visible on the development server (`:5173`), and the API also still had the old code, because it does not reload by itself. Now `web/dist` is rebuilt, and the web tolerates an old API (without `retrievals`) instead of breaking.
 
-| Petición tuya | Cambio |
+| The author's request | Change |
 |---|---|
-| El switch cambiaba de posición | Primero el texto (de longitud variable) y después el interruptor, pegado al borde derecho. Medido: la misma posición encendido y apagado. |
-| Chat como en las webs de IA actuales | La página ocupa la ventana y **solo se desplaza la conversación**. La caja de escritura queda siempre abajo: crece con el texto, Enter envía y Shift+Enter hace salto de línea. Sin conversación, la descripción aparece en el centro. El pie pasa a la columna derecha. En móvil (<860 px) vuelve al scroll normal. |
-| **Selector de modelo** junto a la caja | Desplegable hacia arriba. Opciones: la base (Qwen3-0.6B) y los perfiles `llm-*` de `rag.toml` (Qwen3-1.7B, Qwen3-4B, Phi-4-mini), con una nota de cada uno sacada del benchmark. |
-| **Selector de profundidad** | Cuántas fuentes recibe el LLM: *Auto* (lo de cada dominio: 5, y 8 en el CV) o 3, 5 y 10 forzadas. |
+| The switch changed position | First the text (of variable length) and then the switch, against the right edge. Measured: the same position on and off. |
+| A chat like today's AI websites | The page fills the window and **only the conversation scrolls**. The input box always stays at the bottom: it grows with the text, Enter sends and Shift+Enter adds a line break. With no conversation, the description appears in the middle. The footer moves to the right column. On mobile (<860 px) it goes back to normal scrolling. |
+| **Model picker** next to the box | A drop-down that opens upwards. Options: the base (Qwen3-0.6B) and the `llm-*` profiles of `rag.toml` (Qwen3-1.7B, Qwen3-4B, Phi-4-mini), with a note on each taken from the benchmark. |
+| **Depth picker** | How many sources the LLM gets: *Auto* (each domain's default: 5, and 8 for the CV) or 3, 5 and 10 forced. |
 
-**Cómo funciona por dentro (`src/api/app.py`):**
+**How it works inside (`src/api/app.py`):**
 - **`ModelPool`:**
-  - Un modelo se carga la primera vez que se elige, y solo hay uno cargado a la vez: al cambiar se descarga el anterior.
-  - Variables: `RAG_API_MODELS` limita los modelos que se ofrecen (en el Space solo cabrá uno o dos) y `RAG_API_MAX_LOADED` deja más de uno cargado.
-  - Si un modelo no cabe, la API vuelve a cargar el anterior y responde con un mensaje claro.
-  - La memoria de la conversación (agente) se conserva al cambiar de modelo.
-- **Profundidad:** durante la petición se sustituye el `answer_k` de cada dominio, y se restaura al acabar. Las peticiones van una a una (candado), y no se toca el código de búsqueda ni lo que se mide.
-- **`Agent`** acepta el `generator` que le da la API (parámetro opcional; por defecto, el de siempre).
-- **La traza** de cada respuesta incluye el modelo que la escribió.
+  - A model is loaded the first time it is chosen, and only one is loaded at a time: switching unloads the previous one.
+  - Variables: `RAG_API_MODELS` limits the models offered (only one or two will fit in the Space) and `RAG_API_MAX_LOADED` keeps more than one loaded.
+  - If a model does not fit, the API reloads the previous one and answers with a clear message.
+  - The conversation memory (agent) is kept when switching models.
+- **Depth:** during the request each domain's `answer_k` is replaced, and restored at the end. Requests go one by one (a lock), and neither the search code nor what is measured is touched.
+- **`Agent`** accepts the `generator` the API gives it (an optional parameter; by default, the usual one).
+- **The trace** of each answer includes the model that wrote it.
 
-**Probado:**
-- 96 tests: los nuevos cubren el modelo por defecto, un modelo desconocido y que la profundidad se aplica y se restaura.
-- Recorrido en Chrome headless: menús, profundidad 3 → 3 fuentes, la página sin scroll (solo se desplaza la conversación) y 0 errores en la página.
-- ⚠️ **Cargar Qwen3-1.7B falló en mi prueba** porque había dos APIs en la GPU (la tuya y la mía): 11.5 de 12 GB ocupados. `llm_sdk` reparte parte del modelo a la CPU cuando no cabe y luego falla al moverlo (`You can't move a model that has some modules offloaded`). `llm_sdk` no se toca. Con una sola API debería caber el 1.7B; **el 4B (~8 GB) irá muy justo junto a la búsqueda (~2.7 GB)**. Queda por medir con una sola API.
+**Tested:**
+- 96 tests: the new ones cover the default model, an unknown model, and that the depth is applied and restored.
+- Headless Chrome walkthrough: menus, depth 3 → 3 sources, the page without scrolling (only the conversation scrolls) and 0 errors on the page.
+- ⚠️ **Loading Qwen3-1.7B failed in the test** because there were two APIs on the GPU (the author's and the test one): 11.5 of 12 GB in use. `llm_sdk` puts part of the model on the CPU when it does not fit and then fails to move it (`You can't move a model that has some modules offloaded`). `llm_sdk` is not touched. With a single API, the 1.7B should fit; **the 4B (~8 GB) will be very tight next to the search (~2.7 GB)**. Still to be measured with a single API.
 
-## 6d. Tercera revisión: modelos que no cargaban, recall en tarjetas y ejemplos (2026-10-24)
+## 6d. Third review: models that would not load, recall in cards and examples (2026-10-24)
 
-**Por qué el 1.7B y el 4B "no tenían memoria" y Phi-4-mini sí** (Phi es más grande que el 1.7B):
-- **Fallo mío.** Al cambiar de modelo, el agente de tu conversación seguía apuntando al anterior mientras se cargaba el nuevo, así que el anterior no se liberaba.
-- **Arreglo:** los agentes sueltan el modelo **antes** de cargar otro (test `test_switching_model_releases_the_old_one_first`).
-- **Segundo fallo:** si una carga fallaba, la excepción retenía el modelo a medio cargar, y el mensaje acababa hablando del modelo anterior. Arreglado.
+**Why the 1.7B and the 4B "had no memory" and Phi-4-mini did** (Phi is bigger than the 1.7B):
+- **A bug of our own.** When switching models, the agent of the author's conversation still pointed to the previous model while the new one was loading, so the previous one was not freed.
+- **Fix:** the agents drop the model **before** another is loaded (test `test_switching_model_releases_the_old_one_first`).
+- **A second bug:** if a load failed, the exception kept the half-loaded model, and the message ended up talking about the previous model. Fixed.
 
-**Medido con la API sola en la 3080 Ti**, una conversación con agente que pasa por los cuatro modelos. Tiempo de la respuesta, incluida la carga, y GPU ocupada al acabar:
+**Measured with the API alone on the 3080 Ti**, an agent conversation going through the four models. Time of the answer, loading included, and GPU in use at the end:
 
-| Modelo | Resultado | Tiempo | GPU |
+| Model | Result | Time | GPU |
 |---|---|---|---|
 | Qwen3-0.6B | ✅ | 3.5 s | 5.1 GB |
-| Qwen3-1.7B | ✅ (seguimiento bien resuelto) | 7.2 s | 7.8 GB |
-| Qwen3-4B | ❌ no cabe: ~8 GB de modelo + ~4 GB de búsqueda. Mensaje claro y vuelta al modelo anterior | 7.5 s | 7.6 GB |
-| Qwen3-1.7B (otra vez) | ✅ | 2.7 s | 7.7 GB |
-| Phi-4-mini | ✅ muy justo | 8.7 s | 11.3 GB |
-| Qwen3-0.6B (vuelta) | ✅ | 5.8 s | 5.2 GB |
+| Qwen3-1.7B | ✅ (follow-up resolved well) | 7.2 s | 7.8 GB |
+| Qwen3-4B | ❌ does not fit: ~8 GB of model + ~4 GB of search. A clear message and back to the previous model | 7.5 s | 7.6 GB |
+| Qwen3-1.7B (again) | ✅ | 2.7 s | 7.7 GB |
+| Phi-4-mini | ✅ very tight | 8.7 s | 11.3 GB |
+| Qwen3-0.6B (back) | ✅ | 5.8 s | 5.2 GB |
 
-**Cambios de la web:**
-- **Recall en tarjetas:** una por dominio (vLLM, XQuAD, CV), una debajo de otra. Cada una pasa entre sus conjuntos con flechas (docs/code; EN/ES), como los retrievals del chat.
-- **Preguntas de ejemplo** sobre la caja de escritura, con un interruptor (apagado por defecto). Solo salen las de los filtros activos, y al pulsar una se pregunta.
-- **Profundidad:** 3, 5 o 10 fuentes, **5 por defecto** (la `k` que evalúa 42). Desaparece "Auto". ⚠️ En el CV, esto cambia las 8 fuentes calibradas en la Fase 4b (`32-cv-k8`) por 5. Se puede elegir 10.
-- **Barras de scroll oscuras**, provisionales hasta que elijas un estilo.
+**Web changes:**
+- **Recall in cards:** one per domain (vLLM, XQuAD, CV), one under the other. Each one moves between its sets with arrows (docs/code; EN/ES), like the chat's retrievals.
+- **Example questions** above the input box, with a switch (off by default). Only those of the active filters appear, and clicking one asks it.
+- **Depth:** 3, 5 or 10 sources, **5 by default** (the `k` that 42 evaluates). "Auto" disappears. ⚠️ For the CV, this changes the 8 sources calibrated in Phase 4b (`32-cv-k8`) to 5. 10 can be chosen.
+- **Dark scroll bars**, provisional until a style is chosen.
 
-**Probado:** 97 tests; flake8 y mypy limpios; Chrome headless sin errores.
+**Tested:** 97 tests; flake8 and mypy clean; headless Chrome with no errors.
 
-## 6e. Cuarta revisión (2026-10-24)
+## 6e. Fourth review (2026-10-24)
 
-- **Qwen3-4B fuera de la lista en local:** `make api` pasa `RAG_API_MODELS=$(API_MODELS)` (0.6B, 1.7B y Phi-4-mini). No cabe en 12 GB con la búsqueda en la GPU (§6d). El Space define su propia lista.
-- **Retrievals de un solo dominio:** se ve el dominio del que sale la respuesta. Los demás dominios buscados quedan plegados en una línea ("also searched: xquad (−4.32), vllm (−7.68)") que se despliega al pulsarla: así se sigue viendo cómo eligió el router.
-- **"No encontrado" en el idioma de la pregunta:**
-  - **Antes:** fuera del CV, el mensaje genérico solo existía en inglés ("Not found in the provided sources."), así que una pregunta en español sin respuesta se contestaba en inglés.
-  - **Ahora:** `not_found_for()` (en `src/rag/generator.py`) da "No se encuentra en las fuentes proporcionadas." en español. El pipeline y el agente lo usan cuando el dominio no tiene mensaje propio. El prompt sigue pidiendo la frase en inglés, como hasta ahora.
-  - **Patrón nuevo:** "…no está disponible en las fuentes…" (visto con Qwen3-1.7B) ya se reconoce como "no encontrado", y en el CV se sustituye por tu mensaje con el correo.
-  - **Recall y benchmarks:** sin efecto. El benchmark de 42 es en inglés, y la frase en español ya la reconocían los patrones.
-- **Respuesta en inglés a una pregunta en español con 1.7B:** no reproducida. Con 5 preguntas sobre el CV en español, todas las respuestas con contenido salieron en español. Queda pendiente con tu pregunta exacta.
-- **Pruebas:** 99 tests; flake8 y mypy limpios; Chrome headless sin errores.
+- **Qwen3-4B out of the list locally:** `make api` passes `RAG_API_MODELS=$(API_MODELS)` (0.6B, 1.7B and Phi-4-mini). It does not fit in 12 GB with the search on the GPU (§6d). The Space defines its own list.
+- **Single-domain retrievals:** the domain the answer comes from is shown. The other searched domains are folded in one line ("also searched: xquad (−4.32), vllm (−7.68)") that unfolds when clicked: that way one can still see how the router chose.
+- **"Not found" in the question's language:**
+  - **Before:** outside the CV, the generic message only existed in English ("Not found in the provided sources."), so a Spanish question with no answer was answered in English.
+  - **Now:** `not_found_for()` (in `src/rag/generator.py`) gives "No se encuentra en las fuentes proporcionadas." in Spanish. The pipeline and the agent use it when the domain has no message of its own. The prompt still asks for the English sentence, as before.
+  - **New pattern:** "…no está disponible en las fuentes…" (seen with Qwen3-1.7B) is now recognised as "not found", and in the CV it is replaced by the author's message with the email.
+  - **Recall and benchmarks:** no effect. The 42 benchmark is in English, and the patterns already recognised the Spanish sentence.
+- **An English answer to a Spanish question with the 1.7B:** not reproduced. With 5 Spanish questions about the CV, every answer with content came out in Spanish. Pending the author's exact question.
+- **Tests:** 99 tests; flake8 and mypy clean; headless Chrome with no errors.
 
-## 6f. Respuestas cortadas y en inglés (2026-10-24)
+## 6f. Truncated answers and answers in English (2026-10-24)
 
-**Respuestas en inglés a preguntas en español.** Tu pregunta era "Experiencia laboral de Chrystian". Ninguna de sus palabras estaba entre los marcadores del detector de idioma (`src/rag/language.py`): devolvía "?", no se pedía ningún idioma y el modelo seguía el de las fuentes, que es el inglés.
-- **Nuevos marcadores en español:** "de", "y", "en", "sobre", "mi", "tu", "quién".
-- **Nuevos marcadores en inglés:** "in", "an", "his", "about", "from", "who", "where".
-- **Señal extra:** las tildes, la ñ y ¿¡ cuentan como español.
-- **Comprobado con todas las preguntas de los benchmarks:** ninguna cambia a un idioma equivocado. XQuAD ES pasa de 2 mal detectadas y 13 sin idioma a 0 y 0. XQuAD EN pasa de 20 sin idioma a 3.
+**English answers to Spanish questions.** The author's question was "Experiencia laboral de Chrystian". None of its words was among the language detector's markers (`src/rag/language.py`): it returned "?", no language was requested, and the model followed the sources' language, which is English.
+- **New Spanish markers:** "de", "y", "en", "sobre", "mi", "tu", "quién".
+- **New English markers:** "in", "an", "his", "about", "from", "who", "where".
+- **An extra signal:** accents, ñ and ¿¡ count as Spanish.
+- **Checked against every benchmark question:** none switches to a wrong language. XQuAD ES goes from 2 misdetected and 13 without a language to 0 and 0. XQuAD EN goes from 20 without a language to 3.
 
-**Respuestas cortadas.** El límite era de 150 tokens nuevos (`rag.toml`). Medido con 4 preguntas:
+**Truncated answers.** The limit was 150 new tokens (`rag.toml`). Measured with 4 questions:
 
-| Modelo | Tokens por respuesta con un límite de 600 |
+| Model | Tokens per answer with a 600 limit |
 |---|---|
-| Qwen3-0.6B | 12–61: nunca llega al límite |
-| Qwen3-1.7B | 20–145, pero "Experiencia laboral de Chrystian" necesita **265** (12.9 s en la 3080 Ti) |
+| Qwen3-0.6B | 12–61: it never reaches the limit |
+| Qwen3-1.7B | 20–145, but "Experiencia laboral de Chrystian" needs **265** (12.9 s on the 3080 Ti) |
 
-- **La web sube el límite a 400** (`API_MAX_TOKENS` en `make api`; `RAG_GENERATION_MAX_NEW_TOKENS=400` en la imagen del Space).
-- **`rag.toml` mantiene 150,** para que `gen-bench` siga siendo comparable con las fases anteriores.
+- **The web raises the limit to 400** (`API_MAX_TOKENS` in `make api`; `RAG_GENERATION_MAX_NEW_TOKENS=400` in the Space image).
+- **`rag.toml` keeps 150,** so that `gen-bench` stays comparable with the earlier phases.
 
-**Pruebas:** 100 tests; flake8 y mypy limpios.
+**Tests:** 100 tests; flake8 and mypy clean.
 
-## 6g. Botón Stop, límite alto y esquinas de puntos (2026-10-24)
+## 6g. Stop button, a high limit and dotted corners (2026-10-24)
 
-**Objetivo (tuyo):** que el LLM escriba lo que necesite, sin cortar respuestas válidas y sin quedar atrapado en bucles.
+**Goal (the author's):** let the LLM write what it needs, without cutting valid answers and without getting caught in loops.
 
-**Medido antes de decidir:**
-- Con 6 preguntas complejas y sin límite práctico, la respuesta válida más larga fue de **464 tokens** (Phi-4-mini con 10 fuentes). El 1.7B no pasó de 321.
-- Phi-4-mini entró una vez en **bucle** con el "paso a paso de vLLM": a partir del paso ~20 repite una plantilla y se inventa opciones (`--response-func`…) hasta agotar el límite.
-- **Un detector de bucles automático no es fiable:** una regla de "parar si se repite la misma secuencia de N palabras" salta en 32 de 3.933 respuestas buenas guardadas (código, listas…), y el bucle de Phi solo repite su secuencia 5 veces.
-- **Penalizar la repetición** cambiaría todas las respuestas y obligaría a repetir `gen-bench`. Descartado por ahora.
+**Measured before deciding:**
+- With 6 complex questions and no practical limit, the longest valid answer was **464 tokens** (Phi-4-mini with 10 sources). The 1.7B did not go beyond 321.
+- Phi-4-mini went into a **loop** once with the "vLLM step by step": from step ~20 it repeats a template and makes up options (`--response-func`…) until it uses up the limit.
+- **An automatic loop detector is not reliable:** a rule of "stop if the same sequence of N words repeats" fires on 32 of 3,933 good saved answers (code, lists…), and Phi's loop only repeats its sequence 5 times.
+- **Penalising repetition** would change every answer and force rerunning `gen-bench`. Discarded for now.
 
-**Lo aplicado (opción 1):**
-- **Límite de la web: 1024 tokens**, solo como red de seguridad (`API_MAX_TOKENS` en `make api`; también en la imagen del Space). `rag.toml` mantiene 150 para los benchmarks.
-- **Si se llega al límite,** la respuesta se recorta en la última frase completa con "…" y se cierra un bloque de código que haya quedado abierto. La traza lo indica: "cut at the length limit".
-- **Botón Stop:** mientras se escribe, el botón de enviar pasa a ser ■. Al pulsarlo, la web corta la conexión y la API para la generación de verdad. Se hace con un criterio de parada (`Generator.cancel`, comprobado en cada token) que solo se activa así, de modo que no cambia ninguna respuesta normal ni los benchmarks.
-  - **Arregla además un problema que no teníamos presente:** antes, cerrar la pestaña a mitad de una respuesta dejaba al servidor generando y bloqueando al siguiente visitante. Ahora también para.
-  - **La API manda el `session_id` al empezar** (evento `start`), así que una conversación parada antes de su primera respuesta conserva su memoria.
-  - **Medido en Chrome headless:** Stop corta en 48 ms y la siguiente pregunta empieza a responder a los 2.9 s. Sin parar, habría esperado los ~45 s del bucle.
+**What was applied (option 1):**
+- **The web's limit: 1024 tokens**, only as a safety net (`API_MAX_TOKENS` in `make api`; also in the Space image). `rag.toml` keeps 150 for the benchmarks.
+- **If the limit is reached,** the answer is trimmed at its last complete sentence with "…", and an open code block is closed. The trace says so: "cut at the length limit".
+- **Stop button:** while it writes, the send button becomes ■. When pressed, the web closes the connection and the API really stops generating. It is done with a stopping criterion (`Generator.cancel`, checked on every token) that is only triggered this way, so it changes no normal answer and no benchmark.
+  - **It also fixes a problem that had not been considered:** before, closing the tab in the middle of an answer left the server generating and blocking the next visitor. Now it stops too.
+  - **The API sends the `session_id` at the start** (the `start` event), so a conversation stopped before its first answer keeps its memory.
+  - **Measured in headless Chrome:** Stop cuts in 48 ms and the next question starts answering after 2.9 s. Without stopping, it would have waited for the ~45 s of the loop.
 
 **Web:**
-- **Esquinas de puntos** en las tarjetas de retrieval (la variante `dots` de tu documento, adaptada a CSS normal): cuatro rejillas de 3×3 puntos que se apagan hacia dentro, rojas en la del dominio de la respuesta y grises en las demás.
-- **Preguntas de ejemplo:** el desplegable flota encima del interruptor, que ya no se mueve al abrirlo (medido: la misma posición).
+- **Dotted corners** on the retrieval cards (the `dots` variant from the author's document, adapted to plain CSS): four 3×3 dot grids that fade inwards, red on the domain of the answer and grey on the others.
+- **Example questions:** the drop-down floats above the switch, which no longer moves when it opens (measured: the same position).
 
-**Pruebas:** 102 tests; flake8 y mypy limpios.
+**Tests:** 102 tests; flake8 and mypy clean.
 
-## 7. Qué debes saber
+## 7. What to know
 
-- **Los ejemplos de los tests y comentarios del enmascarado usan datos ficticios** (DEC-18).
-- **Latencia en el Space gratuito:** ~15–25 s (directo) y ~22–32 s (agente) por respuesta (§6). El agente sigue por defecto (D7), pero con este coste quizá prefieras otro valor por defecto en la web pública. Es una decisión tuya. La web toma el valor por defecto de `/config` (`agent_default` en `src/api/app.py`), y el campo `agent` de la petición tiene el mismo valor por defecto.
+- **The examples in the tests and masking comments use fictitious data** (DEC-18).
+- **Latency on the free Space:** ~15–25 s (direct) and ~22–32 s (agent) per answer (§6). The agent was the default (D7), but with that cost another default might be preferable on the public web. **Resolved in Phase 7:** direct by default in the web, with the agent marked as a work in progress.
+- **Before deploying, decide** which LLM goes to the Space (proposal in `BENCHMARK_REPORT.md` §8.3) and whether the privacy strategy (DEC-09) is fine or an already masked index is preferred (option C).
+- **The Streamlit web still works** (`make web`), as legacy (DEC-13). It can be deleted once the new one has been reviewed.
+- **To update the deployment:** `make index` → `make bundle` → upload the bundle again and restart the Space. The code and the web are updated with `make space-stage` and a `push`.
+- **What was not done, on purpose:** creating repos on Hugging Face, uploading the bundle, publishing Pages or any `push`. That is the "up to the point of deployment" the author asked for.
 
-- **Antes de desplegar, decide** qué LLM va al Space (propuesta en `BENCHMARK_REPORT.md` §8.3) y si te vale la estrategia de privacidad (DEC-09) o prefieres un índice ya enmascarado (opción C).
-- **La web de Streamlit sigue funcionando** (`make web`), como legacy (DEC-13). Se puede borrar cuando hayas revisado la nueva.
-- **Para actualizar el despliegue:** `make index` → `make bundle` → volver a subir el bundle y reiniciar el Space. El código y la web se actualizan con `make space-stage` y un `push`.
-- **Lo que no he hecho, a propósito:** crear repos en Hugging Face, subir el bundle, publicar Pages o cualquier `push`. Es el "hasta el punto de deploy" que pediste.
+## 8. Files
 
-## 8. Ficheros
-
-| Fichero | Cambio |
+| File | Change |
 |---|---|
-| `src/api/app.py`, `metrics.py`, `__main__.py` | **Nuevos.** API FastAPI. |
-| `src/deploy/bundle.py` | **Nuevo.** Export y restore del índice. |
-| `src/cli.py` | Comandos `bundle_export` y `bundle_restore`. |
-| `web/**` | **Nuevo.** Frontend React (`node_modules` y `dist` ignorados por git). |
-| `deploy/README.md`, `deploy/space/**` | **Nuevos.** Guía, Dockerfile, `.dockerignore`, `entrypoint.sh` y ficha del Space. |
-| `.github/workflows/pages.yml` | **Nuevo.** Workflow manual de GitHub Pages. |
-| `Makefile` | `api`, `web-dev`, `web-build`, `bundle`, `space-build`, `space-run` y `space-stage`. |
-| `.gitignore` | `deploy/bundle/` y `deploy/stage/`. |
-| `pyproject.toml`, `uv.lock` | `fastapi`, `uvicorn`; `httpx` en `dev` (DEC-15). |
-| `tests/test_api.py` | **Nuevo.** |
-| `docs/decisions.md` | **Nuevo.** Decisiones tomadas por necesidad. |
-| `src/rag/domain_rules.py`, `tests/test_domain_rules.py` | Datos de ejemplo ficticios (DEC-18). Sin cambios de lógica. |
-| `web/README.md` | Sustituye la plantilla de Vite. |
+| `src/api/app.py`, `metrics.py`, `__main__.py` | **New.** The FastAPI API. |
+| `src/deploy/bundle.py` | **New.** Export and restore of the index. |
+| `src/cli.py` | The `bundle_export` and `bundle_restore` commands. |
+| `web/**` | **New.** The React frontend (`node_modules` and `dist` ignored by git). |
+| `deploy/README.md`, `deploy/space/**` | **New.** Guide, Dockerfile, `.dockerignore`, `entrypoint.sh` and the Space card. |
+| `.github/workflows/pages.yml` | **New.** Manual GitHub Pages workflow. |
+| `Makefile` | `api`, `web-dev`, `web-build`, `bundle`, `space-build`, `space-run` and `space-stage`. |
+| `.gitignore` | `deploy/bundle/` and `deploy/stage/`. |
+| `pyproject.toml`, `uv.lock` | `fastapi`, `uvicorn`; `httpx` in `dev` (DEC-15). |
+| `tests/test_api.py` | **New.** |
+| `docs/decisions.md` | **New.** Decisions taken out of necessity. |
+| `src/rag/domain_rules.py`, `tests/test_domain_rules.py` | Fictitious example data (DEC-18). No logic changes. |
+| `web/README.md` | Replaces the Vite template. |

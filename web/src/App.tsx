@@ -262,7 +262,7 @@ export default function App() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [useAgent, setUseAgent] = useState(true);
+  const [useAgent, setUseAgent] = useState(false);
   const [domains, setDomains] = useState<string[]>([]);
   const [model, setModel] = useState("default");
   const [depth, setDepth] = useState(5);
@@ -393,11 +393,20 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <label className="switch" title="The agent remembers the conversation and rewrites follow-up questions">
-              <span className="switch-label">{useAgent ? "With agent (memory)" : "Direct RAG"}</span>
-              <input type="checkbox" checked={useAgent} onChange={(e) => setUseAgent(e.target.checked)} />
-              <span className="switch-track"><span className="switch-thumb" /></span>
-            </label>
+            <div className="agent-toggle">
+              <label className="switch" title="The agent remembers the conversation and rewrites follow-up questions">
+                <span className="switch-label">{useAgent ? "With agent (memory)" : "Direct RAG"}</span>
+                <input type="checkbox" checked={useAgent} onChange={(e) => setUseAgent(e.target.checked)} />
+                <span className="switch-track"><span className="switch-thumb" /></span>
+              </label>
+              {/* Floats under the switch, so turning it on moves nothing. */}
+              {useAgent && (
+                <div className="wip-note">
+                  Work in progress: the agent's conversation memory is still being improved, and it may mix in earlier
+                  topics.
+                </div>
+              )}
+            </div>
           </div>
 
           {apiError && !loaded && <div className="notice">{apiError}</div>}

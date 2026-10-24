@@ -4,7 +4,7 @@ from src.rag.ingestion.chunkers import (
     chunk_markdown_packed, chunk_python_file,
     markdown_sections, split_by_size,
 )
-from src.rag.ingestion.pipeline import Ingester, assign_ids
+from src.rag.ingestion.pipeline import Ingester, assign_ids, walk_source
 
 PYTHON_SOURCE = '''import os
 
@@ -239,3 +239,24 @@ def test_chunk_ids_are_stable_and_disambiguated() -> None:
     assert chunk_uuid("vllm", PARENT, "f.py", 0, 10, 0) != chunk_uuid(
         "vllm", PARENT, "f.py", 0, 10, 1
     )
+
+
+def test_exclude_paths_skips_one_folder_not_its_namesakes(tmp_path) -> None:
+    for rel in ("README.md", "PLANING.md", "deploy/README.md",
+                "deploy/stage/src/x.py", "deploy/bundle/b.md",
+                "src/deploy/bundle.py", "src/data/y.py", "data/z.md"):
+        path = tmp_path / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("x", encoding="utf-8")
+    source = SourceConfig(
+        root=str(tmp_path), include=[".md", ".py"],
+        exclude_dirs=["PLANING.md"],
+        exclude_paths=["deploy/stage", "deploy/bundle/", "data"],
+    )
+    found = sorted(
+        p.replace("\\", "/").split(str(tmp_path).replace("\\", "/") + "/")[1]
+        for p in (f.replace("\\", "/") for f in walk_source(source))
+    )
+    # By path: only that folder; src/deploy and src/data stay.
+    assert found == ["README.md", "deploy/README.md", "src/data/y.py",
+                     "src/deploy/bundle.py"]

@@ -119,7 +119,7 @@ def events(response: Any) -> list[tuple[str, Any]]:
 def test_health_and_config(client: TestClient) -> None:
     assert client.get("/health").json() == {"status": "ok", "loaded": True}
     config = client.get("/config").json()
-    assert "modes" not in config and config["agent_default"]
+    assert "modes" not in config and config["agent_default"] is False
 
 
 def test_direct_chat_streams_tokens_then_the_answer(
@@ -192,9 +192,11 @@ def test_agent_sessions_keep_their_memory(client: TestClient) -> None:
         return agents[session_id]
 
     service.agent_for = agent_for
-    first = events(client.post("/chat", json={"message": "a"}))[-1][1]
+    first = events(client.post("/chat", json={"message": "a",
+                                              "agent": True}))[-1][1]
     sid = first["session_id"]
-    client.post("/chat", json={"message": "b", "session_id": sid})
+    client.post("/chat", json={"message": "b", "session_id": sid,
+                               "agent": True})
     assert created == [sid] and agents[sid].asked == ["a", "b"]
     assert first["trace"]["mode"] == "agent"
     assert first["trace"]["model"] == "Qwen3-1.7B"

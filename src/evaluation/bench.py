@@ -22,12 +22,14 @@ SUITES = {
     "en": ("bench/datasets/en", "en"),
     "xquad": ("bench/datasets/xquad", "xquad"),
     "cv": ("bench/datasets/cv", "cv"),
+    "about": ("bench/datasets/about", "about"),
 }
 # Datasets of each suite (default: the 42 docs/code pair) and the corpus
 # its ground truth points into (default: the --domain argument). XQuAD:
 # the same questions in English and Spanish over its own domain.
-SUITE_DATASETS = {"xquad": ("en", "es"), "cv": ("en", "es")}
-SUITE_DOMAINS = {"xquad": "xquad", "cv": "cv"}
+SUITE_DATASETS = {"xquad": ("en", "es"), "cv": ("en", "es"),
+                  "about": ("en", "es")}
+SUITE_DOMAINS = {"xquad": "xquad", "cv": "cv", "about": "about"}
 RESULTS_DIR = "bench/results"
 # Retrieval path measured (the official 42 one). Kept in result names
 # and records so they stay comparable with the earlier runs.

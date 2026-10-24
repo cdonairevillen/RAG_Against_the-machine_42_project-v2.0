@@ -244,6 +244,21 @@ class CLI:
         except (OSError, ValueError) as exc:
             print(f"Error building the CV benchmark: {exc}")
 
+    def build_about_bench(self) -> None:
+        """Build the about datasets from bench/datasets/about/questions.json.
+
+        Locates every answer's evidence in its file (README, docs or
+        code; re-run after editing them; fails if an evidence is missing
+        or ambiguous).
+        """
+        from src.rag.sources.about import build
+
+        try:
+            print(f"About benchmark: {build()} questions per language "
+                  f"(en, es), evidence verified.")
+        except (OSError, ValueError) as exc:
+            print(f"Error building the about benchmark: {exc}")
+
     def embed_children(self, ingester: "Ingester") -> dict:
         """Embed every child chunk with the configured model.
 

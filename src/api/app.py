@@ -9,13 +9,13 @@ Endpoints:
     GET  /sources/{chunk_id}     full (masked) text of a source
     GET  /metrics                latest benchmark numbers for the web
 
-/chat takes the web's controls: `agent` (D7: the agent by default,
-direct RAG when false), `domains`, the domain filters (omitted: every
-domain; an empty list: every filter off, answered with NO_FILTER_MESSAGE
-without searching), `model` (an LLM from the rag.toml profiles, see
-ModelPool) and `depth` (sources given to the LLM; None keeps each
-domain's default). Conversations live in memory only, per session id,
-capped and expired (D7: nothing about visitors is stored).
+/chat takes the web's controls: `agent` (off by default since Phase 7;
+the CLI keeps the agent by default, D7), `domains`, the domain filters
+(omitted: every domain; an empty list: every filter off, answered with
+NO_FILTER_MESSAGE without searching), `model` (an LLM from the rag.toml
+profiles, see ModelPool) and `depth` (sources given to the LLM; None
+keeps each domain's default). Conversations live in memory only, per
+session id, capped and expired (D7: nothing about visitors is stored).
 
 Run: make api   (uvicorn on http://127.0.0.1:8000)
 """
@@ -64,7 +64,9 @@ class ChatRequest(BaseModel):
 
     message: str = Field(min_length=1, max_length=1000)
     session_id: Optional[str] = Field(default=None, max_length=64)
-    agent: bool = True
+    # Direct RAG by default; the agent is opt-in in the web while its
+    # conversation memory is being improved (Phase 7b).
+    agent: bool = False
     # Domain filters: None = every domain, [] = none (nothing searched).
     domains: Optional[list[str]] = None
     # An id from /config "models" (None: the default model).
@@ -87,6 +89,10 @@ class ResetRequest(BaseModel):
 
     session_id: str = Field(max_length=64)
 
+
+# The web's agent switch starts off (changed 2026-10-24: with small
+# models the memory mixes earlier topics in; see FASE_7.md).
+AGENT_DEFAULT = False
 
 # Depth options of the web. 5 by default: the k that 42 evaluates.
 DEPTHS = [3, 5, 10]
@@ -208,7 +214,11 @@ class RagService:
             if self.tools is None:
                 from src.server.tools import RagTools
 
-                tools = RagTools.load(self.config)
+                # RAG_API_DOMAINS: the domains the web serves (default:
+                # every indexed one), to keep one out until it is ready.
+                domains = [d.strip() for d in os.environ.get(
+                    "RAG_API_DOMAINS", "").split(",") if d.strip()]
+                tools = RagTools.load(self.config, domains=domains or None)
                 self.models.get("default")
                 self.tools = tools
         return self.tools
@@ -484,7 +494,7 @@ def create_app(config: Optional[RagConfig] = None,
             "models": service.models.describe(),
             "depths": DEPTHS,
             "depth_default": DEPTH_DEFAULT,
-            "agent_default": True,
+            "agent_default": AGENT_DEFAULT,
             "k": 5,
         }
 

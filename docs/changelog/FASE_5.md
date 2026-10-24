@@ -1,175 +1,175 @@
-# CHANGELOG — Fase 5: Agentes y RAG como servidor MCP
+# CHANGELOG — Phase 5: Agents and the RAG as an MCP server
 
-**Fecha de inicio:** 2026-10-23
-**Estado:** 🟡 en curso.
-- **Hecho:** decisiones de D7, reorganización de `src/`, herramientas del RAG, servidor MCP, agente (memoria, reescritura, bucle de herramientas, plan B) y `chat` con el interruptor agente/directo.
-- **En marcha:** benchmark de agente frente a acceso directo con los cuatro modelos.
+> English translation of [`../es/changelog/FASE_5.md`](../es/changelog/FASE_5.md), the working version.
+
+**Start date:** 2026-10-23
+**Status:** ✅ completed (2026-10-24). D7's decisions, the `src/` reorganisation, the RAG's tools, the MCP server, the agent (memory, rewriting, tool loop, fallback and safety nets), `chat` with the agent/direct switch, and the agent vs direct access benchmark with four models (§7).
 
 ---
 
-## 1. Decisiones (tuyas)
+## 1. Decisions (the author's)
 
-- **D7 — agente por defecto**, como en un RAG real, y con memoria de sesión. El **acceso directo** se mantiene como opción. En la web será un **interruptor "Con agente / Sin agente"** (Fase 6), y la API lo recibirá como un parámetro de la petición.
-- **Todos los modelos pueden ser agente**, incluido Qwen3-0.6B, sin limitarlo. Si un modelo falla, el benchmark lo enseñará, y los benchmarks decidirán qué modelo se despliega.
-- **Memoria solo de sesión:** no se guarda nada de los visitantes de la web.
-- **El campo `lang` del payload sale del plan:** las respuestas ya siguen el idioma de la pregunta (90–100 % en todos los sets).
+- **D7 — the agent by default**, as in a real RAG, with session memory. **Direct access** stays as an option. In the web it will be a **"With agent / Without agent" switch** (Phase 6), and the API will take it as a request parameter.
+- **Every model can be an agent**, Qwen3-0.6B included, without restrictions. If a model fails, the benchmark will show it, and the benchmarks will decide which model is deployed.
+- **Session-only memory:** nothing about the web's visitors is stored.
+- **The payload's `lang` field leaves the plan:** answers already follow the question's language (90–100% on every set).
 
-## 2. Reorganización de `src/` (sin cambios de lógica)
+## 2. `src/` reorganisation (no logic changes)
 
-`src/` estaba plano. Ahora separa el RAG, el RAG como servicio y el agente:
+`src/` was flat. Now it separates the RAG, the RAG as a service, and the agent:
 
 ```
 src/
-├── __main__.py, cli.py     entradas (python -m src …; los comandos de 42 no cambian)
-├── config.py, models.py    compartidos (models.py = formatos pydantic de 42)
-├── rag/                    el RAG: indexar, recuperar y responder
+├── __main__.py, cli.py     entry points (python -m src …; the 42 commands do not change)
+├── config.py, models.py    shared (models.py = the 42 pydantic formats)
+├── rag/                    the RAG: indexing, retrieving and answering
 │   ├── ingestion/  storage/  sources/
 │   ├── retriever.py  router.py  embeddings.py
 │   ├── generator.py  language.py  domain_rules.py
-│   └── pipeline.py         (antes src/rag.py: el flujo de respuesta)
-├── server/                 el RAG como servicio: tools.py + mcp_server.py
-├── agent/                  el agente (en construcción)
-├── evaluation/             benchmarks y evaluador de 42
+│   └── pipeline.py         (formerly src/rag.py: the answer pipeline)
+├── server/                 the RAG as a service: tools.py + mcp_server.py
+├── agent/                  the agent (under construction)
+├── evaluation/             benchmarks and the 42 evaluator
 └── web.py
 ```
 
-| Antes | Ahora |
+| Before | Now |
 |---|---|
 | `src/ingestion/`, `src/storage/`, `src/sources/` | `src/rag/ingestion/`, `src/rag/storage/`, `src/rag/sources/` |
 | `src/{retriever,router,embeddings,generator,language,domain_rules}.py` | `src/rag/…` |
 | `src/rag.py` | `src/rag/pipeline.py` |
-| `src/tools.py`, `src/mcp_server.py` (nuevos) | `src/server/` |
+| `src/tools.py`, `src/mcp_server.py` (new) | `src/server/` |
 
-- **Por qué `server/` y no dentro de `agent/`:** el servidor MCP es la puerta del RAG. Cualquier cliente lo usa, y nuestro agente es un cliente más. El agente solo depende de las herramientas, nunca de las tripas del RAG.
-- **Comprobado:**
-  - `make bench` da exactamente lo mismo (`60-fase5-restructure`: docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88).
-  - 78 tests, flake8 y mypy en verde.
-  - `answer` y el servidor MCP funcionan de principio a fin.
-- **Los changelogs anteriores** conservan las rutas de su momento; esta tabla las traduce.
+- **Why `server/` and not inside `agent/`:** the MCP server is the RAG's door. Any client uses it, and our agent is just one more client. The agent only depends on the tools, never on the RAG's internals.
+- **Checked:**
+  - `make bench` gives exactly the same (`60-fase5-restructure`: docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88).
+  - 78 tests, flake8 and mypy green.
+  - `answer` and the MCP server work end to end.
+- **The earlier changelogs** keep the paths of their time; this table translates them.
 
-## 3. Herramientas del RAG y servidor MCP
+## 3. The RAG's tools and the MCP server
 
 - **`src/server/tools.py` (`RagTools`):**
-  - `list_domains()`: nombre, descripción y chunks de cada dominio. La descripción es un campo nuevo, `description`, en cada `[sources.<x>]` de `rag.toml`; la necesitan el agente y los clientes MCP para elegir dónde buscar.
-  - `search(query, domains, k)`: dominio elegido, puntuación y fuentes con el **texto ya enmascarado**. Si no supera el filtro fuera de dominio, devuelve una lista vacía.
-  - `answer(question, domains, k)`: el flujo directo, con sus fuentes.
-- **`src/server/mcp_server.py`:** expone esas tres herramientas con el SDK oficial de MCP. En `mcp` 2.x, **FastMCP se llama `MCPServer`**: es la misma API con otro nombre.
-  - El RAG se carga en la primera llamada, así el servidor responde al handshake al momento.
-  - **Por stdio, la salida de progreso del RAG** ("Loaded … chunks") se redirige a stderr, porque stdout es el canal del protocolo.
-- **Uso:**
-  - `make mcp`: stdio, para clientes que lanzan el servidor (Claude Desktop, el agente…).
+  - `list_domains()`: name, description and chunks of each domain. The description is a new field, `description`, in each `[sources.<x>]` of `rag.toml`; the agent and MCP clients need it to choose where to search.
+  - `search(query, domains, k)`: the chosen domain, its score and the sources with the **text already masked**. If it does not pass the out-of-domain gate, it returns an empty list.
+  - `answer(question, domains, k)`: the direct pipeline, with its sources.
+- **`src/server/mcp_server.py`:** exposes those three tools with the official MCP SDK. In `mcp` 2.x, **FastMCP is called `MCPServer`**: the same API under another name.
+  - The RAG is loaded on the first call, so the server answers the handshake at once.
+  - **Over stdio, the RAG's progress output** ("Loaded … chunks") is redirected to stderr, because stdout is the protocol's channel.
+- **Usage:**
+  - `make mcp`: stdio, for clients that launch the server (Claude Desktop, the agent…).
   - `make mcp MCP_TRANSPORT=streamable-http`: `http://127.0.0.1:8765/mcp`.
-- **Prueba de punta a punta:** un cliente MCP real lanza el servidor por stdio, lista las tres herramientas y llama a `list_domains` y a `search`.
-  - Con el CV, el texto sale enmascarado.
-  - La pregunta sobre la Super Bowl va a XQuAD (puntuación 2.8).
-  - Corregido: con un solo dominio, la puntuación salía `NaN`, que no es JSON válido; ahora sale `null`.
+- **End-to-end test:** a real MCP client launches the server over stdio, lists the three tools and calls `list_domains` and `search`.
+  - With the CV, the text comes out masked.
+  - The Super Bowl question goes to XQuAD (score 2.8).
+  - Fixed: with a single domain, the score came out as `NaN`, which is not valid JSON; now it comes out as `null`.
 
-## 4. El agente (`src/agent/`)
+## 4. The agent (`src/agent/`)
 
-Se inspira en AgentSmith: estructura del bucle, traza de pasos y plan B cuando el modelo no sigue el formato. Cambia lo que es distinto aquí: modelos locales en vez de una API, llamadas a herramientas nativas en vez de código, y una respuesta final redactada por el generador del RAG con sus guardarraíles.
+It is inspired by AgentSmith: the loop's structure, the trace of steps and a fallback when the model does not follow the format. What is different here changes: local models instead of an API, native tool calls instead of code, and a final answer written by the RAG's generator with its guardrails.
 
-**Flujo por pregunta** (`Agent.ask`):
-1. **Planificar:** el LLM recibe los dominios (con su descripción), la conversación y la pregunta, y llama a `search` con una **pregunta completa**: aquí es donde se reescriben los seguimientos. Puede buscar hasta 3 veces y para cuando deja de llamar a la herramienta.
-2. **Plan B determinista:** si no hace ninguna llamada válida, se busca la pregunta precedida de la última consulta que escribió el modelo. Así un seguimiento conserva su tema ("¿Dónde nació Chrystian? ¿Y en qué año?").
-3. **Responder:** las fuentes reunidas van al **mismo generador del flujo directo**, con las reglas del dominio (citas, prompt del CV, datos privados, tu mensaje de "no encontrado") y en el **idioma del usuario**, aunque la búsqueda se haya reescrito en otro.
-4. **Memoria:** el turno se añade a la sesión (`Session`, solo en memoria; D7).
+**Flow per question** (`Agent.ask`):
+1. **Plan:** the LLM gets the domains (with their descriptions), the conversation and the question, and calls `search` with a **complete question**: this is where follow-ups are rewritten. It can search up to 3 times and stops when it no longer calls the tool.
+2. **Deterministic fallback:** if it makes no valid call, the question is searched preceded by the last query the model itself wrote. That way a follow-up keeps its topic ("Where was Chrystian born? And in which year?").
+3. **Answer:** the gathered sources go to **the same generator as the direct pipeline**, with the domain's rules (citations, the CV prompt, private data, the author's "not found" message) and in **the user's language**, even if the search was rewritten in another one.
+4. **Memory:** the turn is added to the session (`Session`, in memory only; D7).
 
-**Cada modelo con su convención de herramientas** (`src/agent/toolcalls.py`):
-- **`native`** (Qwen3): `apply_chat_template(..., tools=)`, y las llamadas salen como `<tool_call>{json}</tool_call>`.
-- **`system_tools`** (Phi-4-mini): las herramientas van como JSON en un campo `tools` del mensaje de sistema (`<|tool|>…<|/tool|>`).
-- **`prompt`** (cualquier otro modelo): se describen en el prompt de sistema y se pide el formato `<tool_call>`.
-- **El parser acepta todos los envoltorios** y formas de JSON, incluso cortadas o con comillas simples.
-- `Generator.complete()` devuelve la salida en bruto con esas marcas; `decode()` las quitaba.
+**Each model with its tool convention** (`src/agent/toolcalls.py`):
+- **`native`** (Qwen3): `apply_chat_template(..., tools=)`, and the calls come out as `<tool_call>{json}</tool_call>`.
+- **`system_tools`** (Phi-4-mini): the tools go as JSON in a `tools` field of the system message (`<|tool|>…<|/tool|>`).
+- **`prompt`** (any other model): they are described in the system prompt and the `<tool_call>` format is requested.
+- **The parser accepts every wrapper** and JSON shape, even truncated or with single quotes.
+- `Generator.complete()` returns the raw output with those markers; `decode()` used to remove them.
 
-**Ajustes medidos a mano con Qwen3-0.6B** (antes de los benchmarks):
+**Adjustments measured by hand with Qwen3-0.6B** (before the benchmarks):
 
-| Problema | Arreglo |
+| Problem | Fix |
 |---|---|
-| Con el historial como turnos de chat anteriores (usuario/asistente), en los seguimientos el modelo **copiaba el patrón y respondía sin buscar** | El historial va **dentro del turno del usuario** ("Conversation so far: … New question: …"), y así el patrón siempre es pregunta → herramienta |
-| En los seguimientos respondía "DONE" sin buscar ("la conversación ya lo dice") | Regla del prompt: "toda pregunta nueva necesita al menos una búsqueda"; DONE solo después de buscar |
-| El plan B encadenaba consultas ("¿Dónde nació…? ¿Y en qué año? ¿En qué barrio…?") y perdía el tema | El plan B usa la última consulta escrita por el **modelo**, no las de otros planes B |
+| With the history as earlier chat turns (user/assistant), on follow-ups the model **copied the pattern and answered without searching** | The history goes **inside the user turn** ("Conversation so far: … New question: …"), so the pattern is always question → tool |
+| On follow-ups it answered "DONE" without searching ("the conversation already says it") | A prompt rule: "every new question needs at least one search"; DONE only after searching |
+| The fallback chained queries ("Where was… born? And in which year? In which neighbourhood…?") and lost the topic | The fallback uses the last query written by the **model**, not those of other fallbacks |
 
-**Redes de seguridad** (tras la ronda 1 del benchmark; tu propuesta, acotada; `docs/decisions.md`, DEC-03):
+**Safety nets** (after round 1 of the benchmark; the author's proposal, bounded; `decisions.md`, DEC-03):
 
-| Red | Cuándo actúa | Qué hace |
+| Net | When it acts | What it does |
 |---|---|---|
-| **1. Pregunta original** | Ninguna búsqueda del modelo encontró fuentes (sus reescrituras en palabras sueltas no pasan el filtro de relevancia) | Busca la pregunta tal como la escribió el usuario, dentro de su filtro |
-| **2. Dominios** | El modelo restringió dominios, el usuario **no** puso filtro y no se encontró nada | Repite la misma consulta en todos los dominios (exactamente lo que busca el modo directo) |
+| **1. Original question** | None of the model's searches found sources (its keyword-style rewrites do not pass the relevance gate) | Searches the question as the user wrote it, within the user's filter |
+| **2. Domains** | The model restricted the domains, the user did **not** set a filter, and nothing was found | Repeats the same query in every domain (exactly what direct mode searches) |
 
-- **Nunca se sale del filtro del usuario:** con filtro, los dominios del modelo ya son ese filtro, y la red 2 no actúa. Lo garantiza `test_user_filter_is_never_exceeded`.
-- **Si las dos fallan**, se usa el plan B determinista de siempre.
-- **Cada uso queda en la traza** (`AgentAnswer.retries`: `"all-domains"`, `"original-question"`), visible en la web y en `chat`.
+- **It never goes beyond the user's filter:** with a filter, the model's domains already are that filter, and net 2 does not act. `test_user_filter_is_never_exceeded` guarantees it.
+- **If both fail**, the usual deterministic fallback is used.
+- **Every use is recorded in the trace** (`AgentAnswer.retries`: `"all-domains"`, `"original-question"`), visible in the web and in `chat`.
 
-Con esto, Qwen3-0.6B reescribe de verdad: "¿Y en qué año?" → "¿Y en qué año? Chrystian Donaire Villén nació en Madrid."; "¿En qué barrio creció?" → "¿En qué barrio creció Chrystian Donaire Villén?"; "And which one unloads it?" → "which endpoint unloads a LoRA adapter in vLLM" (con `domains: vllm`).
+With this, Qwen3-0.6B really rewrites: "¿Y en qué año?" → "¿Y en qué año? Chrystian Donaire Villén nació en Madrid."; "¿En qué barrio creció?" → "¿En qué barrio creció Chrystian Donaire Villén?"; "And which one unloads it?" → "which endpoint unloads a LoRA adapter in vLLM" (with `domains: vllm`).
 
-**Uso:**
-- `answer` usa el **agente por defecto** (D7); `--agent False` usa el flujo directo.
-- **`chat`** es una conversación interactiva con memoria: `/agent` alterna agente/directo (el futuro interruptor de la web), `/reset` olvida la conversación y `/exit` sale.
-- El **filtro de dominios del usuario** (por ejemplo, el modo CV de la web) manda sobre los dominios que elija el modelo.
+**Usage:**
+- `answer` uses **the agent by default** (D7); `--agent False` uses the direct pipeline.
+- **`chat`** is an interactive conversation with memory: `/agent` toggles agent/direct (the future web switch), `/reset` forgets the conversation and `/exit` quits.
+- **The user's domain filter** (for example, the web's CV mode) prevails over the domains the model picks.
 
 **Benchmark** (`make agent-bench`, `src/evaluation/agent_bench.py`):
-- Cada pregunta se responde con el agente y con el flujo directo.
-- **Conversaciones:** `bench/datasets/conversations/conversations.json`, 12 diálogos de 2–3 turnos en inglés y español sobre CV, XQuAD y vLLM, uno de ellos con cambio de dominio. Los seguimientos ("¿Y cómo se llama el videojuego en el que trabaja allí?", "And which one unloads it?") necesitan los turnos anteriores.
-- **Preguntas sueltas:** CV (30 + 30), XQuAD (50 + 50, muestra fija) y vLLM (25 docs + 25 code).
-- **Métricas:** contiene la respuesta, F1, "no encontrado", segundos por respuesta y, solo para el agente, la proporción de llamadas válidas a la herramienta (sin plan B) y los pasos.
-- **El LLM es el del perfil activo**, así que el mismo benchmark compara modelos: `make agent-bench PROFILE=llm-qwen3-4b`.
+- Every question is answered with the agent and with the direct pipeline.
+- **Conversations:** `bench/datasets/conversations/conversations.json`, 12 dialogues of 2–3 turns in English and Spanish about the CV, XQuAD and vLLM, one of them with a change of domain. The follow-ups ("¿Y cómo se llama el videojuego en el que trabaja allí?", "And which one unloads it?") need the earlier turns.
+- **Single questions:** CV (30 + 30), XQuAD (50 + 50, a fixed sample) and vLLM (25 docs + 25 code).
+- **Metrics:** contains the answer, F1, "not found", seconds per answer and, for the agent only, the proportion of valid tool calls (without the fallback) and the steps.
+- **The LLM is the active profile's**, so the same benchmark compares models: `make agent-bench PROFILE=llm-qwen3-4b`.
 
-## 5. Descarga de datos unificada (`Makefile`, petición tuya)
+## 5. Unified data download (`Makefile`, the author's request)
 
-| Target | Antes | Ahora |
+| Target | Before | Now |
 |---|---|---|
-| `make data` | Solo vLLM | **Todas las fuentes públicas:** `data-vllm` + `data-xquad` |
-| `make data-vllm` | — | vLLM 0.10.1 desde la etiqueta de GitHub (el antiguo `data`) |
-| `make data-xquad` | Igual | Igual |
-| `make data-42` | Descarga original de 42 (vLLM + datasets) | **Eliminado.** Era redundante: su vLLM es idéntico al de la etiqueta de GitHub (comprobado en la Fase 0), los datasets públicos ya están versionados (ahora en `bench/datasets/public/`, ver más abajo) y el CDN de la intra da 403 sin sesión de 42. Se elimina también la variable `URL_42` |
-| `make install` | Dependía de `data`, que corría antes de crear el venv | Crea el venv, instala y **después** ejecuta `data` (XQuAD se prepara con Python) |
+| `make data` | vLLM only | **Every public source:** `data-vllm` + `data-xquad` |
+| `make data-vllm` | — | vLLM 0.10.1 from the GitHub tag (the old `data`) |
+| `make data-xquad` | The same | The same |
+| `make data-42` | The original 42 download (vLLM + datasets) | **Removed.** It was redundant: its vLLM is identical to the GitHub tag's (checked in Phase 0), the public datasets are already versioned (now in `bench/datasets/public/`, see below) and the intranet CDN returns 403 without a 42 session. The `URL_42` variable is removed too |
+| `make install` | It depended on `data`, which ran before creating the venv | It creates the venv, installs and **then** runs `data` (XQuAD is prepared with Python) |
 
-- **No se descargan:** el CV (material privado) y Gulliver (4c, aplazada).
-- **Comprobado:** `make data` regenera XQuAD idéntico (2 380 respuestas verificadas, los datasets versionados no cambian).
+- **Not downloaded:** the CV (private material) and Gulliver (4c, postponed).
+- **Checked:** `make data` regenerates XQuAD identically (2,380 answers verified, the versioned datasets do not change).
 
-**`data/` y `bench/` unificados** (petición tuya; elegí el sentido, `docs/decisions.md` DEC-01):
-- Los datasets públicos de 42 pasan de `data/datasets/` a **`bench/datasets/public/`** (`git mv`, sin cambiar los ficheros).
-- **Ahora:** `bench/` es lo versionado (datasets y resultados) y `data/` es lo local y regenerable (corpus, índices, salidas), ignorado entero por git sin excepciones.
-- **Rutas actualizadas:** `Makefile` (`DATASETS`), `SUITES` de `bench.py`, ejemplos de `cli.py`, el docstring del evaluador, `web.py` y el `README.md`.
-- **El evaluador de 42 se conserva:** es la métrica de referencia (D4) que usan todos los benchmarks; no es código legacy. Se añade una nota en su docstring.
-- **Comprobado:** `make bench` da lo mismo (`61-datasets-moved`: docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88).
+**`data/` and `bench/` unified** (the author's request; the direction was chosen in `decisions.md` DEC-01):
+- The public 42 datasets move from `data/datasets/` to **`bench/datasets/public/`** (`git mv`, without changing the files).
+- **Now:** `bench/` is what is versioned (datasets and results) and `data/` is what is local and can be regenerated (corpora, indices, outputs), fully ignored by git with no exceptions.
+- **Paths updated:** `Makefile` (`DATASETS`), the `SUITES` of `bench.py`, the examples in `cli.py`, the evaluator's docstring, `web.py` and `README.md`.
+- **The 42 evaluator is kept:** it is the reference metric (D4) that every benchmark uses; it is not legacy code. A note is added to its docstring.
+- **Checked:** `make bench` gives the same (`61-datasets-moved`: docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88).
 
-## 6. Ficheros
+## 6. Files
 
-| Fichero | Cambio |
+| File | Change |
 |---|---|
-| `src/rag/**`, `src/server/**` | Movidos (§2) y nuevos `tools.py` y `mcp_server.py`. |
-| `src/cli.py` | Comando `mcp`; imports nuevos. |
+| `src/rag/**`, `src/server/**` | Moved (§2), and the new `tools.py` and `mcp_server.py`. |
+| `src/cli.py` | The `mcp` command; new imports. |
 | `src/config.py` | `SourceConfig.description`. |
-| `rag.toml` | Descripción de cada dominio. |
+| `rag.toml` | The description of each domain. |
 | `Makefile` | `make mcp` (`MCP_TRANSPORT`, `MCP_PORT`). |
 | `pyproject.toml`, `uv.lock` | `mcp>=2.3.0`. |
-| Resto de `src/` y `tests/` | Solo imports y rutas en comentarios. |
-| `src/agent/agent.py`, `memory.py`, `toolcalls.py` | **Nuevos.** El agente, la memoria de sesión y las convenciones de herramientas. |
-| `src/rag/generator.py` | `complete()` (salida en bruto) e idioma de respuesta opcional (`language`). |
-| `src/cli.py` | `answer` con agente por defecto (`--agent`), `chat` interactivo y `agent_bench`. |
-| `src/evaluation/agent_bench.py`, `bench/datasets/conversations/` | **Nuevos.** Benchmark de agente frente a acceso directo. |
-| `Makefile` | `make agent-bench` (`SETS=`, `PROFILE=`); `data` unificado (§5). |
-| `tests/test_agent.py` | **Nuevo.** Parser de cada convención, estilos, memoria y bucle del agente (llamada válida y plan B). Después, también las redes de seguridad y que el filtro del usuario nunca se supera. |
-| `src/agent/agent.py` | Redes de seguridad y `AgentAnswer.retries` (después del checkpoint `680f21a`). |
+| The rest of `src/` and `tests/` | Only imports and paths in comments. |
+| `src/agent/agent.py`, `memory.py`, `toolcalls.py` | **New.** The agent, the session memory and the tool conventions. |
+| `src/rag/generator.py` | `complete()` (raw output) and an optional answer language (`language`). |
+| `src/cli.py` | `answer` with the agent by default (`--agent`), the interactive `chat` and `agent_bench`. |
+| `src/evaluation/agent_bench.py`, `bench/datasets/conversations/` | **New.** The agent vs direct access benchmark. |
+| `Makefile` | `make agent-bench` (`SETS=`, `PROFILE=`); unified `data` (§5). |
+| `tests/test_agent.py` | **New.** The parser of each convention, styles, memory and the agent loop (valid call and fallback). Later also the safety nets, and that the user's filter is never exceeded. |
+| `src/agent/agent.py` | Safety nets and `AgentAnswer.retries` (after the `680f21a` checkpoint). |
 | `src/evaluation/agent_bench.py` | `safety_net_rate`. |
-| `data/datasets/` → `bench/datasets/public/` | Movidos (§5). Rutas en `Makefile`, `bench.py`, `cli.py`, `evaluator.py`, `web.py` y `README.md`; `.gitignore` sin la excepción `!data/datasets/`. |
-| `docs/BENCHMARK_REPORT.md` | §8: agente frente a acceso directo. |
+| `data/datasets/` → `bench/datasets/public/` | Moved (§5). Paths in `Makefile`, `bench.py`, `cli.py`, `evaluator.py`, `web.py` and `README.md`; `.gitignore` without the `!data/datasets/` exception. |
+| `docs/BENCHMARK_REPORT.md` | §8: agent vs direct access. |
 
-## 7. Resultados y cierre
+## 7. Results and closing
 
-Detalle completo en `BENCHMARK_REPORT.md` §8. Contiene la respuesta, agente / directo (ronda 2, con redes):
+Full details in `BENCHMARK_REPORT.md` §8. Contains the answer, agent / direct (round 2, with the nets):
 
-| Modelo | Seguimientos | CV EN / ES | XQuAD EN / ES |
+| Model | Follow-ups | CV EN / ES | XQuAD EN / ES |
 |---|---|---|---|
-| **Qwen3-0.6B** | **0.78** / 0.33 | 0.70 / 0.80 (directo 0.73 / 0.80) | 0.58 / 0.70 (directo 0.62 / 0.70) |
+| **Qwen3-0.6B** | **0.78** / 0.33 | 0.70 / 0.80 (direct 0.73 / 0.80) | 0.58 / 0.70 (direct 0.62 / 0.70) |
 | Qwen3-1.7B | 0.83 / 0.33 | 0.90 / 0.87 | 0.76 / 0.68 |
 | Qwen3-4B | **1.00** / 0.39 | 0.87 / 0.90 | 0.80 / 0.88 |
 | Phi-4-mini | 0.78 / 0.33 | 0.83 / 0.90 | 0.74 / 0.64 |
 
-- **El agente resuelve los seguimientos** (el directo no puede) y, con las redes, queda **a la par del directo** (±0.04) en preguntas sueltas con los cuatro modelos. En la ronda 1, el 0.6B perdía 0.12 en XQuAD EN y el 1.7B, hasta 0.32.
-- **Recall de 42:** sin cambios (`61-datasets-moved`). El agente no toca el retrieval medido.
-- **Tests:** 94 pasan; flake8 y mypy limpios.
-- **Ronda 1** (`01-agent-*`) incluida en el commit de checkpoint; **ronda 2** (`02-agent-nets-*`) sin commitear.
+- **The agent solves the follow-ups** (direct mode cannot) and, with the nets, it is **on a par with direct mode** (±0.04) on single questions with all four models. In round 1, the 0.6B lost 0.12 on XQuAD EN and the 1.7B up to 0.32.
+- **42 recall:** unchanged (`61-datasets-moved`). The agent does not touch the measured retrieval.
+- **Tests:** 94 pass; flake8 and mypy clean.
+- **Round 1** (`01-agent-*`) is included in the checkpoint commit; **round 2** (`02-agent-nets-*`) was left uncommitted.
 
-> ✅ **Fase 5 completada (2026-10-24)**, a falta de tu revisión: agente por defecto con memoria de sesión, servidor MCP, acceso directo como opción y benchmark. **Pendiente de decidir:** qué LLM se despliega (propuesta en `BENCHMARK_REPORT.md` §8.3: Qwen3-0.6B, con Qwen3-1.7B como candidato si la CPU del Space lo aguanta).
+> ✅ **Phase 5 completed (2026-10-24)**: the agent by default with session memory, the MCP server, direct access as an option, and the benchmark. **Pending decision:** which LLM is deployed (proposal in `BENCHMARK_REPORT.md` §8.3: Qwen3-0.6B, with Qwen3-1.7B as a candidate if the Space's CPU can take it).

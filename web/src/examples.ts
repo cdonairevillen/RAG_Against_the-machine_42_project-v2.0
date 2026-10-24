@@ -8,4 +8,11 @@ export const EXAMPLES: Record<string, string[]> = {
     "¿Qué proyectos hizo en 42 Madrid?",
     "Which instrument does he play?",
   ],
+  // The project talking about itself (Phase 7a).
+  about: [
+    "What is RAG against the Machine?",
+    "How does the router choose a domain?",
+    "¿Qué modelos usa el proyecto?",
+    "¿Cómo se mide el recall?",
+  ],
 };

@@ -1,186 +1,188 @@
-# CHANGELOG — Fase 3: Mejoras en la generación de respuesta
+# CHANGELOG — Phase 3: Improving answer generation
 
-**Fecha de inicio:** 2026-10-19
-**Estado:** ✅ completada (2026-10-19). Benchmark de generación, prompt nuevo, guardarraíl fuera de dominio (B15), flujo de respuesta unificado, streaming, LLM opcionales con comparativa y juez, revisión de código muerto y evaluadores agrupados en `src/evaluation/`.
+> English translation of [`../es/changelog/FASE_3.md`](../es/changelog/FASE_3.md), the working version.
+
+**Start date:** 2026-10-19
+**Status:** ✅ completed (2026-10-19). Generation benchmark, a new prompt, an out-of-domain guardrail (B15), a unified answer pipeline, streaming, optional LLMs with a comparison and a judge, a dead-code review, and the evaluators grouped in `src/evaluation/`.
 
 ---
 
-## 1. Resultado hasta ahora
+## 1. Result so far
 
-Benchmark de generación (`make gen-bench`): 50 preguntas de cada dataset oficial, las 20 del set en español y 40 fuera de dominio. Qwen3-0.6B, k = 5, decodificación greedy, 150 tokens de salida.
+The generation benchmark (`make gen-bench`): 50 questions from each official dataset, the 20 of the Spanish set and 40 out of domain. Qwen3-0.6B, k = 5, greedy decoding, 150 output tokens.
 
-| Set | Métrica | v1 (`00`) | **Actual (`06`/`07`)** |
+| Set | Metric | v1 (`00`) | **Current (`06`/`07`)** |
 |---|---|---|---|
-| Oficial docs | F1 frente a la respuesta de 42 | 0.480 | **0.497** |
-| | Falsos "no encontrado" | 0.02 | **0.00** |
-| | Cita alguna fuente / cita la correcta | 0.82 / 0.75 | **0.90 / 0.80** |
-| Oficial code | F1 | 0.426 | **0.437** |
-| | Falsos "no encontrado" (con la respuesta en el contexto) | 0.12 (—) | 0.12 (**0.04**) |
-| | Cita alguna fuente / cita la correcta | 0.86 / 0.82 | **1.00 / 0.84** |
-| Español docs | Responde en español | 0.62 | **0.90** |
-| | Falsos "no encontrado" | 0.20 | **0.00** |
-| Español code | Responde en español | 0.70 | **1.00** |
-| Fuera de dominio | Rechazo correcto: ajenas EN / ES | 0.80 / 0.90 | **1.00 / 1.00** (`07`, set corregido) |
-| | Rechazo correcto: casi del dominio EN / ES | 1.00 / 0.70 | 0.90 / 0.70 |
+| Official docs | F1 against the 42 answer | 0.480 | **0.497** |
+| | False "not found" | 0.02 | **0.00** |
+| | Cites some source / cites the right one | 0.82 / 0.75 | **0.90 / 0.80** |
+| Official code | F1 | 0.426 | **0.437** |
+| | False "not found" (with the answer in the context) | 0.12 (—) | 0.12 (**0.04**) |
+| | Cites some source / cites the right one | 0.86 / 0.82 | **1.00 / 0.84** |
+| Spanish docs | Answers in Spanish | 0.62 | **0.90** |
+| | False "not found" | 0.20 | **0.00** |
+| Spanish code | Answers in Spanish | 0.70 | **1.00** |
+| Out of domain | Right rejection: unrelated EN / ES | 0.80 / 0.90 | **1.00 / 1.00** (`07`, corrected set) |
+| | Right rejection: almost in-domain EN / ES | 1.00 / 0.70 | 0.90 / 0.70 |
 
-**Notas de lectura:**
-- **El F1 de los sets en español no es fiable:** compara con la respuesta de referencia de 42, que está en inglés, así que una respuesta correcta en español puntúa bajo. En español valen el idioma, las citas y los rechazos.
-- **"Con la respuesta en el contexto"** separa los fallos del generador de los de la recuperación: si la fuente correcta no llegó al contexto, decir "no encontrado" es lo honesto.
-- El F1 de tokens es una medida aproximada (gratuita y reproducible); el juez LLM queda como complemento.
+**Reading notes:**
+- **The F1 of the Spanish sets is not reliable:** it compares with the 42 reference answer, which is in English, so a correct answer in Spanish scores low. In Spanish, what counts is the language, the citations and the rejections.
+- **"With the answer in the context"** separates the generator's failures from retrieval's: if the right source did not reach the context, saying "not found" is the honest answer.
+- Token F1 is an approximate measure (free and reproducible); the LLM judge is a complement.
 
 ---
 
-## 2. Qué se ha cambiado y por qué
+## 2. What was changed and why
 
-### 2.1 Benchmark de generación (nuevo)
+### 2.1 Generation benchmark (new)
 
-- **`src/gen_bench.py`** + `make gen-bench` (`--limit`, `--k`). Por cada pregunta guarda la respuesta, las fuentes y las métricas en `data/output/gen_bench/<label>/answers.json`; el resumen va a `bench/results/gen/`.
-- **Métricas:**
-  - F1 de tokens estilo SQuAD.
-  - Si la respuesta cita una fuente (por nombre de fichero o `[n]`) y si es la del ground truth.
-  - Idioma de la respuesta.
-  - Falsos "no encontrado", separando si la respuesta estaba en el contexto (mismo criterio de solapamiento que el evaluador de 42).
-  - Rechazo correcto fuera de dominio.
-  - Latencia.
-- **Set fuera de dominio** (`bench/datasets/ood/questions.json`): 40 preguntas, 20 en inglés y 20 en español. La mitad son "ajenas" (geografía, cocina, deporte…) y la otra mitad "casi del dominio" (nginx, PyTorch Lightning, Keras, Kubernetes…).
-  - **Corrección (`07`):** *"What is the capital of France?"* **sí está en el corpus**. La documentación de vLLM la usa, con su respuesta, como ejemplo de la API (`openai_compatible_server.md`; aparece en 79 ficheros), así que responder "Paris" citándola es correcto. Se sustituyó por la del Everest. Todos los términos del set se han comprobado contra la parte indexada del corpus (incluido `benchmarks/`).
-  - Esto **matiza B15**: el caso estrella de "alucinación" desde la Fase 0 estaba, en realidad, en la documentación.
+- **`src/gen_bench.py`** + `make gen-bench` (`--limit`, `--k`). For each question it saves the answer, the sources and the metrics in `data/output/gen_bench/<label>/answers.json`; the summary goes to `bench/results/gen/`.
+- **Metrics:**
+  - SQuAD-style token F1.
+  - Whether the answer cites a source (by file name or `[n]`) and whether it is the ground-truth one.
+  - The answer's language.
+  - False "not found", separating whether the answer was in the context (the same overlap criterion as the 42 evaluator).
+  - Right out-of-domain rejection.
+  - Latency.
+- **Out-of-domain set** (`bench/datasets/ood/questions.json`): 40 questions, 20 in English and 20 in Spanish. Half are "unrelated" (geography, cooking, sport…) and the other half "almost in-domain" (nginx, PyTorch Lightning, Keras, Kubernetes…).
+  - **Correction (`07`):** *"What is the capital of France?"* **is in the corpus**. The vLLM documentation uses it, with its answer, as an API example (`openai_compatible_server.md`; it appears in 79 files), so answering "Paris" while citing it is correct. It was replaced by the Everest one. Every term in the set was checked against the indexed part of the corpus (`benchmarks/` included).
+  - This **qualifies B15**: the star "hallucination" case since Phase 0 was actually in the documentation.
 
-### 2.2 Prompt nuevo (`src/generator.py`)
+### 2.2 New prompt (`src/generator.py`)
 
-Medido paso a paso: `01` prompt v2, `04` regla de "no encontrado" suavizada (descartada), `05` solo la regla de código (adoptada).
+Measured step by step: `01` prompt v2, `04` a softened "not found" rule (discarded), `05` only the code rule (adopted).
 
-- **Chat template oficial** de Qwen3 con `enable_thinking=False`, en lugar del prompt escrito a mano con `/no_think`. En la v1 se colaban restos del razonamiento (`</think>`).
-- **Fuentes numeradas** `[1]…[n]` y citas con `[n]`. El ejemplo de la v1 (*"Source: \<filename\>"*) hacía que el modelo copiara literalmente `<filename>`.
-- **Idioma explícito:** se detecta el idioma de la pregunta (`src/language.py`) y se pide *"Answer in Spanish/English"*.
-- **Regla para leer código:** *"Sources may be code: read default values, conditions and return values directly from it."* Bajó los rechazos de code con la respuesta en el contexto de 0.12 a 0.04.
-- **Regla de "no encontrado" estricta (la de v2):** la versión suavizada (`04`) mejoraba code pero empeoraba docs (2 falsos "no encontrado" y menos citas). Al separar los dos cambios (`05`) se vio que la mejora venía de la regla de código.
-- **Presupuesto de contexto en tokens (B9):** las fuentes se recortan para que el prompt quepa en 3072 tokens; **la pregunta nunca se trunca**. La v1 truncaba por caracteres y luego, al tokenizar, por la derecha, que es donde estaba la pregunta.
-- **Limpieza de la salida** (`clean_output`): restos de razonamiento y frases de "no encontrado" en inglés y español.
-- `max_new_tokens` se mantiene en 150 para comparar sin mezclar efectos (las respuestas de referencia tienen una mediana de 31 palabras).
+- **Qwen3's official chat template** with `enable_thinking=False`, instead of the hand-written prompt with `/no_think`. In v1, reasoning leftovers (`</think>`) slipped through.
+- **Numbered sources** `[1]…[n]` and `[n]` citations. v1's example (*"Source: \<filename\>"*) made the model copy `<filename>` literally.
+- **Explicit language:** the question's language is detected (`src/language.py`) and *"Answer in Spanish/English"* is requested.
+- **A rule for reading code:** *"Sources may be code: read default values, conditions and return values directly from it."* It lowered the code rejections with the answer in the context from 0.12 to 0.04.
+- **A strict "not found" rule (v2's):** the softened version (`04`) improved code but made docs worse (2 false "not found" and fewer citations). Separating the two changes (`05`) showed that the improvement came from the code rule.
+- **A context budget in tokens (B9):** the sources are trimmed so that the prompt fits in 3072 tokens; **the question is never truncated**. v1 truncated by characters and then, when tokenising, from the right, which is where the question was.
+- **Output clean-up** (`clean_output`): reasoning leftovers and "not found" sentences in English and Spanish.
+- `max_new_tokens` stays at 150 to compare without mixing effects (the reference answers have a median of 31 words).
 
-### 2.3 Guardarraíl fuera de dominio (B15)
+### 2.3 Out-of-domain guardrail (B15)
 
-- **Puntuación del reranker** en lugar del umbral BM25: la ruta de generación devuelve "no encontrado" si el mejor de los fragmentos recuperados tiene un logit del reranker inferior a `relevance_threshold = 0.0` (probabilidad 0.5 de "relevante").
-- **Medido** sobre 220 preguntas legítimas y 40 fuera de dominio:
+- **The reranker's score** instead of the BM25 threshold: the generation path returns "not found" if the best retrieved fragment has a reranker logit below `relevance_threshold = 0.0` (a 0.5 probability of "relevant").
+- **Measured** on 220 legitimate questions and 40 out of domain:
 
-| Umbral | Legítimas rechazadas | Fuera de dominio rechazadas |
+| Threshold | Legitimate rejected | Out of domain rejected |
 |---|---|---|
-| −3 | 0.0 % | 60.0 % |
-| **0** | **0.9 %** | **82.5 %** |
-| 2 | 5.0 % | 87.5 % |
+| −3 | 0.0% | 60.0% |
+| **0** | **0.9%** | **82.5%** |
+| 2 | 5.0% | 87.5% |
 
-- **Por qué 0:** es la frontera natural del modelo (logit 0 = 50 %), no un valor ajustado a mano a nuestras 40 preguntas.
-- **Por qué hacía falta:** con el prompt nuevo, Qwen se lanzaba más a responder fuera de dominio (`01`: rechazo de 0.50–0.80). Un modelo de 0.6B no es un buen guardarraíl; el filtro va **antes** del LLM.
-- **Coste:** 2 preguntas legítimas de code se rechazan por error (sobre `OvisConfig` y la atención de Triton). En la ruta de la web, code R@5 pasa de 0.80 a 0.78. **El benchmark oficial no cambia** (`search_dataset` no usa el filtro).
-- El umbral BM25 (`bm25_score_floor`) queda solo como respaldo si no hay reranker cargado.
+- **Why 0:** it is the model's natural boundary (logit 0 = 50%), not a value hand-tuned to our 40 questions.
+- **Why it was needed:** with the new prompt, Qwen was keener to answer out of domain (`01`: rejection of 0.50–0.80). A 0.6B model is not a good guardrail; the gate goes **before** the LLM.
+- **Cost:** 2 legitimate code questions are wrongly rejected (about `OvisConfig` and Triton attention). On the web's path, code R@5 goes from 0.80 to 0.78. **The official benchmark does not change** (`search_dataset` does not use the gate).
+- The BM25 threshold (`bm25_score_floor`) stays only as a fallback if no reranker is loaded.
 
-### 2.4 Un único flujo de respuesta (tu propuesta)
+### 2.4 A single answer pipeline (the author's proposal)
 
-- **`src/rag.py` (nuevo): `RagPipeline.answer()`**, que hace recuperación (`search_for_generation`: `search_smart` + filtro) → bloques de contexto → generación, con streaming opcional (`on_piece`). Devuelve un `RagAnswer` (texto, fuentes en orden `[n]`, `not_found` y tiempos).
-- **Lo usan todos:** `answer` y `answer_dataset` de la CLI, la web y el benchmark de generación. Antes había cuatro copias de la misma secuencia.
-- **Un solo punto de medición por cosa:** `make bench` mide el recall (benchmark oficial) y `make gen-bench` el flujo de respuesta completo, filtro incluido. **Eliminados** el modo `generation` de `bench` y `make bench-gen`.
-- **Verificado:** las 160 respuestas del benchmark son idénticas antes y después de unificar (`05` = `06`).
+- **`src/rag.py` (new): `RagPipeline.answer()`**, which does retrieval (`search_for_generation`: `search_smart` + gate) → context blocks → generation, with optional streaming (`on_piece`). It returns a `RagAnswer` (text, sources in `[n]` order, `not_found` and timings).
+- **Everything uses it:** the CLI's `answer` and `answer_dataset`, the web and the generation benchmark. There used to be four copies of the same sequence.
+- **One measurement point per thing:** `make bench` measures recall (the official benchmark) and `make gen-bench` the whole answer pipeline, gate included. `bench`'s `generation` mode and `make bench-gen` are **removed**.
+- **Checked:** the 160 benchmark answers are identical before and after unifying (`05` = `06`).
 
 ### 2.5 Streaming
 
-- `Generator.stream_answer()` usa `TextIteratorStreamer` de transformers, con la generación en otro hilo; mismo prompt y misma decodificación que `answer_with_text()`.
-- **CLI:** `answer` muestra la respuesta según se genera (`--stream False` para desactivarlo).
-- **Web:** la respuesta se pinta mientras se genera, y después aparecen las tarjetas de fuentes `[1]…[n]`.
+- `Generator.stream_answer()` uses transformers' `TextIteratorStreamer`, with generation in another thread; the same prompt and the same decoding as `answer_with_text()`.
+- **CLI:** `answer` shows the answer as it is generated (`--stream False` to turn it off).
+- **Web:** the answer is drawn as it is generated, and then the `[1]…[n]` source cards appear.
 
 ### 2.6 Web
 
-- Usa `RagPipeline` con streaming.
-- **B6 resuelto:** la respuesta se escapa antes de pintarla como HTML; el código citado con `<…>` ya no rompe la página.
-- **Probada de verdad** con `streamlit.testing.AppTest` (ejecuta la página sin navegador, escribe una pregunta y pulsa el botón): la pregunta en español se responde en español con su cita `[1]` y 5 tarjetas de fuentes.
-- ⚠️ **En tu equipo, el Control de aplicaciones de Windows bloquea `streamlit.exe`** (el lanzador de pip, como pasó con `pyarrow`). Funciona con `python -m streamlit run src/web.py`, y **`make web` ya lo lanza así**.
-- **Sigue pendiente B5:** el modelo se carga por sesión de navegador; se resuelve en la reescritura de la web (Fase 6).
+- Uses `RagPipeline` with streaming.
+- **B6 solved:** the answer is escaped before rendering it as HTML; code quoted with `<…>` no longer breaks the page.
+- **Really tested** with `streamlit.testing.AppTest` (it runs the page without a browser, types a question and presses the button): the question in Spanish is answered in Spanish with its `[1]` citation and 5 source cards.
+- ⚠️ **On the author's machine, Windows Application Control blocks `streamlit.exe`** (pip's launcher, as happened with `pyarrow`). It works with `python -m streamlit run src/web.py`, and **`make web` now launches it that way**.
+- **B5 still pending:** the model is loaded per browser session; solved in the web rewrite (Phase 6).
 
-### 2.7 Revisión de código muerto (a petición tuya)
+### 2.7 Dead-code review (at the author's request)
 
-Tras las reestructuraciones (ingesta a `src/ingestion/`, flujo único en `src/rag.py`, fin del modo `generation`) se revisó el código con **`vulture`** (análisis estático, ejecutado puntualmente con `uvx`, sin añadirlo al proyecto) y se comprobó a mano cada hallazgo.
+After the restructurings (ingestion into `src/ingestion/`, a single pipeline in `src/rag.py`, the end of the `generation` mode) the code was reviewed with **`vulture`** (static analysis, run once with `uvx`, without adding it to the project), and each finding was checked by hand.
 
-**Eliminado:**
+**Removed:**
 
-| Qué | Por qué |
+| What | Why |
 |---|---|
-| `Embedder.dimension` | Nunca se usó (la dimensión se lee del propio vector) |
-| `Generator.MODEL_NAME` | El modelo viene ahora de `[generation]` en `rag.toml` |
-| `Generator(repo_root=…)` | Se mantenía "por compatibilidad", pero ya nadie lo pasaba |
-| `Retriever.search_no_rerank()` | Era un alias de `search()`; queda solo `search()` |
-| `bench --mode` y `MODES` | Desde que se unificaron las rutas solo quedaba `smart`. Se mantiene `"mode": "smart"` en los resultados para no romper la comparación con los 90 ya guardados |
-| Copias de `build_context_blocks` / `is_not_found` en la CLI y la web | Sustituidas por el flujo único (`src/rag.py`) |
+| `Embedder.dimension` | Never used (the dimension is read from the vector itself) |
+| `Generator.MODEL_NAME` | The model now comes from `[generation]` in `rag.toml` |
+| `Generator(repo_root=…)` | Kept "for compatibility", but nobody passed it any more |
+| `Retriever.search_no_rerank()` | It was an alias of `search()`; only `search()` remains |
+| `bench --mode` and `MODES` | Since the paths were unified only `smart` remained. `"mode": "smart"` is kept in the results so as not to break the comparison with the 90 already saved |
+| Copies of `build_context_blocks` / `is_not_found` in the CLI and the web | Replaced by the single pipeline (`src/rag.py`) |
 
-**Convertido en algo útil:** `TOKEN_MODES` describía los modos válidos de `code_aware_tokens`, pero nada los comprobaba. Ahora el tipo de la configuración es `Literal[...]`, así que un valor mal escrito (`"cod"`) da un error claro en lugar de comportarse como `"none"` sin avisar.
+**Turned into something useful:** `TOKEN_MODES` described the valid modes of `code_aware_tokens`, but nothing checked them. Now the configuration type is `Literal[...]`, so a misspelt value (`"cod"`) gives a clear error instead of silently behaving like `"none"`.
 
-**Se queda, aunque `vulture` lo marca:**
-- Los comandos de la CLI (`search_dataset`, `evaluate`, `bench`…): Fire los invoca por nombre.
-- `max_context_length` en `evaluate`: compatibilidad con la llamada de la moulinette de 42.
-- `question_str`: formato JSON de 42.
-- `Chunk.modality`: se guarda en Qdrant y es la base de la Fase 4b.
-- `available_profiles`: lista para el selector de la web (Fase 6), con test.
+**Kept, although `vulture` flags it:**
+- The CLI commands (`search_dataset`, `evaluate`, `bench`…): Fire calls them by name.
+- `max_context_length` in `evaluate`: compatibility with the 42 moulinette's call.
+- `question_str`: the 42 JSON format.
+- `Chunk.modality`: stored in Qdrant and the basis for Phase 4b.
+- `available_profiles`: the list for the web's picker (Phase 6), with a test.
 
-**Documentación desactualizada corregida:** la docstring de `Retriever` describía `search_for_generation` como "BM25 + reranker over the unified index", que era la ruta antigua.
+**Outdated documentation fixed:** the `Retriever` docstring described `search_for_generation` as "BM25 + reranker over the unified index", which was the old path.
 
-**Verificado:** recall idéntico a `49-fase2-final` (`52-deadcode-check`), 58 tests, lint limpio, y `search` y `answer` probados desde la CLI.
+**Checked:** recall identical to `49-fase2-final` (`52-deadcode-check`), 58 tests, lint clean, and `search` and `answer` tested from the CLI.
 
-### 2.8 LLM opcionales y juez
+### 2.8 Optional LLMs and the judge
 
-- **`[generation]` en `rag.toml`:** modelo, `max_new_tokens`, `max_input_tokens` y `trust_remote_code`. La base es `Qwen/Qwen3-0.6B`. **Todos los modelos se cargan a través de `llm_sdk`** (que acepta `model_name`), sin tocar la carpeta del SDK.
-- **El generador ya no da por hecho que el modelo es Qwen:** los tokens de fin de respuesta se toman de la configuración de cada modelo (antes estaba fijo `<|im_end|>`).
-- **Perfiles** (decisión tuya tras la comparativa): `llm-qwen3-1.7b`, `llm-qwen3-4b` y `llm-phi4-mini`. **SmolLM3-3B, medido y descartado.** Resultados en `docs/BENCHMARK_REPORT.md` §5.
-- **Dos problemas resueltos al medir:**
-  - **Phi-4-mini:** el código de su repositorio importa nombres que ya no existen en transformers 5 (`LossKwargs`). Con `trust_remote_code = false` se usa la implementación nativa de transformers (arquitectura `phi3`).
-  - **Qwen3-4B:** no cabe en 12 GB junto con `bge-m3` y el reranker (accelerate intenta mover parte del modelo a la CPU y el SDK no lo permite). Su perfil pone la recuperación en CPU, que ya se comprobó que da los mismos resultados.
-- **Juez (`src/judge.py`, `make judge LABEL=…`):**
-  - LLM como juez sobre una API compatible con OpenAI (Groq, `openai/gpt-oss-120b`), con nota 0–2 frente a la respuesta de referencia de 42.
-  - **Solo se ejecuta a petición**, sobre las respuestas ya guardadas por `gen-bench`; el programa normal nunca lo usa.
-  - **Ahorro de cuota:** caché en disco (`data/output/judge_cache.json`), las respuestas "no encontrado" no se envían, pausa entre peticiones y reintentos ante 429. En total, unas 190 llamadas para comparar los cinco modelos.
-  - Lee `JUDGE_BASE_URL`, `JUDGE_MODEL` y `GROQ_API_KEY` del `.env` (ignorado por git); la clave nunca se imprime. Sin dependencias nuevas (`urllib`).
-  - **Resuelve el problema del F1 en español:** el juez evalúa el significado, no el idioma.
+- **`[generation]` in `rag.toml`:** model, `max_new_tokens`, `max_input_tokens` and `trust_remote_code`. The base is `Qwen/Qwen3-0.6B`. **Every model is loaded through `llm_sdk`** (which accepts `model_name`), without touching the SDK folder.
+- **The generator no longer assumes the model is Qwen:** the end-of-answer tokens are taken from each model's configuration (before, `<|im_end|>` was hard-coded).
+- **Profiles** (the author's decision after the comparison): `llm-qwen3-1.7b`, `llm-qwen3-4b` and `llm-phi4-mini`. **SmolLM3-3B, measured and discarded.** Results in `docs/BENCHMARK_REPORT.md` §5.
+- **Two problems solved while measuring:**
+  - **Phi-4-mini:** its repository code imports names that no longer exist in transformers 5 (`LossKwargs`). With `trust_remote_code = false`, transformers' native implementation (the `phi3` architecture) is used.
+  - **Qwen3-4B:** it does not fit in 12 GB together with `bge-m3` and the reranker (accelerate tries to move part of the model to the CPU, and the SDK does not allow it). Its profile puts retrieval on the CPU, which was already shown to give the same results.
+- **Judge (`src/judge.py`, `make judge LABEL=…`):**
+  - An LLM as a judge over an OpenAI-compatible API (Groq, `openai/gpt-oss-120b`), with a 0–2 score against the 42 reference answer.
+  - **It only runs on request**, over the answers already saved by `gen-bench`; the normal program never uses it.
+  - **Saving quota:** a disk cache (`data/output/judge_cache.json`), "not found" answers are not sent, a pause between requests and retries on 429. In total, about 190 calls to compare the five models.
+  - It reads `JUDGE_BASE_URL`, `JUDGE_MODEL` and `GROQ_API_KEY` from `.env` (ignored by git); the key is never printed. No new dependencies (`urllib`).
+  - **It solves the Spanish F1 problem:** the judge evaluates the meaning, not the language.
 
-### 2.8 bis Regla de "dónde" (añadida en el checkpoint)
+### 2.8 bis The "where" rule (added at the checkpoint)
 
-**Regla 5 del prompt:** *"If the question asks where to find something, give the file path shown in that source's header."* La razón y la medición están en `CHECKPOINT_42.md` §3: el juez de docs EN sube de 1.00 a 1.30.
+**Prompt rule 5:** *"If the question asks where to find something, give the file path shown in that source's header."* The reason and the measurement are in `CHECKPOINT_42.md` §3: the docs EN judge score goes from 1.00 to 1.30.
 
-### 2.9 Evaluadores agrupados en `src/evaluation/`
+### 2.9 Evaluators grouped in `src/evaluation/`
 
-- `evaluator.py` (recall de 42), `bench.py`, `gen_bench.py` y `judge.py` pasan de `src/` a **`src/evaluation/`**: se distingue a simple vista qué es el RAG y qué son las herramientas para medirlo. Movidos con `git mv` para conservar el historial; `judge.py` era nuevo y se movió normalmente.
-- **Sin cambios de comportamiento:** los comandos (`make bench`, `make gen-bench`, `make judge`, `evaluate`/`search_dataset` de 42) son los mismos. Verificado con el recall idéntico a `49` (`53-evaluation-package`), los comandos de 42, el juez (con 0 llamadas a la API gracias a la caché), 61 tests y lint limpio.
+- `evaluator.py` (42 recall), `bench.py`, `gen_bench.py` and `judge.py` move from `src/` to **`src/evaluation/`**: it shows at a glance what is the RAG and what are the tools to measure it. Moved with `git mv` to keep the history; `judge.py` was new and was moved normally.
+- **No behaviour changes:** the commands (`make bench`, `make gen-bench`, `make judge`, the 42 `evaluate`/`search_dataset`) are the same. Checked with recall identical to `49` (`53-evaluation-package`), the 42 commands, the judge (with 0 API calls thanks to the cache), 61 tests and lint clean.
 
 ---
 
-## 3. Ficheros
+## 3. Files
 
-| Fichero | Cambio |
+| File | Change |
 |---|---|
-| `src/rag.py` | **Nuevo**: `RagPipeline`, `RagAnswer`, `build_context_blocks` |
-| `src/evaluation/gen_bench.py` | **Nuevo**: benchmark de generación |
-| `src/evaluation/judge.py` | **Nuevo**: juez LLM (Groq), con caché |
-| `src/evaluation/` | `evaluator.py` y `bench.py` movidos aquí (§2.9) |
-| `src/language.py` | **Nuevo**: detección de idioma (es/en) |
-| `src/generator.py` | Chat template oficial, fuentes `[n]`, idioma, presupuesto en tokens, `clean_output`, `stream_answer` |
-| `src/retriever.py` | Filtro de relevancia con el reranker (`top_relevance`) |
-| `src/config.py`, `rag.toml` | `relevance_threshold = 0.0`; `[generation]`; perfiles `llm-qwen3-1.7b`, `llm-qwen3-4b` y `llm-phi4-mini`; `code_aware_tokens` validado |
-| `src/cli.py` | `answer`/`answer_dataset` vía `RagPipeline`, streaming, `gen_bench` |
-| `src/bench.py`, `Makefile` | Fuera el modo `generation` y `bench-gen`; añadido `gen-bench`; `make web` con `python -m streamlit` |
-| `src/web.py` | `RagPipeline` + streaming; respuesta escapada (B6) |
-| `bench/datasets/ood/questions.json` | **Nuevo**: set fuera de dominio |
-| `tests/test_generator.py`, `tests/test_gen_bench.py`, `tests/test_judge.py` | **Nuevos** |
-| `llm_sdk/**` | **Sin tocar** |
+| `src/rag.py` | **New**: `RagPipeline`, `RagAnswer`, `build_context_blocks` |
+| `src/evaluation/gen_bench.py` | **New**: generation benchmark |
+| `src/evaluation/judge.py` | **New**: LLM judge (Groq), with a cache |
+| `src/evaluation/` | `evaluator.py` and `bench.py` moved here (§2.9) |
+| `src/language.py` | **New**: language detection (es/en) |
+| `src/generator.py` | Official chat template, `[n]` sources, language, token budget, `clean_output`, `stream_answer` |
+| `src/retriever.py` | Relevance gate with the reranker (`top_relevance`) |
+| `src/config.py`, `rag.toml` | `relevance_threshold = 0.0`; `[generation]`; the `llm-qwen3-1.7b`, `llm-qwen3-4b` and `llm-phi4-mini` profiles; `code_aware_tokens` validated |
+| `src/cli.py` | `answer`/`answer_dataset` through `RagPipeline`, streaming, `gen_bench` |
+| `src/bench.py`, `Makefile` | The `generation` mode and `bench-gen` removed; `gen-bench` added; `make web` with `python -m streamlit` |
+| `src/web.py` | `RagPipeline` + streaming; escaped answer (B6) |
+| `bench/datasets/ood/questions.json` | **New**: out-of-domain set |
+| `tests/test_generator.py`, `tests/test_gen_bench.py`, `tests/test_judge.py` | **New** |
+| `llm_sdk/**` | **Untouched** |
 
-**Tests:** 61. Lint limpio.
+**Tests:** 61. Lint clean.
 
 ---
 
-## 4. Pendiente en la Fase 3
+## 4. Pending in Phase 3
 
-1. ~~`make web` con `python -m streamlit`~~ → hecho.
-2. ~~Capa de LLM y perfiles opcionales~~ → hecho (§2.8).
-3. ~~Comparativa de LLMs con juez~~ → hecho (§2.8 y `BENCHMARK_REPORT.md` §5).
-4. ~~Cierre: `BENCHMARK_REPORT.md` y roadmap~~ → hecho.
+1. ~~`make web` with `python -m streamlit`~~ → done.
+2. ~~The LLM layer and optional profiles~~ → done (§2.8).
+3. ~~Comparison of LLMs with a judge~~ → done (§2.8 and `BENCHMARK_REPORT.md` §5).
+4. ~~Closing: `BENCHMARK_REPORT.md` and the roadmap~~ → done.
 
-**Para revisar contigo:**
-- **Modelo recomendado en la web:** se decide en la Fase 6.
-- **Velocidad en CPU de los LLM opcionales:** no medida. Te parece aceptable que aumente.
-- **Las 2 preguntas legítimas de code que rechaza el filtro** (§2.3): si se quieren recuperar, el umbral es configurable (`relevance_threshold`).
+**To review with the author:**
+- **The model recommended in the web:** decided in Phase 6.
+- **CPU speed of the optional LLMs:** not measured. The author finds it acceptable that it goes up.
+- **The 2 legitimate code questions the gate rejects** (§2.3): if they are to be recovered, the threshold is configurable (`relevance_threshold`).

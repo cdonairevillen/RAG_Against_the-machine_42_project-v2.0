@@ -1,0 +1,76 @@
+{
+  "rag_questions": [
+    {
+      "question_id": "about-01",
+      "question": "¿Qué es RAG against the Machine?"
+    },
+    {
+      "question_id": "about-02",
+      "question": "¿Qué modelo de lenguaje usa el proyecto por defecto?"
+    },
+    {
+      "question_id": "about-03",
+      "question": "¿Qué modelo de embeddings usa la recuperación?"
+    },
+    {
+      "question_id": "about-04",
+      "question": "¿Qué reranker usa el proyecto?"
+    },
+    {
+      "question_id": "about-05",
+      "question": "¿Qué base de datos guarda los chunks y sus vectores?"
+    },
+    {
+      "question_id": "about-06",
+      "question": "¿Cómo elige el router qué dominio responde una pregunta?"
+    },
+    {
+      "question_id": "about-07",
+      "question": "¿Cuánto mejoró el recall en el benchmark oficial de 42?"
+    },
+    {
+      "question_id": "about-08",
+      "question": "¿Recuerda el agente la conversación?"
+    },
+    {
+      "question_id": "about-09",
+      "question": "¿Cómo se divide el código Python en chunks?"
+    },
+    {
+      "question_id": "about-10",
+      "question": "¿Qué herramientas expone el servidor MCP?"
+    },
+    {
+      "question_id": "about-11",
+      "question": "¿Dónde se despliega el proyecto?"
+    },
+    {
+      "question_id": "about-12",
+      "question": "¿Bajo qué licencia se publica el proyecto?"
+    },
+    {
+      "question_id": "about-13",
+      "question": "¿Cuándo cuenta como acierto una fuente recuperada en la evaluación de 42?"
+    },
+    {
+      "question_id": "about-14",
+      "question": "¿Qué bases de datos se compararon antes de elegir Qdrant?"
+    },
+    {
+      "question_id": "about-15",
+      "question": "¿Por qué la rama de documentación no usa el reranker?"
+    },
+    {
+      "question_id": "about-16",
+      "question": "¿Qué función lista los ficheros de una fuente antes de indexarlos?"
+    },
+    {
+      "question_id": "about-17",
+      "question": "¿Cómo detiene la generación el botón Stop de la web?"
+    },
+    {
+      "question_id": "about-18",
+      "question": "¿Qué hace el agente si su consulta reescrita no encuentra nada?"
+    }
+  ]
+}

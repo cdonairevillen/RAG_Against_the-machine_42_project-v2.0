@@ -1,448 +1,463 @@
 # ROADMAP — RAG Against the Machine v2.0
 
-Planificación del roadmap de la mejora del proyecto RAG. Todo lo que se discuta y acepte de aquí al futuro del proyecto se actualizará aquí donde corresponda.
+> English translation of [`es/ROADMAP.md`](es/ROADMAP.md), the working version. Updated at the end of each phase.
 
-**Documentos relacionados** (todos en `docs/`):
-- `PLANING.md`: objetivos, propuestas, limitaciones y normas.
-- `RESPUESTA.md`: análisis técnico, bugs detectados (B1–B13) y opciones valoradas. B14 y B15 están en `changelog/FASE_0.md`.
-- `ROADMAP.md` (este): **documento vigente**. Si algo contradice a `RESPUESTA.md`, manda este.
-- `changelog/FASE_N.md`: un changelog por fase, según las normas de `PLANING.md`.
-- `BENCHMARK_REPORT.md`: comparativa de modelos y configuraciones (se crea en la Fase 2).
+The roadmap of the project's improvement. Everything discussed and agreed from here on is updated here, where it belongs.
+
+**Related documents** (the Spanish working versions are in `docs/es/`):
+- `PLANING.md` (Spanish only): goals, proposals, constraints and rules.
+- `RESPUESTA.md` (Spanish only): technical analysis, bugs found (B1–B13) and options considered. B14 and B15 are in `changelog/FASE_0.md`.
+- `ROADMAP.md` (this one): **the current document**. If something contradicts `RESPUESTA.md`, this one prevails.
+- `changelog/FASE_N.md`: one changelog per phase, following the rules in `PLANING.md`.
+- `BENCHMARK_REPORT.md`: comparison of models and configurations (created in Phase 2).
+- `decisions.md`: decisions taken out of necessity, with their options.
+- `es/README.md`: Spanish translation of the project's README.
+
+**Languages:** the work is done in Spanish (`docs/es/`), and these English versions are updated **at the end of each phase**. `PLANING.md`, `RESPUESTA.md` and `Elements_frontend.md` are not translated (the initial plan and working notes).
 
 ---
 
-# Respuestas #
+# Answers #
 
-Tus respuestas a las dudas de `RESPUESTA.md` §7, con lo que implica cada una para el roadmap.
+The author's answers to the questions in `RESPUESTA.md` §7, and what each one means for the roadmap.
 
-| Duda | Respuesta | Consecuencia en el roadmap |
+| Question | Answer | Consequence for the roadmap |
 |---|---|---|
-| **D1** Datasets privados | Eran propios de la corrección. Con los públicos basta para tener una idea del rendimiento. | Los targets `test-*` del Makefile se eliminan en la Fase 0. La línea base se mide **solo** con los datasets públicos. |
-| **D2** URLs del Makefile | Cambiaron en su momento. Actualizadas aquí; se cambiarán en el repo real más adelante. | El cambio del Makefile entra en el primer commit de la Fase 0. |
-| **D3** Hardware | NVIDIA RTX 3080 Ti en local. La idea es que funcione en los ordenadores de 42 (tienen gráfica, poco potente, modelo desconocido). | **Valores por defecto ligeros** (deben correr en 42 y en CPU). Los modelos grandes son opcionales y se prueban en la 3080 Ti. Está pendiente averiguar la GPU de 42.<br>**Actualizado 2026-10-23:** las GPU de 42 no aceptan CUDA (indexar vLLM ahí lleva ~10 h), así que **se descarta indexar en 42**. Toda la ingesta se hace en la 3080 Ti y el proyecto se sirve **en línea**. En las presentaciones a empresas en 42 se enseña la web desplegada o se da el enlace. Los valores por defecto siguen siendo ligeros porque el despliegue gratuito es en CPU. |
-| **D4** Evaluación | Los recalls se hacen **solo** sobre los datasets de 42. Cualquier test extra es bienvenido. Se puede usar una key gratuita para tests de respuesta. | El evaluador de 42 es la referencia y no se toca. Las métricas extra (MRR, nDCG, set manual, juez LLM por API gratuita) son complementarias. |
-| **D5** Frontend | FastAPI + React, pero **la estética debe quedarse igual que la actual**. | Fase 6: React reproduce el diseño de `src/web.py` (colores, tipografías, tarjetas). |
-| **D6** Idioma y dominios | Multilenguaje. Además, más datasets, no solo vLLM. Este repo es sobre todo para tener las marcas de recall claras. | Embeddings y reranker **multilingües** desde la Fase 2. La ingesta multi-dominio se prepara en la Fase 1 y se usa en la Fase 4. vLLM sigue siendo el **benchmark**. |
-| **D7** Agente | Dicotomía: agente propio como intermediario, pero también acceso directo al RAG. **A discutir.** | La arquitectura soporta **ambos** caminos desde el diseño. La decisión de qué es lo por defecto se toma antes de la Fase 5.<br>**Decidido (2026-10-23): agente por defecto**, como en un RAG real, y con memoria de sesión. El acceso directo sigue disponible como opción. |
-| **D8** Permiso Fase 0 | Sí, permiso para arreglar el código. Curiosidad por ver cómo evolucionan los recalls. | Se mide antes y después de cada fix, y se documenta en `changelog/FASE_0.md`. |
-| **D9** Multimedia | Quiero que acepte todo lo posible. Videos y audios sobre todo. La idea es que funcione igual que algo destinado a produccion de alto standing. | La Fase 4b **deja de ser opcional**, con prioridad para **vídeo y audio**:<br>• Transcripción con marcas de tiempo.<br>• Imágenes con OCR + captions.<br>• Búsqueda de imágenes por texto (CLIP/SigLIP, nivel B).<br>El VLM generativo (nivel C) solo en local.<br>⚠️ "Producción de alto standing" choca con el despliegue gratuito en CPU: la ingesta se hace offline en la 3080 Ti y en producción solo se sirve lo ya indexado. |
+| **D1** Private datasets | They belonged to the grading. The public ones are enough to get an idea of the performance. | The Makefile's `test-*` targets are removed in Phase 0. The baseline is measured **only** with the public datasets. |
+| **D2** Makefile URLs | They changed at some point. Updated here; they will be changed in the real repo later. | The Makefile change goes into the first commit of Phase 0. |
+| **D3** Hardware | An NVIDIA RTX 3080 Ti locally. The idea is that it runs on the 42 machines (they have a GPU, not a powerful one, model unknown). | **Light defaults** (they must run at 42 and on a CPU). The big models are optional and tested on the 3080 Ti. The 42 GPU is still to be found out.<br>**Updated 2026-10-23:** the 42 GPUs do not accept CUDA (indexing vLLM there takes ~10 h), so **indexing at 42 is ruled out**. All ingestion is done on the 3080 Ti and the project is served **online**. In company presentations at 42, the deployed web is shown or the link is given. The defaults stay light because the free deployment runs on a CPU. |
+| **D4** Evaluation | Recall is measured **only** on the 42 datasets. Any extra test is welcome. A free key can be used for answer tests. | The 42 evaluator is the reference and is not touched. Extra metrics (MRR, nDCG, a manual set, an LLM judge through a free API) are complementary. |
+| **D5** Frontend | FastAPI + React, but **the look must stay the same as the current one**. | Phase 6: React reproduces the design of `src/web.py` (colours, typefaces, cards). |
+| **D6** Language and domains | Multilingual. Also, more datasets, not just vLLM. This repo is mainly about having clear recall figures. | **Multilingual** embeddings and reranker from Phase 2. Multi-domain ingestion is prepared in Phase 1 and used in Phase 4. vLLM stays as the **benchmark**. |
+| **D7** Agent | A dichotomy: its own agent as an intermediary, but also direct access to the RAG. **To be discussed.** | The architecture supports **both** paths by design. Which one is the default is decided before Phase 5.<br>**Decided (2026-10-23): the agent by default**, as in a real RAG, with session memory. Direct access stays available as an option.<br>**Changed in the web (2026-10-24):** direct by default, the agent marked as a work in progress (Phase 7). |
+| **D8** Permission for Phase 0 | Yes, permission to fix the code. Curious to see how recall evolves. | Each fix is measured before and after, and documented in `changelog/FASE_0.md`. |
+| **D9** Multimedia | It should accept as much as possible. Video and audio above all. The idea is that it works like something meant for high-end production. | Phase 4b **is no longer optional**, with priority for **video and audio**:<br>• Transcription with timestamps.<br>• Images with OCR + captions.<br>• Image search by text (CLIP/SigLIP, level B).<br>The generative VLM (level C) only locally.<br>⚠️ "High-end production" clashes with a free CPU deployment: ingestion is done offline on the 3080 Ti, and production only serves what is already indexed. |
 
-**Nota:** tendríamos que hacer una comparativa del funcionamiento de los modelos propuestos para ver cuáles nos son más funcionales, igual que el `BENCHMARK_REPORT.md` de AgentSmith. Solo así podremos comprobar qué nos conviene más.
+**Note:** a comparison of how the proposed models work is needed, to see which ones suit the project best, like AgentSmith's `BENCHMARK_REPORT.md`. Only that way can we check what suits us best.
 
-→ Se crea `docs/BENCHMARK_REPORT.md` en la Fase 2 (embeddings y rerankers) y se amplía en la Fase 3 (LLMs) y en la Fase 5 (agente frente a acceso directo).
+→ `docs/BENCHMARK_REPORT.md` is created in Phase 2 (embeddings and rerankers) and extended in Phase 3 (LLMs) and Phase 5 (agent vs direct access).
 
 ---
 
-# Puntualizaciones #
+# Clarifications #
 
-Dado que vamos a hacer un frontend real, podríamos plantear la **modularización** del proyecto: elegir qué modelo usar en cada momento, si usar o no el intermediario… cambiando la navegación dentro de la página web. **Tendremos que discutirlo.**
+Since a real frontend is being built, the **modularisation** of the project could be considered: choosing which model to use at each moment, whether or not to use the intermediary… by changing the navigation in the website. **To be discussed.**
 
-**Cómo lo preparamos sin cerrar la discusión:**
-- Cada pieza del pipeline (chunker, embeddings, reranker, LLM, agente sí/no) se elige por **configuración**, no por código. Un fichero de config más un override por petición de la API.
-- Las mismas opciones están disponibles en la CLI, en la API y en la web. La web solo muestra lo que la API permite.
-- Qué opciones se exponen al usuario de la web, y cómo se navega entre ellas, se decide en la Fase 6.
+**How it is prepared without closing the discussion:**
+- Every pipeline piece (chunker, embeddings, reranker, LLM, agent yes/no) is chosen by **configuration**, not by code. A config file plus a per-request override in the API.
+- The same options are available in the CLI, the API and the web. The web only shows what the API allows.
+- Which options are exposed to the web user, and how to navigate between them, is decided in Phase 6.
 
 ---
 
 # ROADMAP #
 
-**Regla común a todas las fases:**
-- Al cerrar cada fase se ejecuta `make bench` sobre los datasets públicos de 42.
-- **Los recalls no pueden empeorar** respecto a la mejor marca anterior. Si empeoran, se justifica en el changelog o se revierte.
-- **Prioridad de métricas: R@5 > R@10 > R@3 > R@1.** Un cambio que sube R@1 a costa de las demás no se adopta.
-- Cada fase cierra con su `changelog/FASE_N.md`: qué se ha cambiado, lista de ficheros, por qué, en qué afecta y qué debes saber de la arquitectura.
+**Rule common to all phases:**
+- At the end of each phase, `make bench` is run on the public 42 datasets.
+- **Recall cannot get worse** than the previous best. If it does, it is justified in the changelog or reverted.
+- **Metric priority: R@5 > R@10 > R@3 > R@1.** A change that raises R@1 at the expense of the others is not adopted.
+- Each phase closes with its `changelog/FASE_N.md`: what was changed, the list of files, why, what it affects, and what to know about the architecture.
 
 ```
-Fase 0 ─► Fase 1 ─► Fase 2 ─► Fase 3 ─► [Pruebas 42] ─► Fase 4 ─► Fase 5 ─► Fase 6 ─► Fase 7
-saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web +     opcionales
-                                                                  MCP       deploy    y mejoras
+Phase 0 ─► Phase 1 ─► Phase 2 ─► Phase 3 ─► [42 tests] ─► Phase 4 ─► Phase 5 ─► Phase 6 ─► Phase 7
+clean-up   ingestion  hybrid     generation  checkpoint    modes      agent +    web +      optional
+                                                                      MCP        deploy     & polish
 ```
 
-## Fase 0 — Saneamiento y profesionalización del repositorio
+## Phase 0 — Clean-up and professionalisation of the repository
 
-**Objetivo:** dejar una base limpia y una **línea base medida y reproducible**.
+**Goal:** leave a clean base and a **measured, reproducible baseline**.
 
-- **Repositorio**
+- **Repository**
   - `.gitignore`.
-  - Sacar `__pycache__/*.pyc` del control de versiones.
-  - Commit de las URLs nuevas del Makefile (D2).
-- **Makefile portable**
-  - La ruta de caché pasa a ser una variable: `/goinfre` por defecto en 42, ruta local fuera de 42.
-  - Eliminar los `test-*` (D1) y corregir `.PHONY`.
-  - Retirar `index-embed` hasta la Fase 2 (hoy no hace nada).
-- **Línea base "antes"**
-  - Medir el recall público con el código tal cual, **antes** de tocar nada.
-  - Se mide con `search_smart` (el modo evaluado en 42), no con `answer_dataset`.
-- **Bugs** (permiso D8; cada uno se mide por separado):
-  - **B1**: arreglar la señal CamelCase del clasificador.
-  - **B2**: quitar la expansión por símbolos que no hace nada y que además recorre todo el corpus en cada query.
-  - **B3**: una sola ruta de evaluación. `search-docs` y `search-code` pasan a usar `search_dataset`.
-  - **B10**: centralizar los mensajes de "not found".
-  - **B13**: limpieza de imports y constantes sin uso.
+  - Take `__pycache__/*.pyc` out of version control.
+  - Commit the new Makefile URLs (D2).
+- **Portable Makefile**
+  - The cache path becomes a variable: `/goinfre` by default at 42, a local path elsewhere.
+  - Remove the `test-*` targets (D1) and fix `.PHONY`.
+  - Drop `index-embed` until Phase 2 (it does nothing today).
+- **"Before" baseline**
+  - Measure public recall with the code as it is, **before** touching anything.
+  - It is measured with `search_smart` (the mode evaluated at 42), not with `answer_dataset`.
+- **Bugs** (permission D8; each one measured separately):
+  - **B1**: fix the classifier's CamelCase signal.
+  - **B2**: remove the symbol expansion that does nothing and also walks the whole corpus on every query.
+  - **B3**: a single evaluation path. `search-docs` and `search-code` now use `search_dataset`.
+  - **B10**: centralise the "not found" messages.
+  - **B13**: clean up unused imports and constants.
 - **`make bench`**
-  - Ejecuta búsqueda y evaluación de docs y code.
-  - Guarda la config y las métricas en `bench/results/<fecha>_<etiqueta>.json`.
-  - Imprime una tabla comparativa con las ejecuciones anteriores.
-- **Tests mínimos** (`pytest`): evaluador, offsets de chunks y deduplicación hijo→padre. No buscan cobertura completa, sino servir de red de seguridad para las fases siguientes.
-- **Lint**: se mantienen flake8 + mypy (los de 42).
+  - Runs search and evaluation for docs and code.
+  - Saves the config and the metrics in `bench/results/<date>_<label>.json`.
+  - Prints a comparison table with the previous runs.
+- **Minimal tests** (`pytest`): evaluator, chunk offsets and child→parent deduplication. They do not aim for full coverage, but to act as a safety net for the next phases.
+- **Lint**: flake8 + mypy are kept (the 42 ones).
 
-**Cierre:** tabla "antes / después de cada fix" en `changelog/FASE_0.md`. La línea base oficial del v2.0 es el "después".
+**Closing:** a "before / after each fix" table in `changelog/FASE_0.md`. The official v2.0 baseline is the "after".
 
-> ✅ **Completada (2026-10-18).** Línea base oficial v2.0 (`search_smart`, datasets públicos):
+> ✅ **Completed (2026-10-18).** Official v2.0 baseline (`search_smart`, public datasets):
 > - **Docs:** 0.64 / 0.83 / 0.85 / 0.85.
-> - **Code:** 0.45 / 0.62 / 0.64 / 0.72 (R@10 de code sube desde 0.68).
+> - **Code:** 0.45 / 0.62 / 0.64 / 0.72 (code R@10 up from 0.68).
 >
-> Detalle en `changelog/FASE_0.md`. Pendiente de tu commit.
+> Details in `changelog/FASE_0.md`.
 
-## Fase 1 — Modificación de la ingesta
+## Phase 1 — Changing the ingestion
 
-**Objetivo:** pasar de JSON sueltos a una **base de datos** con un modelo de datos que aguante todo lo que viene: multi-dominio, multilingüe, modos y multimedia.
+**Goal:** move from loose JSON files to a **database** with a data model that can take everything that comes: multi-domain, multilingual, modes and multimedia.
 
-- **Interfaz `Chunker`**, con implementaciones intercambiables por config:
-  - **Código**: chunker AST propio, con los offsets corregidos (B7).
-  - **Docs**: `langchain-text-splitters` (`MarkdownHeaderTextSplitter` + `RecursiveCharacterTextSplitter`), comparado con el chunker actual.
-  - **PDF/DOCX**: Docling, que se integra cuando llegue el CV (Fase 4).
-- **Qdrant en modo local**:
-  - IDs estables.
-  - Payload con `domain` (vllm, cv, …), `chunk_type`, `modality` (text de momento), `lang`, `file_path`, rangos y `parent_id`.
-- **BM25 (`bm25s`) se mantiene** como índice sparse, enlazado por el mismo ID.
-- **Ingesta multi-dominio** (D6): `index --source vllm` (y en el futuro otros). Cada fuente declara su chunker y su colección o dominio.
-- **Sistema de configuración** (base de la modularización): un fichero de config + variables de entorno, validado con pydantic.
+- **`Chunker` interface**, with implementations swappable by config:
+  - **Code**: the project's own AST chunker, with the offsets fixed (B7).
+  - **Docs**: `langchain-text-splitters` (`MarkdownHeaderTextSplitter` + `RecursiveCharacterTextSplitter`), compared with the current chunker.
+  - **PDF/DOCX**: Docling, integrated when the CV arrives (Phase 4).
+- **Qdrant in local mode**:
+  - Stable IDs.
+  - Payload with `domain` (vllm, cv, …), `chunk_type`, `modality` (text for now), `lang`, `file_path`, ranges and `parent_id`.
+- **BM25 (`bm25s`) is kept** as the sparse index, linked by the same ID.
+- **Multi-domain ingestion** (D6): `index --source vllm` (and others in the future). Each source declares its chunker and its collection or domain.
+- **Configuration system** (the basis of modularisation): a config file + environment variables, validated with pydantic.
 
-**Cierre:** es un refactor, así que **los recalls deben ser iguales** a los de la Fase 0, salvo la variación por el fix de offsets (B7), que se documenta.
+**Closing:** it is a refactor, so **recall must be the same** as in Phase 0, except for the change from the offsets fix (B7), which is documented.
 
-> ✅ **Completada (2026-10-18).** Detalle en `changelog/FASE_1.md`. Cambios respecto al plan:
-> - **Qdrant en servidor (Docker)**, no en modo local: el modo local tardaba ~9 min en escribir los chunks.
-> - **Chunker de docs:** tu versión empaquetada (`markdown_headers_packed`), no LangChain.
-> - **`split_by_size()` arreglado (B16 + B17):** sin texto perdido, sin trozos duplicados y empezando en salto de línea.
+> ✅ **Completed (2026-10-18).** Details in `changelog/FASE_1.md`. Changes from the plan:
+> - **Qdrant as a server (Docker)**, not in local mode: local mode took ~9 min to write the chunks.
+> - **Docs chunker:** the author's packed version (`markdown_headers_packed`), not LangChain.
+> - **`split_by_size()` fixed (B16 + B17):** no lost text, no duplicated pieces, and starting at a line break.
 >
-> Línea base oficial (`search_smart`, ejecución `20-fix-b16-b17-v2`):
+> Official baseline (`search_smart`, run `20-fix-b16-b17-v2`):
 > - **Docs:** 0.67 / 0.84 / 0.87 / 0.89.
-> - **Code:** 0.43 / 0.59 / 0.64 / 0.71. ⚠️ R@3 y R@10 quedan por debajo de la Fase 0 (0.62 / 0.72); se recupera en la Fase 2.
+> - **Code:** 0.43 / 0.59 / 0.64 / 0.71. ⚠️ R@3 and R@10 fall below Phase 0 (0.62 / 0.72); recovered in Phase 2.
 
-## Fase 2 — Retrieval híbrido
+## Phase 2 — Hybrid retrieval
 
-**Objetivo:** demostrar con números si el híbrido mejora, ahora que los embeddings se implementan bien (ver `RESPUESTA.md` §3).
+**Goal:** show with numbers whether hybrid search improves things, now that embeddings are implemented properly (see `RESPUESTA.md` §3).
 
-- ✅ **Tokenizador code-aware** (B8 + B14): modo `code` (partes de identificadores solo en chunks e índices de code). Code 0.49 / 0.70 / 0.75 / 0.83; docs 0.72 / 0.91 / 0.93 / 0.94.
-- **Embeddings de chunks y de query** con el mismo modelo y el prefijo de instrucción correcto.
-  - Candidatos **multilingües** (D6): `multilingual-e5-small`, `bge-m3`, `Qwen3-Embedding-0.6B`.
-  - Referencia: `bge-small-en-v1.5`.
-  - La ingesta pesada se hace en la 3080 Ti. Los valores por defecto deben poder ejecutarse en 42 (D3).
-  - ✅ torch con CUDA 12.6 configurado; `device = "auto"` cae a CPU sin GPU (probado).
-- ✅ **Rutas unificadas**: `search_for_generation` = filtro de relevancia + `search_smart`.
-- ✅ **Code recuperado** con la fusión RRF por listas y el reranker siempre activo: code 0.45 / 0.63 / 0.67 / 0.72 (supera la Fase 0) y docs 0.72 / 0.90 / 0.93 / 0.95.
-- **Búsqueda por vectores contra Qdrant** (vectores con nombre en los mismos puntos de `rag_<dominio>`). Hoy el retriever carga todos los chunks en memoria.
-- **Volver a medir el chunker de LangChain** tras el híbrido (está en *Posibilidades* de `PLANING.md`), por si se busca subir R@1.
-- **Fusión con RRF**, con ablaciones por separado en docs y en code (BM25 / dense / híbrido).
+- ✅ **Code-aware tokenizer** (B8 + B14): `code` mode (identifier parts only in code chunks and indices). Code 0.49 / 0.70 / 0.75 / 0.83; docs 0.72 / 0.91 / 0.93 / 0.94.
+- **Chunk and query embeddings** with the same model and the right instruction prefix.
+  - **Multilingual** candidates (D6): `multilingual-e5-small`, `bge-m3`, `Qwen3-Embedding-0.6B`.
+  - Reference: `bge-small-en-v1.5`.
+  - Heavy ingestion is done on the 3080 Ti. The defaults must be able to run at 42 (D3).
+  - ✅ torch with CUDA 12.6 set up; `device = "auto"` falls back to CPU without a GPU (tested).
+- ✅ **Unified paths**: `search_for_generation` = relevance gate + `search_smart`.
+- ✅ **Code recovered** with per-list RRF fusion and the reranker always on: code 0.45 / 0.63 / 0.67 / 0.72 (beats Phase 0) and docs 0.72 / 0.90 / 0.93 / 0.95.
+- **Vector search against Qdrant** (named vectors in the same points of `rag_<domain>`). Today the retriever loads every chunk into memory.
+- **Measure the LangChain chunker again** after hybrid search (it is in the *Possibilities* of `PLANING.md`), in case R@1 needs raising.
+- **RRF fusion**, with separate ablations on docs and code (BM25 / dense / hybrid).
 - **Rerankers**:
-  - `ms-marco-MiniLM` (referencia actual).
-  - `bge-reranker-v2-m3` (multilingüe).
+  - `ms-marco-MiniLM` (current reference).
+  - `bge-reranker-v2-m3` (multilingual).
   - `Qwen3-Reranker-0.6B`.
-- **Reglas manuales**: ✅ `skip_rerank_score` (ahora `inf`) y ✅ mínimo de 2 docs (eliminado al unificar). El umbral 5.5 está medido como mala señal; pasa a la Fase 3 (B15). Pendiente: revisar el clasificador doc/code.
-- **Métricas complementarias**: MRR y nDCG@10. El evaluador de 42 queda intacto.
+- **Hand-made rules**: ✅ `skip_rerank_score` (now `inf`) and ✅ the 2-doc minimum (removed when unifying). The 5.5 threshold is measured as a bad signal; it moves to Phase 3 (B15). Pending: review the doc/code classifier.
+- **Complementary metrics**: MRR and nDCG@10. The 42 evaluator stays untouched.
 
-**Entregable:** `docs/BENCHMARK_REPORT.md`, sección *Retrieval* (tabla de configuraciones × recall docs/code × latencia).
+**Deliverable:** `docs/BENCHMARK_REPORT.md`, *Retrieval* section (table of configurations × docs/code recall × latency).
 
-> ✅ **Completada (2026-10-19).** Detalle en `changelog/FASE_2.md` y `docs/BENCHMARK_REPORT.md`.
-> - **Línea base oficial:** docs **0.76 / 0.91 / 0.92 / 0.94**, code **0.51 / 0.72 / 0.80 / 0.88**. Las dos rutas son idénticas.
-> - **Configuración:** BM25 code-aware + embeddings `bge-m3` (en las dos ramas) + reranker `mmarco-mMiniLMv2-L12` con RRF + clasificador con señales en inglés y español.
-> - **Hecho:** CUDA con CPU como alternativa, rutas unificadas, tokenizador code-aware, embeddings, rerankers y clasificador.
-> - **No hecho, pasa a pendientes:**
->   - Métricas MRR/nDCG.
->   - Volver a medir LangChain.
->   - Clasificador semántico.
+> ✅ **Completed (2026-10-19).** Details in `changelog/FASE_2.md` and `BENCHMARK_REPORT.md`.
+> - **Official baseline:** docs **0.76 / 0.91 / 0.92 / 0.94**, code **0.51 / 0.72 / 0.80 / 0.88**. Both paths are identical.
+> - **Configuration:** code-aware BM25 + `bge-m3` embeddings (in both branches) + the `mmarco-mMiniLMv2-L12` reranker with RRF + a classifier with English and Spanish signals.
+> - **Done:** CUDA with CPU fallback, unified paths, code-aware tokenizer, embeddings, rerankers and classifier.
+> - **Not done, moved to pending:**
+>   - MRR/nDCG metrics.
+>   - Measuring LangChain again.
+>   - A semantic classifier.
 
-## Fase 3 — Mejoras en la generación de respuesta
+## Phase 3 — Improving answer generation
 
-**Objetivo:** respuestas más naturales, con fuentes estructuradas y modelos intercambiables.
+**Goal:** more natural answers, with structured sources and swappable models.
 
-- **Backend de LLM** (`src/llm/`):
-  - Qwen3-0.6B vía `llm_sdk` como **base y valor por defecto**. `llm_sdk` no se toca.
-  - Backend HF genérico para los modelos opcionales.
+- **LLM backend** (`src/llm/`):
+  - Qwen3-0.6B through `llm_sdk` as the **base and default**. `llm_sdk` is not touched.
+  - A generic HF backend for the optional models.
 - **Prompt**:
-  - Chat template oficial con `enable_thinking=False`.
-  - Presupuesto de contexto en tokens (B9).
-  - Citas `[n]` enlazadas a las fuentes estructuradas.
-  - Prompts por modo.
-  - **Responder en el idioma de la pregunta** (hoy Qwen contesta en inglés a preguntas en español, aunque la recuperación ya es multilingüe).
-  - **B15**: guardarraíles fuera de dominio. Hoy *"What is the capital of France?"* responde "Paris", aunque es literalmente el ejemplo de rechazo del prompt.
-- **Streaming de tokens**, que prepara la API de la Fase 6.
-- **Comparativa de LLMs** en la 3080 Ti: Qwen3-0.6B frente a Qwen3-1.7B / Qwen3-4B, SmolLM3-3B y Phi-4-mini.
-  - Set de preguntas manual + juez LLM con una key gratuita (D4).
-  - Se mide calidad y latencia.
+  - The official chat template with `enable_thinking=False`.
+  - A context budget in tokens (B9).
+  - `[n]` citations linked to the structured sources.
+  - Prompts per mode.
+  - **Answer in the language of the question** (today Qwen answers Spanish questions in English, although retrieval is already multilingual).
+  - **B15**: out-of-domain guardrails. Today *"What is the capital of France?"* answers "Paris", although it is literally the prompt's rejection example.
+- **Token streaming**, which prepares the Phase 6 API.
+- **Comparison of LLMs** on the 3080 Ti: Qwen3-0.6B vs Qwen3-1.7B / Qwen3-4B, SmolLM3-3B and Phi-4-mini.
+  - A manual question set + an LLM judge with a free key (D4).
+  - Quality and latency are measured.
 
-**Entregable:** `BENCHMARK_REPORT.md`, sección *Generación*.
+**Deliverable:** `BENCHMARK_REPORT.md`, *Generation* section.
 
-> ✅ **Completada (2026-10-19).** Detalle en `changelog/FASE_3.md` y `BENCHMARK_REPORT.md` §5.
-> - **Benchmark de generación** (`make gen-bench`) y **juez** (`make judge`, Groq `gpt-oss-120b`, con caché).
-> - **Prompt nuevo:** chat template oficial, citas `[n]`, idioma de la pregunta (ES: 90–100 %) y presupuesto en tokens (B9).
-> - **B15 resuelto:** filtro con el reranker; rechaza el 100 % de lo claramente ajeno.
-> - **Flujo único** (`src/rag.py`) para CLI, web y benchmark, con streaming.
-> - **LLM:** Qwen3-0.6B como base; Qwen3-1.7B, Qwen3-4B y Phi-4-mini como perfiles (SmolLM3 descartado).
-> - Evaluadores agrupados en `src/evaluation/`.
+> ✅ **Completed (2026-10-19).** Details in `changelog/FASE_3.md` and `BENCHMARK_REPORT.md` §5.
+> - **Generation benchmark** (`make gen-bench`) and **judge** (`make judge`, Groq `gpt-oss-120b`, with a cache).
+> - **New prompt:** official chat template, `[n]` citations, the question's language (ES: 90–100%) and a token budget (B9).
+> - **B15 solved:** a gate with the reranker; it rejects 100% of what is clearly unrelated.
+> - **A single pipeline** (`src/rag.py`) for the CLI, the web and the benchmark, with streaming.
+> - **LLM:** Qwen3-0.6B as the base; Qwen3-1.7B, Qwen3-4B and Phi-4-mini as profiles (SmolLM3 discarded).
+> - Evaluators grouped in `src/evaluation/`.
 
-## Pruebas 42 — Checkpoint
+## 42 tests — Checkpoint
 
-No deben empeorar los resultados obtenidos durante la evaluación.
+The results obtained during the evaluation must not get worse.
 
-- `make bench` completo sobre los datasets públicos y comparativa contra la línea base de la Fase 0.
-- Comprobar que el formato de salida sigue siendo compatible con la moulinette (`search_dataset`, `answer_dataset`, `evaluate`).
-- Etiqueta `v2.0-core` si se supera. A partir de aquí se **añaden** funcionalidades; el núcleo medido no se toca sin volver a pasar este checkpoint.
+- A full `make bench` on the public datasets and a comparison against the Phase 0 baseline.
+- Check that the output format is still compatible with the moulinette (`search_dataset`, `answer_dataset`, `evaluate`).
+- Tag `v2.0-core` if it passes. From here on, features are **added**; the measured core is not touched without passing this checkpoint again.
 
-> ✅ **Superado (2026-10-19).** Detalle en `changelog/CHECKPOINT_42.md`.
-> - **Recall frente a la v1:** docs R@5 +0.07 (0.92) y code R@5 +0.17 (0.80).
-> - **Comandos de 42:** compatibles.
-> - **Sin GPU:** mismas métricas.
-> - Se añade al prompt la regla de "dónde".
+> ✅ **Passed (2026-10-19).** Details in `changelog/CHECKPOINT_42.md`.
+> - **Recall vs v1:** docs R@5 +0.07 (0.92) and code R@5 +0.17 (0.80).
+> - **42 commands:** compatible.
+> - **Without a GPU:** the same metrics.
+> - The "where" rule is added to the prompt.
 
-## Fase 4 — Inserción de modos
+## Phase 4 — Adding modes
 
-**Objetivo:** el RAG deja de ser "solo vLLM": cultura general multilingüe, tu CV y multimedia, cada uno como dominio propio y con su forma de medirse.
+**Goal:** the RAG stops being "vLLM only": multilingual general knowledge, the author's CV and multimedia, each as its own domain and with its own way of being measured.
 
-**Orden decidido:** 4a cultura general → 4b modo CV → 4c multimedia. El **router** se construye en 4a, en cuanto exista un segundo dominio, y crece con cada uno.
+**Agreed order:** 4a general knowledge → 4b CV mode → 4c multimedia. The **router** is built in 4a, as soon as there is a second domain, and grows with each one.
 
-### 4a — Cultura general: XQuAD (después, MLQA)
+### 4a — General knowledge: XQuAD (then MLQA)
 
-- **Dataset:** XQuAD (Google, CC-BY-SA 4.0). Las **mismas** preguntas, sobre los mismos párrafos de Wikipedia, traducidas profesionalmente a 12 idiomas, entre ellos **inglés y español**.
-  - Según su ficha, ~1 190 preguntas sobre ~240 párrafos; **a verificar** al descargarlo.
-- **Por qué:** permite medir el multilingüismo con exactitud: *recall en inglés frente a español con las mismas preguntas y las mismas fuentes*. Es la versión a escala del set complementario de 20 preguntas.
-- **Benchmark como el de 42:** se convierte al formato `RagDataset` (pregunta, respuesta y pasaje fuente con offsets), así que `make bench` y `make gen-bench` funcionan igual. El evaluador de 42 no se toca.
-- **Ingesta:** dominio `xquad`, con su propia colección en Qdrant (`rag_xquad`) y un chunker adecuado para párrafos de Wikipedia.
-- **Router:** decide entre `vllm` y `xquad` (y después los demás) según la pregunta o el modo elegido.
-- **Licencia:** CC-BY-SA exige **citar la fuente** de forma visible en la web y publicar los derivados con la misma licencia.
-- **Después:** MLQA (Meta, CC-BY-SA 3.0, miles de preguntas por idioma) como corpus más grande y exigente.
+- **Dataset:** XQuAD (Google, CC-BY-SA 4.0). The **same** questions, over the same Wikipedia paragraphs, professionally translated into 12 languages, **English and Spanish** among them.
+  - According to its card, ~1,190 questions over ~240 paragraphs; **to be checked** when downloading it.
+- **Why:** it measures multilinguality exactly: *recall in English vs Spanish with the same questions and the same sources*. It is the scaled-up version of the 20-question complementary set.
+- **A benchmark like 42's:** it is converted to the `RagDataset` format (question, answer and source passage with offsets), so `make bench` and `make gen-bench` work the same way. The 42 evaluator is not touched.
+- **Ingestion:** the `xquad` domain, with its own Qdrant collection (`rag_xquad`) and a chunker suited to Wikipedia paragraphs.
+- **Router:** decides between `vllm` and `xquad` (and later the others) from the question or the chosen mode.
+- **License:** CC-BY-SA requires **citing the source** visibly in the web and publishing derived works under the same license.
+- **Later:** MLQA (Meta, CC-BY-SA 3.0, thousands of questions per language) as a bigger, harder corpus.
 
-> ✅ **Completada (2026-10-23).** Detalle en `changelog/FASE_4.md` y `BENCHMARK_REPORT.md` §6.
-> - **Hecho:** datos (HF + títulos de GitHub, con SHA256), un fichero por artículo, ground truth con el fragmento de la respuesta, dominio mixto `xquad` y `bench --suite xquad`.
-> - **Hecho:** `make index` indexa todas las fuentes, router sin filtro o con `--domains` y atribución CC-BY-SA en la web.
-> - **Recall:** EN 0.95 / 0.99 / 0.99 / 1.00, ES 0.92 / 0.99 / 0.99 / 1.00. vLLM sin cambios.
-> - **Router:** el 100 % de las preguntas de 42 y ~98 % de las de XQuAD llegan a su dominio.
-> - **Generación:** contiene la respuesta correcta en el 65 % (EN) y el 57 % (ES); cita la fuente correcta en el 99 %.
-> - **Umbral del filtro fuera de dominio por dominio:** XQuAD usa −2.0, calibrado con `gate_scores`; vLLM sigue con 0.0. Sin ese umbral se descartaba el 18 % de las preguntas válidas.
-> - **`gen-bench` de XQuAD:** subconjunto fijo de 300 preguntas por idioma; `FULL=1` para pruebas completas.
-> - **Pendiente para más adelante:** MLQA.
+> ✅ **Completed (2026-10-23).** Details in `changelog/FASE_4.md` and `BENCHMARK_REPORT.md` §6.
+> - **Done:** data (HF + GitHub titles, with SHA256), one file per article, ground truth with the answer span, a mixed `xquad` domain and `bench --suite xquad`.
+> - **Done:** `make index` indexes every source, the router without a filter or with `--domains`, and CC-BY-SA attribution in the web.
+> - **Recall:** EN 0.95 / 0.99 / 0.99 / 1.00, ES 0.92 / 0.99 / 0.99 / 1.00. vLLM unchanged.
+> - **Router:** 100% of the 42 questions and ~98% of the XQuAD ones reach their domain.
+> - **Generation:** contains the right answer in 65% (EN) and 57% (ES); cites the right source in 99%.
+> - **Out-of-domain gate threshold per domain:** XQuAD uses −2.0, calibrated with `gate_scores`; vLLM keeps 0.0. Without it, 18% of the valid questions were dropped.
+> - **XQuAD `gen-bench`:** a fixed subset of 300 questions per language; `FULL=1` for full runs.
+> - **Pending for later:** MLQA.
 
-### 4b — Modo CV
+### 4b — CV mode
 
-- **Material** (en `data/raw/cv/`, **ignorado por git**; se movió desde la raíz, donde se habría subido con `git add .`):
-  - CV en `.docx` y perfil de LinkedIn en PDF.
-  - `autobiography.md`, una autobiografía con gustos, aficiones y viajes, **por escribir juntos más adelante**.
-- **Ingesta:** Docling para el `.docx` y el PDF; Markdown para la autobiografía. Colección `cv`.
-- **Multilingüe**, con guardarraíles: si algo no está en los datos, no se inventa y se ofrece contacto.
-- **Revisión de privacidad antes de indexar:** qué datos personales entran y cuáles no. Lo decides tú.
-- **El juez externo (Groq) no se usa con datos personales** salvo que lo decidas expresamente.
+- **Material** (in `data/raw/cv/`, **ignored by git**; moved from the root, where `git add .` would have uploaded it):
+  - The CV as `.docx` and the LinkedIn profile as a PDF.
+  - `autobiography.md`, an autobiography with tastes, hobbies and travels, **to be written together later**.
+- **Ingestion:** Docling for the `.docx` and the PDF; Markdown for the autobiography. The `cv` collection.
+- **Multilingual**, with guardrails: if something is not in the data, it is not made up, and contact is offered.
+- **Privacy review before indexing:** which personal data goes in and which does not. The author decides.
+- **The external judge (Groq) is not used with personal data** unless the author explicitly decides so.
 
+> ✅ **Completed (2026-10-23).** Details in `changelog/FASE_4.md` (4b) and `BENCHMARK_REPORT.md` §7.
+> - **Indexed:** the CV (`.docx`, EN), LinkedIn (`.pdf`, ES) and the biography (ES + an EN version), with Docling.
+> - **Privacy:** private contact data is masked at answer time, without touching the files. 0 leaks in every test.
+> - **Missing data**, it answers: *"I don't have that information, but you can ask him yourself! cdonairevillen@gmail.com"* (and its Spanish version).
+> - **CV mode prompt** in the third person, without mixing jobs, reserved topics and contact. Chunks of 800, 8 sources and a −3.0 threshold.
+> - **Result:** contains the right answer in 73% (EN) and 80% (ES); the router sends 100% of the CV questions to their domain.
 
-> ✅ **Completada (2026-10-23).** Detalle en `changelog/FASE_4.md` (4b) y `BENCHMARK_REPORT.md` §7.
-> - **Indexado:** CV (`.docx`, EN), LinkedIn (`.pdf`, ES) y biografía (ES + versión EN), con Docling.
-> - **Privacidad:** los datos de contacto privados se enmascaran al responder, sin tocar los ficheros. 0 fugas en todas las pruebas.
-> - **Sin dato**, responde: *"No dispongo de esa información, ¡pero puedes preguntárselo tú! cdonairevillen@gmail.com"*.
-> - **Prompt del modo CV** con tercera persona, sin mezclar trabajos, temas reservados y contacto. Chunks de 800, 8 fuentes y umbral −3.0.
-> - **Resultado:** contiene la respuesta correcta en el 73 % (EN) y el 80 % (ES); el router manda el 100 % de las preguntas del CV a su dominio.
+- **Future, a module of the author's own texts:** some of his stories could be ingested as part of the CV mode (or as a separate domain).
 
-- **Futuro, módulo de textos propios:** algunos relatos tuyos podrán ingestarse como parte del modo CV (o como dominio aparte).
+### 4c — Multimedia: *Gulliver's Travels* (1939) vs Swift's novel (1726)
 
-### 4c — Multimedia: *Los viajes de Gulliver* (1939) frente a la novela de Swift (1726)
+> ⏸️ **Postponed (2026-10-23, the author's decision):** it remains a possible phase at the end of the project. The plan below is kept as it is. The book and the film are already downloaded in `data/raw/gulliver/`, with URL and SHA256 in the checklist. Proposal pending approval when it is resumed: a Markdown transcription with one header per time window (`## 00:12:30`) instead of the offset-to-seconds map.
 
-> ⏸️ **Aplazada (2026-10-23, decisión tuya):** queda como posible fase al final del proyecto. El plan de abajo se conserva tal cual. Ya están descargados el libro y la película en `data/raw/gulliver/`, con URL y SHA256 en la checklist. Propuesta pendiente de aprobar cuando se retome: transcripción en Markdown con una cabecera por ventana de tiempo (`## 00:12:30`) en lugar del mapa de offsets a segundos.
-
-- **Objetivo:** ingestar una misma historia en dos formatos, novela y película, y comparar qué recupera de cada uno. Un recruiter debe poder ver el código y todos los archivos usados en la ingesta.
-- **Requisitos:**
-  - La película debe tener **sonido**, para que la transcripción con Whisper aporte texto real.
-  - Libro y película deben poder descargarse y publicarse sin problemas de derechos.
-  - Todo **reproducible**: quien clone el repo obtiene los mismos datos.
-- **Por qué Gulliver:** película de Fleischer, animada, en color, con diálogo y canciones, que **solo adapta la parte de Liliput**. Así se pueden probar tres tipos de preguntas:
-  - **Solo libro:** Brobdingnag, Laputa, los Houyhnhnms. Sirven para comprobar que el RAG no inventa la respuesta a partir del vídeo.
-  - **Solo película:** lo que la película añade, como la boda de la princesa Glory con el príncipe David o el personaje de Gabby.
-  - **Ambos:** Liliput, Blefuscu, la guerra.
-- **Descartados:**
-  - *El Señor de los Anillos*: libros y películas con derechos de autor.
-  - *Drácula* frente a *Nosferatu* (1922): las dos son de dominio público, pero *Nosferatu* es **muda**. Whisper no sacaría nada y habría que recurrir al OCR de los intertítulos.
-  - *Drácula* de Universal (1931): tiene sonido, pero no es de dominio público.
-- **Reservas** (si Gulliver falla por calidad de la copia o del audio):
+- **Goal:** ingest the same story in two formats, novel and film, and compare what is retrieved from each. A recruiter must be able to see the code and every file used in the ingestion.
+- **Requirements:**
+  - The film must have **sound**, so that the Whisper transcription contributes real text.
+  - The book and the film must be downloadable and publishable without rights issues.
+  - Everything **reproducible**: whoever clones the repo gets the same data.
+- **Why Gulliver:** Fleischer's film, animated, in colour, with dialogue and songs, which **only adapts the Lilliput part**. Three kinds of questions can therefore be tested:
+  - **Book only:** Brobdingnag, Laputa, the Houyhnhnms. They check that the RAG does not make the answer up from the video.
+  - **Film only:** what the film adds, such as Princess Glory's wedding to Prince David, or the character of Gabby.
+  - **Both:** Lilliput, Blefuscu, the war.
+- **Discarded:**
+  - *The Lord of the Rings*: books and films under copyright.
+  - *Dracula* vs *Nosferatu* (1922): both are in the public domain, but *Nosferatu* is **silent**. Whisper would get nothing, and the intertitles would need OCR.
+  - Universal's *Dracula* (1931): it has sound, but it is not in the public domain.
+- **Backups** (if Gulliver fails because of the copy or the audio quality):
   - *The Little Princess* (1939) + Burnett, Gutenberg #146.
-  - *Scrooge* (1935) + Dickens, *A Christmas Carol*. Falta verificar la copia en archive.org y el número de Gutenberg.
+  - *Scrooge* (1935) + Dickens, *A Christmas Carol*. The archive.org copy and the Gutenberg number are still to be checked.
 - **Material:**
-  - Novela: Gutenberg **#829**, en Plain Text UTF-8, quitando la cabecera y el pie de licencia antes de trocear.
-  - Película: Internet Archive. Se elige la copia más ligera con buen audio y se anotan su URL y su SHA256.
-- **Ingesta multimedia (nivel A del análisis), offline en la 3080 Ti:**
-  - **Transcripción con Whisper** (`faster-whisper` con filtro VAD) y marcas de tiempo. La película tiene muchas canciones, y Whisper tiende a inventarse texto en los tramos de música; se comprueba con una prueba de 5 minutos.
-  - **Descripción de escenas:** keyframes (PySceneDetect) + captions con un modelo de visión pequeño. La frecuencia de keyframes y el modelo se deciden en la prueba.
-  - Cada chunk guarda su **modalidad** (libro, transcripción, caption) y su **posición** (capítulo o timestamp). Las fuentes enlazan al minuto exacto de la película.
-  - **Propuesta a validar:** la transcripción se guarda como texto derivado más un mapa de offsets → segundos. Así `Chunk` y el evaluador siguen trabajando con offsets de caracteres, y la web convierte el offset al minuto.
-  - Búsqueda de imágenes por texto con CLIP/SigLIP (nivel B) como opcional.
-- **Evaluación:** el benchmark de 42 no cubre multimedia. Hace falta un set propio de 10–15 preguntas: solo libro, solo película y ambos. Las preguntas en español sobre el audio en inglés miden el multilingüismo.
-- **Publicación:**
-  - **Código** en GitHub: pipeline, `scripts/fetch_data.py` (URLs fijas + SHA256) y un GIF o keyframes del resultado en el README.
-  - **Datos** en un **Hugging Face Dataset**: vídeo, `.txt` del libro y artefactos derivados (transcripción, captions, chunks en JSONL). Una dataset card con la fuente y la licencia de cada archivo. GitHub no acepta ficheros de más de 100 MB sin LFS, y el vídeo los supera.
-  - **Demo:** la web de la Fase 6 (FastAPI + React), no una app aparte en Gradio o Streamlit.
-- **Nota legal:** las películas candidatas son de dominio público en **EE. UU.**, no necesariamente en España, donde una película se protege 70–80 años desde la muerte del director, el guionista y el compositor. Publicarlas en plataformas estadounidenses (Hugging Face, Internet Archive) es la práctica habitual en proyectos de portfolio, pero **no es una garantía legal**. Las tres novelas son de dominio público en todo el mundo.
-- **Plan B**, sin dudas legales en ningún país: películas abiertas de Blender con diálogo y licencia CC-BY (*Sprite Fright*, *Tears of Steel*) o audiolibros de LibriVox con el texto de Gutenberg. A cambio, se pierde la comparativa libro frente a película de la misma historia.
+  - Novel: Gutenberg **#829**, Plain Text UTF-8, removing the license header and footer before chunking.
+  - Film: Internet Archive. The lightest copy with good audio is chosen, and its URL and SHA256 are recorded.
+- **Multimedia ingestion (level A of the analysis), offline on the 3080 Ti:**
+  - **Whisper transcription** (`faster-whisper` with a VAD filter) with timestamps. The film has many songs, and Whisper tends to make text up during music; this is checked with a 5-minute test.
+  - **Scene descriptions:** keyframes (PySceneDetect) + captions from a small vision model. The keyframe rate and the model are decided in the test.
+  - Each chunk keeps its **modality** (book, transcription, caption) and its **position** (chapter or timestamp). The sources link to the exact minute of the film.
+  - **Proposal to validate:** the transcription is stored as derived text plus an offsets → seconds map. That way `Chunk` and the evaluator keep working with character offsets, and the web turns the offset into the minute.
+  - Image search by text with CLIP/SigLIP (level B) as an option.
+- **Evaluation:** the 42 benchmark does not cover multimedia. A set of 10–15 questions is needed: book only, film only and both. Questions in Spanish about the English audio measure multilinguality.
+- **Publication:**
+  - **Code** on GitHub: the pipeline, `scripts/fetch_data.py` (fixed URLs + SHA256) and a GIF or keyframes of the result in the README.
+  - **Data** in a **Hugging Face Dataset**: the video, the book's `.txt` and the derived artefacts (transcription, captions, chunks in JSONL). A dataset card with the source and license of every file. GitHub does not accept files over 100 MB without LFS, and the video is bigger.
+  - **Demo:** the Phase 6 web (FastAPI + React), not a separate Gradio or Streamlit app.
+- **Legal note:** the candidate films are in the public domain in the **US**, not necessarily in Spain, where a film is protected for 70–80 years after the death of the director, the writer and the composer. Publishing them on US platforms (Hugging Face, Internet Archive) is common practice in portfolio projects, but **it is not a legal guarantee**. The three novels are in the public domain worldwide.
+- **Plan B**, with no legal doubt in any country: Blender's open films with dialogue and a CC-BY license (*Sprite Fright*, *Tears of Steel*) or LibriVox audiobooks with the Gutenberg text. The book-vs-film comparison of the same story is lost in exchange.
 - **Checklist:**
-  - [x] Localizar en archive.org la copia y anotar la URL y el SHA256 (2026-10-23, en `data/raw/gulliver/`, ignorado por git):
-    - **Película:** `GulliversTravels720p_652` (CC0 según la ficha), `https://archive.org/download/GulliversTravels720p_652/GulliversTravels.mp4`. 720p h.264, 76:22, 475 808 316 bytes. SHA256 `a5c8ba9f5d6e57b307ea5398c5c4fefa8424da42fb6ea1d455fad0fc59dfdccd`; el SHA1 coincide con el que publica archive.org. Se descartó la copia más descargada (`gullivers_travels1939`) porque dura 72:39 y le faltan ~4 min.
-    - **Novela:** `https://www.gutenberg.org/ebooks/829.txt.utf-8`, 613 946 bytes. SHA256 `fca36de3de0d8b831b7588cf1df84639ccf4c503172d6444ee61d1c1b2036edd`. Las marcas `*** START/END OF THE PROJECT GUTENBERG EBOOK ***` están en las líneas 27 y 9573. **Ojo:** Gutenberg puede revisar el fichero y cambiar el hash, así que la copia fija para reproducir será la del HF Dataset.
-    - archive.org incluye además una transcripción automática (`GulliversTravels.asr.srt`) que puede servir de referencia para comparar con Whisper.
-  - [ ] Comprobar qué hay que añadir al loader para el `.txt` y el vídeo.
-  - [ ] Probar Whisper con 5 minutos: calidad de la transcripción y tiempo en la 3080 Ti.
-  - [ ] Decidir la frecuencia de keyframes y el modelo de captioning.
-  - [ ] Definir los metadatos de cada chunk: fuente, capítulo o timestamp, modalidad.
-  - [ ] Escribir las 10–15 preguntas de evaluación.
-  - [ ] Crear el dataset en Hugging Face con su dataset card.
+  - [x] Find the copy on archive.org and record its URL and SHA256 (2026-10-23, in `data/raw/gulliver/`, ignored by git):
+    - **Film:** `GulliversTravels720p_652` (CC0 according to its page), `https://archive.org/download/GulliversTravels720p_652/GulliversTravels.mp4`. 720p h.264, 76:22, 475,808,316 bytes. SHA256 `a5c8ba9f5d6e57b307ea5398c5c4fefa8424da42fb6ea1d455fad0fc59dfdccd`; the SHA1 matches the one archive.org publishes. The most downloaded copy (`gullivers_travels1939`) was discarded because it lasts 72:39 and is missing ~4 min.
+    - **Novel:** `https://www.gutenberg.org/ebooks/829.txt.utf-8`, 613,946 bytes. SHA256 `fca36de3de0d8b831b7588cf1df84639ccf4c503172d6444ee61d1c1b2036edd`. The `*** START/END OF THE PROJECT GUTENBERG EBOOK ***` marks are on lines 27 and 9573. **Note:** Gutenberg may revise the file and change the hash, so the fixed copy for reproducibility will be the one in the HF Dataset.
+    - archive.org also has an automatic transcription (`GulliversTravels.asr.srt`) that can serve as a reference to compare with Whisper.
+  - [ ] Check what has to be added to the loader for the `.txt` and the video.
+  - [ ] Test Whisper on 5 minutes: transcription quality and time on the 3080 Ti.
+  - [ ] Decide the keyframe rate and the captioning model.
+  - [ ] Define each chunk's metadata: source, chapter or timestamp, modality.
+  - [ ] Write the 10–15 evaluation questions.
+  - [ ] Create the dataset on Hugging Face with its dataset card.
 
-## Fase 5 — Agentes y RAG como servidor MCP
+## Phase 5 — Agents and the RAG as an MCP server
 
-**Objetivo:** acercarnos a cómo lo hacen las empresas, sin perder el acceso directo (D7).
+**Goal:** get closer to how companies do it, without losing direct access (D7).
 
-- **Servidor MCP** (FastMCP, como en AgentSmith) con las herramientas `search(domain, query)`, `answer(...)` y `list_domains`.
-- **Agente intermediario propio**:
-  - Router, reescritura de la query y llamada a herramientas, con *fallback* determinista.
-  - Bucle de varios pasos solo con los modelos opcionales grandes.
-  - **Memoria** (petición tuya): historial de la conversación más memoria semántica recuperable. Se puede guardar en Qdrant (una colección `memory_*` con vectores) o, si hace falta algo relacional, motivar el paso a Postgres que se dejó abierto en la Fase 1.
-- **Acceso directo al RAG** siempre disponible: se elige con un flag de config o de la petición.
-- **Benchmark agente frente a acceso directo** (recall, calidad, latencia) en `BENCHMARK_REPORT.md`.
-- ✅ **D7 decidido (2026-10-23):**
-  - **Agente por defecto**, con acceso directo como opción.
-  - **Todos los modelos pueden ser agente**, incluido Qwen3-0.6B, sin restringirlo. Los benchmarks dirán cuál se despliega.
-  - **Memoria solo de sesión.**
-- **Diseño:**
-  - `src/server/tools.py` (herramientas del RAG).
-  - Servidor MCP (`src/server/mcp_server.py`; FastMCP se llama `MCPServer` en `mcp` 2.x) sobre esas herramientas. ✅ Hecho: `make mcp`.
-  - Agente en `src/agent/`: reescribe la pregunta con el historial, decide las búsquedas con el formato nativo de llamadas a herramientas del modelo (máximo 3 pasos) y da la respuesta final con el generador y las reglas de dominio actuales. Si falla, usa el flujo directo. ✅ Hecho: `answer` (agente por defecto), `chat` (con `/agent` para alternar) y `make agent-bench`.
+- **MCP server** (FastMCP, as in AgentSmith) with the tools `search(domain, query)`, `answer(...)` and `list_domains`.
+- **The project's own intermediary agent**:
+  - Router, query rewriting and tool calls, with a deterministic *fallback*.
+  - A multi-step loop only with the big optional models.
+  - **Memory** (the author's request): conversation history plus retrievable semantic memory. It could be stored in Qdrant (a `memory_*` collection with vectors) or, if something relational were needed, justify the move to Postgres left open in Phase 1.
+- **Direct access to the RAG** always available: chosen with a config or request flag.
+- **Agent vs direct access benchmark** (recall, quality, latency) in `BENCHMARK_REPORT.md`.
+- ✅ **D7 decided (2026-10-23):**
+  - **The agent by default**, with direct access as an option.
+  - **Every model can be an agent**, Qwen3-0.6B included, without restrictions. The benchmarks will say which one is deployed.
+  - **Session-only memory.**
+- **Design:**
+  - `src/server/tools.py` (the RAG's tools).
+  - An MCP server (`src/server/mcp_server.py`; FastMCP is called `MCPServer` in `mcp` 2.x) on top of those tools. ✅ Done: `make mcp`.
+  - The agent in `src/agent/`: it rewrites the question with the history, decides the searches with the model's native tool-call format (at most 3 steps) and gives the final answer with the generator and the current domain rules. If it fails, it uses the direct pipeline. ✅ Done: `answer` (agent by default), `chat` (with `/agent` to toggle) and `make agent-bench`.
 
-> ✅ **Completada (2026-10-24)**, pendiente de tu revisión. Detalle en `changelog/FASE_5.md` y `BENCHMARK_REPORT.md` §8.
-> - **Redes de seguridad** (DEC-03 en `docs/decisions.md`): si la reescritura no encuentra nada, se busca la pregunta original; si el dominio elegido por el modelo no tiene nada, se repite dentro del filtro del usuario, **nunca fuera**.
-> - **Agente frente a directo** (Qwen3-0.6B): seguimientos **0.78 frente a 0.33**; en preguntas sueltas queda a ±0.04 del directo con los cuatro modelos. Qwen3-4B llega a 1.00 en seguimientos.
-> - **Recall de 42:** sin cambios. Los datasets de 42 pasan a `bench/datasets/public/` y el recall sale idéntico (`61-datasets-moved`).
-> - **Pendiente de decidir:** qué LLM se despliega (propuesta: Qwen3-0.6B; Qwen3-1.7B si la CPU del Space lo aguanta).
-> - **No hecho, a propósito:** memoria semántica en Qdrant (D7: solo de sesión).
+> ✅ **Completed (2026-10-24).** Details in `changelog/FASE_5.md` and `BENCHMARK_REPORT.md` §8.
+> - **Safety nets** (DEC-03 in `decisions.md`): if the rewrite finds nothing, the original question is searched; if the domain the model chose has nothing, the search is repeated within the user's filter, **never outside it**.
+> - **Agent vs direct** (Qwen3-0.6B): follow-ups **0.78 vs 0.33**; on single questions it stays within ±0.04 of direct mode with all four models. Qwen3-4B reaches 1.00 on follow-ups.
+> - **42 recall:** unchanged. The 42 datasets move to `bench/datasets/public/` and recall comes out identical (`61-datasets-moved`).
+> - **Pending decision:** which LLM is deployed (proposal: Qwen3-0.6B; Qwen3-1.7B if the Space's CPU can take it).
+> - **Not done, on purpose:** semantic memory in Qdrant (D7: session only).
 
-## Fase 6 — Web deploy
+## Phase 6 — Web deploy
 
-**Objetivo:** una web pública para LinkedIn con los modos **CV** y **Demostración**.
+**Goal:** a public website for LinkedIn with the **CV** and **Demo** modes.
 
-- **Backend FastAPI**: `/chat` (streaming SSE), `/search`, `/sources/{id}`, `/metrics` y `/config` (modelos y opciones disponibles).
-- **Frontend React** (Vite) con **la misma estética que la web actual** (D5):
-  - Fondo `#0a0a0a` y acento `#ff3b3b`.
-  - Tipografías JetBrains Mono + Inter.
-  - Tarjetas de fuentes y barras de recall.
-- **Navegación y selectores** (modelo, agente sí/no), según lo que se decida de la modularización.
-  - **Interruptor "Con agente / Sin agente"** (petición tuya, 2026-10-23): un switch en la interfaz de chat que alterna entre el agente (por defecto: memoria de sesión, reescritura y herramientas) y la conversación directa con el RAG (el flujo actual, pregunta a pregunta). La API lo recibe como parámetro de la petición (`agent: true|false`); la Fase 5 deja los dos caminos listos detrás de ese mismo parámetro.
-  - **Base ya preparada (Fase 2):** los perfiles de `rag.toml` (`available_profiles`) son las opciones que podría ofrecer un selector de ingesta, reranker o embeddings. La base estable sigue siendo la del benchmark. *A plantear en esta fase.*
-- **Despliegue sin coste**:
-  - Backend en un Hugging Face Space (Docker, CPU gratuito).
-  - Frontend estático en GitHub Pages.
-  - **Google Cloud no se toca.**
-  - En el despliegue gratuito probablemente solo quepa un modelo cargado; el resto, en local.
-  - **Índice preconstruido:** como no se indexa en 42 ni en el Space, el índice (snapshot de Qdrant + ficheros BM25) se construye en la 3080 Ti y el despliegue solo lo carga.
-  - **Presentaciones en 42:** se enseña esta web desplegada o se da el enlace a los recruiters. No se instala nada en los ordenadores de 42.
-  - **Datos en Hugging Face (a explorar, P10):** usar datasets de Hugging Face como fuente de la ingesta (por ejemplo, XQuAD) y, si se puede, alojar allí los nuestros: los de 42, los derivados de Gulliver y quizá el índice preconstruido.
-- **README final**: se reescribe al terminar la mejora completa del proyecto.
+- **FastAPI backend**: `/chat` (SSE streaming), `/search`, `/sources/{id}`, `/metrics` and `/config` (available models and options).
+- **React frontend** (Vite) with **the same look as the current web** (D5):
+  - `#0a0a0a` background and `#ff3b3b` accent.
+  - JetBrains Mono + Inter typefaces.
+  - Source cards and recall bars.
+- **Navigation and pickers** (model, agent yes/no), depending on what is decided about modularisation.
+  - **"With agent / Without agent" switch** (the author's request, 2026-10-23): a switch in the chat interface that toggles between the agent (session memory, rewriting and tools) and the direct conversation with the RAG (the current pipeline, question by question). The API takes it as a request parameter (`agent: true|false`); Phase 5 leaves both paths ready behind that same parameter.
+  - **Groundwork already done (Phase 2):** the `rag.toml` profiles (`available_profiles`) are the options an ingestion, reranker or embeddings picker could offer. The stable base is still the benchmark one. *To be raised in this phase.*
+- **Zero-cost deployment**:
+  - Backend in a Hugging Face Space (Docker, free CPU).
+  - Static frontend on GitHub Pages.
+  - **Google Cloud is not touched.**
+  - The free deployment can probably hold only one loaded model; the rest, locally.
+  - **Prebuilt index:** since indexing happens neither at 42 nor in the Space, the index (Qdrant snapshot + BM25 files) is built on the 3080 Ti and the deployment only loads it.
+  - **Presentations at 42:** this deployed website is shown, or the link is given to the recruiters. Nothing is installed on the 42 machines.
+  - **Data on Hugging Face (to explore, P10):** use Hugging Face datasets as an ingestion source (for example, XQuAD) and, if possible, host ours there: the 42 ones, the Gulliver derivatives and maybe the prebuilt index.
+- **Final README**: rewritten when the whole improvement of the project is finished.
 
-> 🟡 **Preparada hasta el punto de despliegue (2026-10-24)**, pendiente de tu revisión. Detalle en `changelog/FASE_6.md`, guía en `deploy/README.md` y decisiones en `docs/decisions.md` (DEC-04 a DEC-16).
-> - **API FastAPI** (`src/api`): `/chat` (SSE, con `agent`, `domains`, `model` y `depth`), `/search`, `/sources/{id}`, `/metrics`, `/config` y `/health`. Probada con el índice real: 0 fugas.
-> - **Web React** (`web/`), revisada contigo en varias rondas (`FASE_6.md` §6b–6g):
->   - Chat a pantalla completa y filtros de dominio (sin modos Demo/CV).
->   - Interruptor de agente, selectores de modelo y de profundidad (5 por defecto).
->   - Botón Stop y preguntas de ejemplo.
->   - Retrievals del dominio de la respuesta con carrusel y esquinas de puntos, y tarjetas de recall por dominio.
->   - La API sirve la web en `/`. Commit `3378494`.
-> - **Despliegue:** Space de HF (Docker, CPU) con Qdrant dentro; índice en un bundle (`make bundle`, SHA256) en un **dataset privado**; Pages con un workflow manual.
-> - **Queda en tus manos:** crear el dataset y el Space, poner los secretos y decidir el LLM del Space, la estrategia de privacidad (DEC-09) y si se borra Streamlit (DEC-13).
-> - **P4 (modularización):** la web expone los filtros de dominio, el agente sí/no, el modelo (los perfiles `llm-*`, uno cargado a la vez) y la profundidad.
+> 🟡 **Ready up to the point of deployment (2026-10-24).** Details in `changelog/FASE_6.md`, guide in `deploy/README.md` and decisions in `decisions.md` (DEC-04 to DEC-16).
+> - **FastAPI API** (`src/api`): `/chat` (SSE, with `agent`, `domains`, `model` and `depth`), `/search`, `/sources/{id}`, `/metrics`, `/config` and `/health`. Tested with the real index: 0 leaks.
+> - **React web** (`web/`), reviewed with the author over several rounds (`FASE_6.md` §6b–6g):
+>   - Full-screen chat and domain filters (no Demo/CV modes).
+>   - Agent switch, model and depth pickers (5 by default).
+>   - Stop button and example questions.
+>   - Retrievals of the answering domain in a carousel with dotted corners, and recall cards per domain.
+>   - The API serves the web at `/`. Commit `3378494`.
+> - **Deployment:** an HF Space (Docker, CPU) with Qdrant inside; the index in a bundle (`make bundle`, SHA256) in a **private dataset**; Pages with a manual workflow.
+> - **Left to the author:** creating the dataset and the Space, setting the secrets, and deciding the Space's LLM, the privacy strategy (DEC-09) and whether Streamlit is deleted (DEC-13).
+> - **P4 (modularisation):** the web exposes the domain filters, agent yes/no, the model (the `llm-*` profiles, one loaded at a time) and the depth.
 
-## Fase 7 — Opcionales y mejoras
+## Phase 7 — Optional work and polish
 
-**Objetivo:** pulir lo que ha salido al usar la web y recoger los opcionales aparcados. Fase abierta el 2026-10-24, tras el commit `3378494`. Changelog en `changelog/FASE_7.md`.
+**Goal:** polish what came up while using the web, and pick up the parked optional items. Phase opened on 2026-10-24, after commit `3378494`. Changelog in `changelog/FASE_7.md`.
 
-### 7a — Dominio "about": el proyecto habla de sí mismo (lo primero)
-1. **Reescribir el `README.md`** (pendiente desde la Fase 0), pensado para GitHub y los recruiters. Será la fuente principal del dominio. Se revisa contigo antes de indexarlo.
-2. **Fuente `about` en `rag.toml`:**
-   - **Entran:** el README, `ROADMAP.md`, `BENCHMARK_REPORT.md`, `decisions.md`, los changelogs y el código de `src/` (chunker de código AST).
-   - **Fuera:** `PLANING.md`, `RESPUESTA.md` (el planteamiento inicial, ya superado) y `Elements_frontend.md`.
-   - **A comprobar:** si el cargador actual acepta esa selección de ficheros o necesita uno propio, como el del CV.
-3. **Set de 15–20 preguntas** en inglés y español sobre el proyecto, para medir recall y generación.
-4. **Umbral propio** calibrado con `gate_scores`, y **`route-bench`**: 42 → vLLM al 100 %, XQuAD ~98 %, CV 100 %. `docs/` habla mucho de vLLM y del CV, así que el riesgo de robarles preguntas es real.
-5. **API y web:** chip "about" **siempre activo** (no se puede apagar), sus preguntas sugeridas en el desplegable de ejemplos, y el dominio dentro del bundle del despliegue.
+### 7a — The "about" domain: the project talks about itself (first)
+1. **Rewrite `README.md`** (pending since Phase 0), aimed at GitHub and recruiters. It will be the domain's main source. Reviewed with the author before indexing it.
+2. **An `about` source in `rag.toml`:**
+   - **In:** the README, `ROADMAP.md`, `BENCHMARK_REPORT.md`, `decisions.md`, the changelogs and the code in `src/` (AST code chunker).
+   - **Out:** `PLANING.md`, `RESPUESTA.md` (the initial plan, now superseded) and `Elements_frontend.md`.
+   - **To check:** whether the current loader accepts that selection of files or needs its own one, like the CV.
+3. **A set of 15–20 questions** in English and Spanish about the project, to measure recall and generation.
+4. **Its own threshold**, calibrated with `gate_scores`, and **`route-bench`**: 42 → vLLM at 100%, XQuAD ~98%, CV 100%. `docs/` talks a lot about vLLM and the CV, so the risk of stealing their questions is real.
+5. **API and web:** an "about" chip **always on** (it cannot be turned off), its suggested questions in the examples drop-down, and the domain inside the deployment bundle.
 
-### 7b — Calidad de las respuestas
-- **Markdown en la web** (listas, negritas, código). Sin riesgo: no cambia ninguna respuesta.
-- **Plan B del agente:** busca con la consulta anterior + la nueva, pero debe **responder a la pregunta original**. Con el 0.6B, responder a la mezcla da respuestas equivocadas en los seguimientos (medido, `FASE_6.md`). Se mide con `agent-bench` antes de adoptarlo.
-- **Regla de formato** (listas y negritas) solo en la web, probada por modelo: con el 0.6B, cada regla de más en el prompt puede costar aciertos.
-- **Juez de las respuestas, sobre todo las del CV:** para encontrar dónde fallan, no para mostrarlo en la web. **Decisión tuya pendiente:** Groq (el juez de la Fase 3; las fuentes del CV saldrían a un servicio externo) o un juez local (Qwen3-4B en la GPU; nada sale de la máquina, pero es un juez más débil).
+**Progress (2026-10-24):**
+- ✅ **1.** README rewritten in English and approved, with an MIT license and a Spanish copy (`docs/es/README.md`).
+- ✅ **2.** The `about` source indexed. A new field, `exclude_paths`, was needed to exclude `deploy/stage` without losing `src/deploy`.
+- 🟡 **3.** 18 EN/ES questions (`bench/datasets/about/`). First measurement: EN R@5 0.78, ES 0.22. Spanish collapses because each question only accepted one source (the README's), and the Spanish questions find the same thing in the Spanish documents.
+- **The author's decision:** documentation in two languages (`docs/` in English and `docs/es/` in Spanish), and several valid sources per question.
+- **Kept out of the web for now** (`API_DOMAINS`) until steps 4–5 are done: uncalibrated, it was picked by the router and mixed test transcripts from the changelogs into CV answers.
+
+### 7b — Answer quality
+- **Markdown in the web** (lists, bold, code). No risk: no answer changes.
+- **The agent's fallback:** it searches with the previous query + the new one, but it must **answer the original question**. With the 0.6B, answering the mix gives wrong answers on follow-ups (measured, `FASE_6.md`). Measured with `agent-bench` before adopting it.
+- **A formatting rule** (lists and bold) only in the web, tested per model: with the 0.6B, every extra rule in the prompt can cost correct answers.
+- **A judge for the answers, especially the CV ones:** to find where they fail, not to show it in the web. **Decided (P11): Groq**, until the free tokens run out; if needed, it is repeated with Qwen3-4B as a local judge.
+- **Agent off by default in the web** (the author's decision, 2026-10-24), marked as a work in progress until the fallback is improved.
 
 ### 7c — Visual
-- Tarjetas de recall flotantes que giran al pasar de una a otra.
-- Estilo definitivo de la barra de scroll.
+- Floating recall cards that flip when moving from one to the next.
+- The final style of the scroll bar.
 
-### 7d — Opcionales aparcados
-- **4c, Gulliver** (multimedia). El plan está en la Fase 4.
+### 7d — Parked optional items
+- **4c, Gulliver** (multimedia). The plan is in Phase 4.
 - **MLQA.**
-- **`repetition_penalty`** contra los bucles de generación (visto con Phi-4-mini). Cambia todas las respuestas, así que exige repetir `gen-bench`.
+- **`repetition_penalty`** against generation loops (seen with Phi-4-mini). It changes every answer, so it requires rerunning `gen-bench`.
 
-**Nota sobre el despliegue:** Phi-4-mini no cabe en el Space gratuito (en CPU, en float32, ocuparía ~15 GB, y además está la búsqueda). Incluso cargado a media precisión, tardaría minutos por respuesta en 2 CPU (estimado, sin medir). En el Space, lo realista es el 0.6B y quizá el 1.7B. Phi sigue siendo una opción en local.
+**Note on deployment:** Phi-4-mini does not fit in the free Space (on a CPU, in float32, it would take ~15 GB, plus the retrieval). Even loaded at half precision, it would take minutes per answer on 2 CPUs (estimated, not measured). In the Space, the realistic options are the 0.6B and maybe the 1.7B. Phi remains an option locally.
 
 ---
 
-# Decisiones pendientes #
+# Pending decisions #
 
-| # | Tema | Cuándo hay que decidirlo |
+| # | Topic | When it must be decided |
 |---|---|---|
-| P1 | ~~D7: agente frente a acceso directo~~ → resuelto: agente por defecto, todos los modelos, memoria de sesión | Hecho |
-| P2 | ~~Material multimedia~~ → resuelto: *Los viajes de Gulliver* (1939) frente a la novela de Swift (Gutenberg #829), con *The Little Princess* y *Scrooge* como reservas. Sustituye a *Nosferatu*/*Drácula*, que era muda. Copias descargadas el 2026-10-23 (URL y SHA256 en la checklist de la 4c) | Hecho |
-| P7 | ~~`.gitattributes` para normalizar los finales de línea~~ → resuelto: todo LF y `llm_sdk/` intacto (commit `5a1cc4b`) | Hecho |
-| P8 | ~~¿`bge-m3` por defecto aunque indexar en CPU lleve ~2 h?~~ → resuelto: `bge-m3` en la base y perfil `cpu-light` (`e5-small`) | Hecho |
-| P9 | ~~`bge-reranker-v2-m3`~~ → resuelto: perfil opcional `gpu-quality` | Hecho |
-| P3 | ~~Dominios nuevos~~ → resuelto: XQuAD (cultura general, en/es) y después MLQA | Hecho |
-| P4 | ~~Modularización: qué opciones se exponen en la web~~ → resuelto en la revisión de la Fase 6: filtros de dominio, agente sí/no, modelo y profundidad | Hecho |
-| P11 | ~~Juez de las respuestas del CV (Fase 7b)~~ → resuelto (2026-10-24, decisión tuya): **Groq**, también con las preguntas del CV, hasta agotar los tokens gratuitos. Si hace falta, se repite con Qwen3-4B como juez local | Hecho |
-| P12 | LLM del Space: el 0.6B (la base) o el 1.7B (mejor agente; su latencia en CPU está sin medir) | Antes del despliegue |
-| P5 | ~~GPU de los ordenadores de 42~~ → resuelto: no aceptan CUDA (vLLM tarda ~10 h en indexarse). Se descarta indexar en 42 y el proyecto se sirve en línea | Hecho |
-| P10 | Hugging Face Datasets: usarlos como fuente de la ingesta y alojar allí los nuestros (los de 42, los derivados multimedia y quizá el índice). Falta revisar si la licencia de los datasets de 42 permite publicarlos. **Avance (2026-10-24):** el índice preconstruido va en un dataset **privado** de HF (DEC-09). Publicar los datasets de 42 sigue sin hacerse: la licencia no está revisada | A desarrollar; antes de la Fase 6 (despliegue) o de la 4c si se retoma |
-| P6 | Proveedor de la key gratuita para el juez LLM | Antes de la Fase 3 |
+| P1 | ~~D7: agent vs direct access~~ → resolved: agent by default, every model, session memory | Done |
+| P2 | ~~Multimedia material~~ → resolved: *Gulliver's Travels* (1939) vs Swift's novel (Gutenberg #829), with *The Little Princess* and *Scrooge* as backups. It replaces *Nosferatu*/*Dracula*, which was silent. Copies downloaded on 2026-10-23 (URL and SHA256 in the 4c checklist) | Done |
+| P7 | ~~`.gitattributes` to normalise line endings~~ → resolved: all LF and `llm_sdk/` untouched (commit `5a1cc4b`) | Done |
+| P8 | ~~`bge-m3` by default even though indexing on a CPU takes ~2 h?~~ → resolved: `bge-m3` in the base and a `cpu-light` profile (`e5-small`) | Done |
+| P9 | ~~`bge-reranker-v2-m3`~~ → resolved: the optional `gpu-quality` profile | Done |
+| P3 | ~~New domains~~ → resolved: XQuAD (general knowledge, en/es) and then MLQA | Done |
+| P4 | ~~Modularisation: which options the web exposes~~ → resolved in the Phase 6 review: domain filters, agent yes/no, model and depth | Done |
+| P11 | ~~Judge for the CV answers (Phase 7b)~~ → resolved (2026-10-24, the author's decision): **Groq**, also with the CV questions, until the free tokens run out. If needed, it is repeated with Qwen3-4B as a local judge | Done |
+| P12 | The Space's LLM: the 0.6B (the base) or the 1.7B (a better agent; its CPU latency is not measured) | Before deployment |
+| P5 | ~~The GPU of the 42 machines~~ → resolved: they do not accept CUDA (vLLM takes ~10 h to index). Indexing at 42 is ruled out and the project is served online | Done |
+| P10 | Hugging Face Datasets: use them as an ingestion source and host ours there (the 42 ones, the multimedia derivatives and maybe the index). Whether the 42 datasets' license allows publishing them is still to be checked. **Progress (2026-10-24):** the prebuilt index goes in a **private** HF dataset (DEC-09). Publishing the 42 datasets has not been done: the license has not been checked | To develop; before Phase 6 (deployment) or 4c if it is resumed |
+| P6 | Provider of the free key for the LLM judge | Before Phase 3 |
 
 ---
 
-# Información sobre el roadmap #
+# Roadmap log #
 
-(Aquí escribiremos puntualizaciones y decisiones que hacer durante la producción.)
+(Clarifications and decisions made during the work.)
 
-- **2026-10-18**: creado el repo v2.0 (`RAG_Against_the-machine_42_project-v2.0`) con todo el historial. El estado entregado a 42 queda etiquetado como `v1.0-42`. Remotos: `origin` apunta al v2.0 y `v1` al repo original, que queda congelado.
-- **2026-10-18**: la documentación de trabajo se mueve a `docs/`. El `README.md` sigue en la raíz y se reescribirá al final del proyecto. En la raíz queda un `CLAUDE.md` mínimo que importa `docs/PLANING.md` y `docs/ROADMAP.md`, para que Claude Code siga cargando las normas automáticamente.
-- **2026-10-18**: el CDN de 42 devuelve 403 sin sesión. Los datasets públicos se versionan en `data/datasets/` (recuperados del historial) y vLLM 0.10.1 se descarga de la etiqueta oficial de GitHub. Verificado: las 200 fuentes de ground truth coinciden en ruta y offsets.
-- **2026-10-18**: `llm_sdk` se importa de forma estándar (`from llm_sdk import ...`). El arreglo está en la config de mypy (`mypy_path = "llm_sdk"`), sin tocar la carpeta del SDK.
-- **2026-10-18**: Fase 0 completada. Ver `changelog/FASE_0.md`.
-- **2026-10-18**: **base de datos: Qdrant en servidor (Docker)**, decidido tras medir Qdrant local, Qdrant servidor, Postgres + pgvector, SQLite y LanceDB (esta última bloqueada por Windows). Postgres queda como opción si más adelante hace falta una base relacional (por ejemplo, la memoria del agente).
-- **2026-10-18**: prioridad de métricas: R@5 > R@10 > R@3 > R@1.
-- **2026-10-18**: LangChain descartado como chunker en esta versión (anotado en *Posibilidades*); el chunker de docs por defecto es el propio empaquetado.
-- **2026-10-18**: el campo `lang` del payload, previsto en la Fase 1, no se ha añadido todavía: vLLM es solo inglés. Entra con el modo CV multilingüe (Fase 4).
-- **2026-10-18**: Fase 1 completada. Ver `changelog/FASE_1.md`.
-- **2026-10-18**: Fase 2 iniciada: CUDA 12.6 (con CPU como alternativa), fusión RRF del reranker y rutas unificadas. Ver `changelog/FASE_2.md`.
-- **2026-10-19**: embeddings `bge-m3` por defecto (con `e5-small` como alternativa sin GPU); reranker `mmarco-mMiniLMv2-L12` (multilingüe); `Qwen3-Embedding` y `Qwen3-Reranker` descartados por coste; Jina descartado por licencia no comercial. Set complementario en inglés y español (20 preguntas) en `bench/datasets/`.
-- **2026-10-19**: Fase 2 completada (pasos 3–5 hechos de forma autónoma con tu autorización, para revisarlos). Ver `changelog/FASE_2.md`.
-- **2026-10-19**: perfiles: base estable (`bge-m3` + `mmarco` + Qwen3-0.6B) y modelos extra como opciones explícitas (`gpu-quality`, `cpu-light`, `llm-*`). Base para los selectores de la web (Fase 6).
-- **2026-10-19**: el caso estrella de B15 ("capital of France") estaba en la documentación de vLLM como ejemplo de la API; no era una alucinación.
-- **2026-10-19**: Fase 3 completada. Ver `changelog/FASE_3.md`.
-- **2026-10-19**: checkpoint "Pruebas 42" superado; etiqueta `v2.0-core` (un marcador, no una rama: el proyecto sigue en `main`). Ver `changelog/CHECKPOINT_42.md`.
-- **2026-10-19**: Fase 4 planificada: 4a cultura general (XQuAD; después MLQA), 4b modo CV y 4c multimedia (*Nosferatu*/*Drácula*). *El Señor de los Anillos*, descartado por derechos de autor. Innovatiana revisado: catálogo orientado a entrenar modelos de visión, sin datasets útiles para evaluar el RAG.
-- **2026-10-19**: la carpeta del CV se movió de la raíz a `data/raw/cv/` (ignorada por git) y se añadió `cv/` al `.gitignore`, para que nunca se suban datos personales.
-- **2026-10-18**: las cifras del README (docs 0.89 / code 0.75 en R@10) eran de los datasets **públicos**, aunque estuvieran etiquetadas como privadas, y salían de configuraciones anteriores que no se reproducen con `v1.0-42`. Se acepta como línea base oficial `04-fase0-final / smart`. La etiqueta del README se corrige en la reescritura final.
-- **2026-10-18**: finales de línea normalizados a LF con `.gitattributes`, con `llm_sdk/` excluido (P7).
-- **2026-10-23**: se **descarta indexar en el cluster de 42**: sus GPU no aceptan CUDA y vLLM tarda ~10 h. Toda la ingesta se hace en la 3080 Ti y el proyecto se aloja en línea. En las presentaciones a empresas se enseña la web desplegada o se da el enlace (P5).
-- **2026-10-23**: 4c cambia de *Nosferatu*/*Drácula* a *Los viajes de Gulliver* (1939) frente a la novela de Swift. Al tener sonido se puede usar Whisper, y como solo adapta Liliput permite preguntas que solo responde el libro. Contenido tomado del documento "RAG 2 — Selección de fuentes multimedia", que se ha borrado tras integrarlo aquí. La demo sigue el roadmap (FastAPI + React), no Gradio ni Streamlit.
-- **2026-10-23**: abierta la exploración de Hugging Face Datasets, como fuente de la ingesta y para alojar los nuestros (P10).
-- **2026-10-23**: Fase 4a iniciada. XQuAD con un fichero por artículo, dominio mixto en+es, ground truth con el fragmento exacto de la respuesta y datos de HF con los títulos de GitHub (decisiones tuyas). Ver `changelog/FASE_4.md`.
-- **2026-10-23**: router decidido: sin filtro busca en todos los dominios y responde desde el mejor; con filtro, solo en los elegidos. `make index` pasa a indexar todas las fuentes (`SOURCE=` para una sola). Los comandos y el benchmark de 42 siguen fijados a `vllm`.
-- **2026-10-23**: umbral del filtro fuera de dominio **por dominio** (`relevance_threshold` en cada fuente). El reranker puntúa cada corpus en su propia escala, así que cada dominio nuevo se calibra con `gate_scores` antes de fijar su umbral.
-- **2026-10-23**: el `gen-bench` de XQuAD usa un subconjunto fijo de 300 preguntas por idioma; la ejecución completa (`FULL=1`) queda para pruebas completas. Fase 4a completada.
-- **2026-10-23**: descarga unificada: `make data` = vLLM (desde el repo de GitHub) + XQuAD. Se elimina `data-42`, que era redundante (mismo vLLM, datasets ya versionados, 403 fuera de 42). Ver `changelog/FASE_5.md` §5.
-- **2026-10-23**: `src/` reorganizado en `rag/` (el RAG), `server/` (herramientas y MCP) y `agent/` (el agente), sin cambios de lógica. Ver `changelog/FASE_5.md`.
-- **2026-10-23**: **D7 decidido** y Fase 5 iniciada: agente por defecto (como un RAG real), todos los modelos pueden ser agente, memoria solo de sesión y acceso directo como opción. El campo `lang` sale del plan: las respuestas ya siguen el idioma de la pregunta (90–100 %).
-- **2026-10-23**: **4c (multimedia, Gulliver) aplazada** como posible fase final. La Fase 4 se cierra con 4a y 4b. MLQA, también opcional, se queda para el final.
-- **2026-10-23**: datasets de 42 movidos de `data/datasets/` a `bench/datasets/public/`: `bench/` queda para lo versionado y `data/` para lo local (DEC-01). El evaluador de 42 se conserva como métrica de referencia.
-- **2026-10-24**: redes de seguridad del agente (DEC-03) y benchmark de agente frente a directo con cuatro modelos (`BENCHMARK_REPORT.md` §8). Fase 5 completada, pendiente de revisión.
-- **2026-10-24**: Fase 6 preparada hasta el punto de despliegue (API, web React, bundle del índice, imagen del Space, workflow de Pages), sin commits ni publicación. Decisiones tomadas por necesidad en `docs/decisions.md`.
-- **2026-10-24**: revisión de la web contigo (`FASE_6.md` §6b–6g). Commit `3378494` ("Phase 6: Frontend and deployment"). El despliegue en Hugging Face queda pendiente de tus cuentas.
-- **2026-10-24**: abierta la **Fase 7 (opcionales y mejoras)**. Empieza por el dominio "about" (el proyecto hablando de sí mismo, con el README reescrito, `docs/` y el código). El juez de las respuestas del CV queda pendiente de decidir (P11).
-- **2026-10-23**: biografía del modo CV, borrador v1 en `data/raw/cv/autobiography.md` (ignorado por git), con los datos pendientes marcados.
+- **2026-10-18**: the v2.0 repo is created (`RAG_Against_the-machine_42_project-v2.0`) with the whole history. The state delivered to 42 is tagged `v1.0-42`. Remotes: `origin` points to v2.0 and `v1` to the original repo, which is frozen.
+- **2026-10-18**: the working documentation moves to `docs/`. `README.md` stays at the root and will be rewritten at the end of the project. A minimal `CLAUDE.md` stays at the root, importing the planning and the roadmap, so that Claude Code keeps loading the rules automatically.
+- **2026-10-18**: the 42 CDN returns 403 without a session. The public datasets are versioned in `data/datasets/` (recovered from the history) and vLLM 0.10.1 is downloaded from the official GitHub tag. Checked: the 200 ground-truth sources match in path and offsets.
+- **2026-10-18**: `llm_sdk` is imported the standard way (`from llm_sdk import ...`). The fix is in the mypy config (`mypy_path = "llm_sdk"`), without touching the SDK folder.
+- **2026-10-18**: Phase 0 completed. See `changelog/FASE_0.md`.
+- **2026-10-18**: **database: Qdrant as a server (Docker)**, decided after measuring local Qdrant, Qdrant server, Postgres + pgvector, SQLite and LanceDB (the last one blocked by Windows). Postgres remains an option if a relational database is needed later (for example, the agent's memory).
+- **2026-10-18**: metric priority: R@5 > R@10 > R@3 > R@1.
+- **2026-10-18**: LangChain discarded as a chunker in this version (noted in *Possibilities*); the default docs chunker is the project's own packed one.
+- **2026-10-18**: the payload's `lang` field, planned in Phase 1, has not been added yet: vLLM is English only. It comes with the multilingual CV mode (Phase 4).
+- **2026-10-18**: Phase 1 completed. See `changelog/FASE_1.md`.
+- **2026-10-18**: Phase 2 started: CUDA 12.6 (with CPU fallback), RRF fusion for the reranker and unified paths. See `changelog/FASE_2.md`.
+- **2026-10-19**: `bge-m3` embeddings by default (with `e5-small` as the no-GPU alternative); the `mmarco-mMiniLMv2-L12` reranker (multilingual); `Qwen3-Embedding` and `Qwen3-Reranker` discarded for their cost; Jina discarded for its non-commercial license. A complementary set in English and Spanish (20 questions) in `bench/datasets/`.
+- **2026-10-19**: Phase 2 completed (steps 3–5 done autonomously with the author's authorisation, for review). See `changelog/FASE_2.md`.
+- **2026-10-19**: profiles: a stable base (`bge-m3` + `mmarco` + Qwen3-0.6B) and extra models as explicit options (`gpu-quality`, `cpu-light`, `llm-*`). The basis for the web's pickers (Phase 6).
+- **2026-10-19**: B15's star case ("capital of France") was in the vLLM documentation as an API example; it was not a hallucination.
+- **2026-10-19**: Phase 3 completed. See `changelog/FASE_3.md`.
+- **2026-10-19**: the "42 tests" checkpoint passed; tag `v2.0-core` (a marker, not a branch: the project stays on `main`). See `changelog/CHECKPOINT_42.md`.
+- **2026-10-19**: Phase 4 planned: 4a general knowledge (XQuAD; then MLQA), 4b CV mode and 4c multimedia (*Nosferatu*/*Dracula*). *The Lord of the Rings* discarded because of copyright. Innovatiana reviewed: a catalogue aimed at training vision models, with no datasets useful to evaluate the RAG.
+- **2026-10-19**: the CV folder moved from the root to `data/raw/cv/` (ignored by git), and `cv/` was added to `.gitignore`, so that personal data is never uploaded.
+- **2026-10-18**: the README figures (docs 0.89 / code 0.75 on R@10) came from the **public** datasets, although they were labelled as private, and from earlier configurations that `v1.0-42` does not reproduce. `04-fase0-final / smart` is accepted as the official baseline. The README label is fixed in the final rewrite.
+- **2026-10-18**: line endings normalised to LF with `.gitattributes`, with `llm_sdk/` excluded (P7).
+- **2026-10-23**: **indexing on the 42 cluster is ruled out**: its GPUs do not accept CUDA and vLLM takes ~10 h. All ingestion is done on the 3080 Ti and the project is hosted online. In company presentations, the deployed web is shown or the link is given (P5).
+- **2026-10-23**: 4c changes from *Nosferatu*/*Dracula* to *Gulliver's Travels* (1939) vs Swift's novel. Having sound, Whisper can be used, and since it only adapts Lilliput it allows questions only the book can answer. Content taken from the document "RAG 2 — Selección de fuentes multimedia", deleted after merging it here. The demo follows the roadmap (FastAPI + React), not Gradio or Streamlit.
+- **2026-10-23**: Hugging Face Datasets exploration opened, as an ingestion source and to host ours (P10).
+- **2026-10-23**: Phase 4a started. XQuAD with one file per article, a mixed en+es domain, ground truth with the exact answer span, and HF data with the GitHub titles (the author's decisions). See `changelog/FASE_4.md`.
+- **2026-10-23**: router decided: without a filter it searches every domain and answers from the best one; with a filter, only in the chosen ones. `make index` now indexes every source (`SOURCE=` for one). The 42 commands and benchmark stay fixed to `vllm`.
+- **2026-10-23**: out-of-domain gate threshold **per domain** (`relevance_threshold` in each source). The reranker scores each corpus on its own scale, so each new domain is calibrated with `gate_scores` before setting its threshold.
+- **2026-10-23**: the XQuAD `gen-bench` uses a fixed subset of 300 questions per language; the full run (`FULL=1`) is kept for complete tests. Phase 4a completed.
+- **2026-10-23**: unified download: `make data` = vLLM (from the GitHub repo) + XQuAD. `data-42` is removed as redundant (the same vLLM, datasets already versioned, 403 outside 42). See `changelog/FASE_5.md` §5.
+- **2026-10-23**: `src/` reorganised into `rag/` (the RAG), `server/` (tools and MCP) and `agent/` (the agent), with no logic changes. See `changelog/FASE_5.md`.
+- **2026-10-23**: **D7 decided** and Phase 5 started: the agent by default (like a real RAG), every model can be an agent, session-only memory, and direct access as an option. The `lang` field leaves the plan: answers already follow the question's language (90–100%).
+- **2026-10-23**: **4c (multimedia, Gulliver) postponed** as a possible final phase. Phase 4 closes with 4a and 4b. MLQA, also optional, is left for the end.
+- **2026-10-23**: the 42 datasets moved from `data/datasets/` to `bench/datasets/public/`: `bench/` is for what is versioned and `data/` for what is local (DEC-01). The 42 evaluator is kept as the reference metric.
+- **2026-10-24**: the agent's safety nets (DEC-03) and the agent vs direct benchmark with four models (`BENCHMARK_REPORT.md` §8). Phase 5 completed.
+- **2026-10-24**: Phase 6 prepared up to the point of deployment (API, React web, index bundle, Space image, Pages workflow), with no commits or publication. Decisions taken out of necessity in `decisions.md`.
+- **2026-10-24**: review of the web with the author (`FASE_6.md` §6b–6g). Commit `3378494` ("Phase 6: Frontend and deployment"). Deployment on Hugging Face is pending the author's accounts.
+- **2026-10-24**: **agent off by default in the web** (the author's decision): with small models, its memory mixes topics or gives answers that are too basic. When turned on, a "work in progress" note. The CLI keeps D7. Reviewed after the fallback improvement (7b). The "about" domain stays out of the web (`API_DOMAINS`) until it is calibrated. See `changelog/FASE_7.md`.
+- **2026-10-24**: **documentation in two languages** (the author's decision, like the ES + EN biography). The Spanish originals move to `docs/es/` (with `git mv`, which keeps the history) and remain the working version. `docs/` holds the English translation, updated at the end of each phase. The README has its Spanish copy in `docs/es/README.md`. `CLAUDE.md` loads the rules from `docs/es/`. Both languages are indexed in the "about" domain.
+- **2026-10-24**: **Phase 7 (optional work and polish)** opened. It starts with the "about" domain (the project talking about itself, with the rewritten README, `docs/` and the code). The judge for the CV answers is decided: Groq (P11).
+- **2026-10-23**: the CV mode's biography, draft v1 in `data/raw/cv/autobiography.md` (ignored by git), with the pending data marked.

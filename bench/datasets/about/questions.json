@@ -1,0 +1,196 @@
+{
+  "description": "About benchmark (Phase 7a): questions on the project itself. Each one is answered by the English documents (file/evidence) and, when it exists, by their Spanish version (file_es/evidence_es); both are valid sources in either language. Build with `python -m src build_about_bench`.",
+  "questions": [
+    {
+      "id": "about-01",
+      "en": "What is RAG against the Machine?",
+      "es": "¿Qué es RAG against the Machine?",
+      "answer": {
+        "en": "Retrieval-Augmented Generation",
+        "es": "Retrieval-Augmented Generation"
+      },
+      "file": "README.md",
+      "evidence": "A multi-domain **Retrieval-Augmented Generation** system with an agent, an MCP server and a web interface.",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "Un sistema de **generación aumentada por recuperación** (RAG) multidominio, con un agente, un servidor MCP y una interfaz web."
+    },
+    {
+      "id": "about-02",
+      "en": "Which language model does the project use by default?",
+      "es": "¿Qué modelo de lenguaje usa el proyecto por defecto?",
+      "answer": "Qwen3-0.6B",
+      "file": "README.md",
+      "evidence": "The base language model is **Qwen3-0.6B**, the model of the original 42 project",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "El modelo de lenguaje base es **Qwen3-0.6B**, el del proyecto original de 42"
+    },
+    {
+      "id": "about-03",
+      "en": "Which embedding model does the retrieval use?",
+      "es": "¿Qué modelo de embeddings usa la recuperación?",
+      "answer": "bge-m3",
+      "file": "README.md",
+      "evidence": "Each branch combines BM25 (with a code-aware tokenizer that also splits `snake_case` and `CamelCase` identifiers) and dense `bge-m3` embeddings.",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "Cada rama combina BM25 (con un tokenizador que entiende el código y separa también los identificadores `snake_case` y `CamelCase`) y embeddings densos de `bge-m3`."
+    },
+    {
+      "id": "about-04",
+      "en": "Which reranker does the project use?",
+      "es": "¿Qué reranker usa el proyecto?",
+      "answer": "mmarco-mMiniLMv2-L12-H384-v1",
+      "file": "README.md",
+      "evidence": "In the code branch, the multilingual cross-encoder `mmarco-mMiniLMv2-L12-H384-v1` reranks the candidates",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "En la rama de código, el cross-encoder multilingüe `mmarco-mMiniLMv2-L12-H384-v1` reordena los candidatos"
+    },
+    {
+      "id": "about-05",
+      "en": "Which database stores the chunks and their vectors?",
+      "es": "¿Qué base de datos guarda los chunks y sus vectores?",
+      "answer": "Qdrant",
+      "file": "README.md",
+      "evidence": "**Storage:** Qdrant (server, in Docker) holds the chunks and their `bge-m3` vectors",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "**Almacenamiento:** Qdrant (en servidor, con Docker) guarda los chunks y sus vectores de `bge-m3`"
+    },
+    {
+      "id": "about-06",
+      "en": "How does the router choose which domain answers a question?",
+      "es": "¿Cómo elige el router qué dominio responde una pregunta?",
+      "answer": {
+        "en": "cross-encoder",
+        "es": "cross-encoder"
+      },
+      "file": "README.md",
+      "evidence": "Without a filter, every domain is searched and the one whose best sources get the highest cross-encoder score answers.",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "Sin filtro, se busca en todos los dominios y responde aquel cuyas mejores fuentes reciben la puntuación más alta del cross-encoder."
+    },
+    {
+      "id": "about-07",
+      "en": "How much did recall improve on the official 42 benchmark?",
+      "es": "¿Cuánto mejoró el recall en el benchmark oficial de 42?",
+      "answer": "0.17",
+      "file": "README.md",
+      "evidence": "**Docs R@5 went up by 0.07 and code R@5 by 0.17.**",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "**El R@5 de docs subió 0.07 y el de code, 0.17.**"
+    },
+    {
+      "id": "about-08",
+      "en": "Does the agent remember the conversation?",
+      "es": "¿Recuerda el agente la conversación?",
+      "answer": {
+        "en": "session",
+        "es": "sesión"
+      },
+      "file": "README.md",
+      "evidence": "It keeps a **session-only memory** of the conversation (nothing is stored).",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "Mantiene una **memoria solo de sesión** de la conversación (no se guarda nada)."
+    },
+    {
+      "id": "about-09",
+      "en": "How is the Python code split into chunks?",
+      "es": "¿Cómo se divide el código Python en chunks?",
+      "answer": "ast",
+      "file": "README.md",
+      "evidence": "**Code** (`.py`) is chunked with Python's `ast`: whole functions and classes",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "**El código** (`.py`) se trocea con el módulo `ast` de Python"
+    },
+    {
+      "id": "about-10",
+      "en": "Which tools does the MCP server expose?",
+      "es": "¿Qué herramientas expone el servidor MCP?",
+      "answer": "list_domains",
+      "file": "README.md",
+      "evidence": "the RAG exposed as `list_domains`, `search` and `answer` tools",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "el RAG expuesto como herramientas `list_domains`, `search` y `answer`"
+    },
+    {
+      "id": "about-11",
+      "en": "Where is the project deployed?",
+      "es": "¿Dónde se despliega el proyecto?",
+      "answer": "Hugging Face",
+      "file": "README.md",
+      "evidence": "**Backend:** a Hugging Face Space (Docker, free CPU), with Qdrant inside the container.",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "**Backend:** un Hugging Face Space (Docker, CPU gratuita), con Qdrant dentro del contenedor."
+    },
+    {
+      "id": "about-12",
+      "en": "Under which license is the project released?",
+      "es": "¿Bajo qué licencia se publica el proyecto?",
+      "answer": "MIT",
+      "file": "README.md",
+      "evidence": "The project's own code and documentation are released under the [MIT License](LICENSE).",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "El código y la documentación propios del proyecto se publican con la [licencia MIT](../../LICENSE)."
+    },
+    {
+      "id": "about-13",
+      "en": "When does a retrieved source count as a hit in the 42 evaluation?",
+      "es": "¿Cuándo cuenta como acierto una fuente recuperada en la evaluación de 42?",
+      "answer": "5%",
+      "file": "README.md",
+      "evidence": "a hit is a retrieved source overlapping the ground truth by at least 5% of its characters",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "un acierto es una fuente recuperada que se solapa con la de referencia en al menos el 5 % de sus caracteres"
+    },
+    {
+      "id": "about-14",
+      "en": "Which databases were compared before choosing Qdrant?",
+      "es": "¿Qué bases de datos se compararon antes de elegir Qdrant?",
+      "answer": "pgvector",
+      "file": "docs/ROADMAP.md",
+      "evidence": "decided after measuring local Qdrant, Qdrant server, Postgres + pgvector, SQLite and LanceDB",
+      "file_es": "docs/es/ROADMAP.md",
+      "evidence_es": "decidido tras medir Qdrant local, Qdrant servidor, Postgres + pgvector, SQLite y LanceDB"
+    },
+    {
+      "id": "about-15",
+      "en": "Why does the docs branch skip the reranker?",
+      "es": "¿Por qué la rama de documentación no usa el reranker?",
+      "answer": {
+        "en": "hurt",
+        "es": "empeor"
+      },
+      "file": "README.md",
+      "evidence": "The docs branch skips it, because it was measured to hurt documentation ranking on this corpus.",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "La rama de documentación no lo usa, porque se midió que empeoraba la clasificación de la documentación en este corpus."
+    },
+    {
+      "id": "about-16",
+      "en": "Which function lists the files of a source before indexing them?",
+      "es": "¿Qué función lista los ficheros de una fuente antes de indexarlos?",
+      "answer": "walk_source",
+      "file": "src/rag/ingestion/pipeline.py",
+      "evidence": "def walk_source(source: SourceConfig) -> Iterator[str]:"
+    },
+    {
+      "id": "about-17",
+      "en": "How does the web's Stop button stop the generation?",
+      "es": "¿Cómo detiene la generación el botón Stop de la web?",
+      "answer": "cancel",
+      "file": "src/rag/generator.py",
+      "evidence": "def stopping_criteria(self) -> Any:"
+    },
+    {
+      "id": "about-18",
+      "en": "What does the agent do if its rewritten query finds nothing?",
+      "es": "¿Qué hace el agente si su consulta reescrita no encuentra nada?",
+      "answer": {
+        "en": "original question",
+        "es": "pregunta original"
+      },
+      "file": "README.md",
+      "evidence": "if the rewrite finds nothing, it searches the original question",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "si la reescritura no encuentra nada, busca la pregunta original"
+    }
+  ]
+}
