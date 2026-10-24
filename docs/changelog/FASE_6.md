@@ -77,7 +77,7 @@ navegador ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) �
 | **GitHub Pages** | `.github/workflows/pages.yml` | **Manual** (`workflow_dispatch`): compila la web con `VITE_API_URL = vars.RAG_API_URL` y la publica. |
 | **Guía** | `deploy/README.md` | Paso a paso, en español. |
 
-**Privacidad (DEC-09):** el enmascarado ocurre al responder, pero el índice guarda el texto en bruto del CV. Por eso:
+**Privacidad (DEC-09):** el enmascarado ocurre al responder, pero el índice guarda el material del CV sin enmascarar. Por eso:
 - El bundle va a un dataset **privado**, no a la imagen.
 - `deploy/bundle/` y `deploy/stage/` están en `.gitignore`.
 - El token del Space es un secreto de solo lectura.
@@ -101,8 +101,8 @@ navegador ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) �
 | `/health` hasta `loaded: true`; `/config` | ✅ 3 dominios (vllm 37 381 chunks, xquad 1 217, cv 162) |
 | "¿Dónde nació Chrystian?" (CV, agente) | ✅ "…nació el 20 de enero de 1996 en Madrid. [3]", con 14 eventos de *streaming* y la cita en la biografía |
 | Seguimiento "¿Y en qué año?" con el mismo `session_id` | ✅ El agente reescribe la consulta ("¿Y en qué año? Chrystian Donaire Villén nació en Madrid.") y responde con el año |
-| "What is his phone number?" | ✅ "I don't have that information, but you can ask him yourself! cdonairevillen@gmail.com" |
-| **Fugas** en todas las respuestas, fuentes y vistas previas | ✅ **0** (ni el teléfono ni el Hotmail; la vista previa del CV muestra `[dato privado]`) |
+| Pregunta por un dato de contacto privado | ✅ "I don't have that information, but you can ask him yourself! cdonairevillen@gmail.com" |
+| **Fugas** en todas las respuestas, fuentes y vistas previas | ✅ **0** (la vista previa del CV muestra `[dato privado]`) |
 | "How do I enable prefix caching in vLLM?" (directo) | ✅ `enable_prefix_caching=True`, con 5 fuentes de vLLM (router: vllm 10.2, xquad −5.2, cv −5.9) |
 | "¿Quién ganó la Super Bowl 50?" (filtro `xquad`) | ✅ "…los Broncos", con el crédito CC-BY-SA en la fuente |
 | "What is the capital of France?" | ⚠️ Responde "Paris", citando `docs/serving/openai_compatible_server.md`: es el caso conocido de la Fase 3 (está en la documentación de vLLM como ejemplo de la API), no una alucinación |
@@ -133,7 +133,7 @@ navegador ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) �
 
 **Mismas pruebas que con la API local**, ahora en CPU dentro del contenedor:
 - Las mismas respuestas que en GPU.
-- **0 fugas** en `/chat`, `/search` y `/sources`. Los 2 chunks padre que contienen el teléfono salen enmascarados por `/sources`. Los hijos dan 404, porque `/sources` solo sirve los padres que citan las respuestas.
+- **0 fugas** en `/chat`, `/search` y `/sources`. Los chunks padre con datos privados salen enmascarados por `/sources`. Los hijos dan 404, porque `/sources` solo sirve los padres que citan las respuestas.
 - La web, en `GET /`.
 
 **Latencia con los límites del Space gratuito simulados** (`docker run --cpus=2 --memory=16g`). Primer token / respuesta completa, en segundos:
@@ -222,9 +222,65 @@ navegador ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) �
 
 **Probado:** 97 tests; flake8 y mypy limpios; Chrome headless sin errores.
 
+## 6e. Cuarta revisión (2026-10-24)
+
+- **Qwen3-4B fuera de la lista en local:** `make api` pasa `RAG_API_MODELS=$(API_MODELS)` (0.6B, 1.7B y Phi-4-mini). No cabe en 12 GB con la búsqueda en la GPU (§6d). El Space define su propia lista.
+- **Retrievals de un solo dominio:** se ve el dominio del que sale la respuesta. Los demás dominios buscados quedan plegados en una línea ("also searched: xquad (−4.32), vllm (−7.68)") que se despliega al pulsarla: así se sigue viendo cómo eligió el router.
+- **"No encontrado" en el idioma de la pregunta:**
+  - **Antes:** fuera del CV, el mensaje genérico solo existía en inglés ("Not found in the provided sources."), así que una pregunta en español sin respuesta se contestaba en inglés.
+  - **Ahora:** `not_found_for()` (en `src/rag/generator.py`) da "No se encuentra en las fuentes proporcionadas." en español. El pipeline y el agente lo usan cuando el dominio no tiene mensaje propio. El prompt sigue pidiendo la frase en inglés, como hasta ahora.
+  - **Patrón nuevo:** "…no está disponible en las fuentes…" (visto con Qwen3-1.7B) ya se reconoce como "no encontrado", y en el CV se sustituye por tu mensaje con el correo.
+  - **Recall y benchmarks:** sin efecto. El benchmark de 42 es en inglés, y la frase en español ya la reconocían los patrones.
+- **Respuesta en inglés a una pregunta en español con 1.7B:** no reproducida. Con 5 preguntas sobre el CV en español, todas las respuestas con contenido salieron en español. Queda pendiente con tu pregunta exacta.
+- **Pruebas:** 99 tests; flake8 y mypy limpios; Chrome headless sin errores.
+
+## 6f. Respuestas cortadas y en inglés (2026-10-24)
+
+**Respuestas en inglés a preguntas en español.** Tu pregunta era "Experiencia laboral de Chrystian". Ninguna de sus palabras estaba entre los marcadores del detector de idioma (`src/rag/language.py`): devolvía "?", no se pedía ningún idioma y el modelo seguía el de las fuentes, que es el inglés.
+- **Nuevos marcadores en español:** "de", "y", "en", "sobre", "mi", "tu", "quién".
+- **Nuevos marcadores en inglés:** "in", "an", "his", "about", "from", "who", "where".
+- **Señal extra:** las tildes, la ñ y ¿¡ cuentan como español.
+- **Comprobado con todas las preguntas de los benchmarks:** ninguna cambia a un idioma equivocado. XQuAD ES pasa de 2 mal detectadas y 13 sin idioma a 0 y 0. XQuAD EN pasa de 20 sin idioma a 3.
+
+**Respuestas cortadas.** El límite era de 150 tokens nuevos (`rag.toml`). Medido con 4 preguntas:
+
+| Modelo | Tokens por respuesta con un límite de 600 |
+|---|---|
+| Qwen3-0.6B | 12–61: nunca llega al límite |
+| Qwen3-1.7B | 20–145, pero "Experiencia laboral de Chrystian" necesita **265** (12.9 s en la 3080 Ti) |
+
+- **La web sube el límite a 400** (`API_MAX_TOKENS` en `make api`; `RAG_GENERATION_MAX_NEW_TOKENS=400` en la imagen del Space).
+- **`rag.toml` mantiene 150,** para que `gen-bench` siga siendo comparable con las fases anteriores.
+
+**Pruebas:** 100 tests; flake8 y mypy limpios.
+
+## 6g. Botón Stop, límite alto y esquinas de puntos (2026-10-24)
+
+**Objetivo (tuyo):** que el LLM escriba lo que necesite, sin cortar respuestas válidas y sin quedar atrapado en bucles.
+
+**Medido antes de decidir:**
+- Con 6 preguntas complejas y sin límite práctico, la respuesta válida más larga fue de **464 tokens** (Phi-4-mini con 10 fuentes). El 1.7B no pasó de 321.
+- Phi-4-mini entró una vez en **bucle** con el "paso a paso de vLLM": a partir del paso ~20 repite una plantilla y se inventa opciones (`--response-func`…) hasta agotar el límite.
+- **Un detector de bucles automático no es fiable:** una regla de "parar si se repite la misma secuencia de N palabras" salta en 32 de 3.933 respuestas buenas guardadas (código, listas…), y el bucle de Phi solo repite su secuencia 5 veces.
+- **Penalizar la repetición** cambiaría todas las respuestas y obligaría a repetir `gen-bench`. Descartado por ahora.
+
+**Lo aplicado (opción 1):**
+- **Límite de la web: 1024 tokens**, solo como red de seguridad (`API_MAX_TOKENS` en `make api`; también en la imagen del Space). `rag.toml` mantiene 150 para los benchmarks.
+- **Si se llega al límite,** la respuesta se recorta en la última frase completa con "…" y se cierra un bloque de código que haya quedado abierto. La traza lo indica: "cut at the length limit".
+- **Botón Stop:** mientras se escribe, el botón de enviar pasa a ser ■. Al pulsarlo, la web corta la conexión y la API para la generación de verdad. Se hace con un criterio de parada (`Generator.cancel`, comprobado en cada token) que solo se activa así, de modo que no cambia ninguna respuesta normal ni los benchmarks.
+  - **Arregla además un problema que no teníamos presente:** antes, cerrar la pestaña a mitad de una respuesta dejaba al servidor generando y bloqueando al siguiente visitante. Ahora también para.
+  - **La API manda el `session_id` al empezar** (evento `start`), así que una conversación parada antes de su primera respuesta conserva su memoria.
+  - **Medido en Chrome headless:** Stop corta en 48 ms y la siguiente pregunta empieza a responder a los 2.9 s. Sin parar, habría esperado los ~45 s del bucle.
+
+**Web:**
+- **Esquinas de puntos** en las tarjetas de retrieval (la variante `dots` de tu documento, adaptada a CSS normal): cuatro rejillas de 3×3 puntos que se apagan hacia dentro, rojas en la del dominio de la respuesta y grises en las demás.
+- **Preguntas de ejemplo:** el desplegable flota encima del interruptor, que ya no se mueve al abrirlo (medido: la misma posición).
+
+**Pruebas:** 102 tests; flake8 y mypy limpios.
+
 ## 7. Qué debes saber
 
-- **Tu teléfono real estaba como ejemplo** en un comentario de `src/rag/domain_rules.py` y en los tests (commits ya subidos). Ahora es un número ficticio. **Decidiste no reescribir el historial** (DEC-18).
+- **Los ejemplos de los tests y comentarios del enmascarado usan datos ficticios** (DEC-18).
 - **Latencia en el Space gratuito:** ~15–25 s (directo) y ~22–32 s (agente) por respuesta (§6). El agente sigue por defecto (D7), pero con este coste quizá prefieras otro valor por defecto en la web pública. Es una decisión tuya. La web toma el valor por defecto de `/config` (`agent_default` en `src/api/app.py`), y el campo `agent` de la petición tiene el mismo valor por defecto.
 
 - **Antes de desplegar, decide** qué LLM va al Space (propuesta en `BENCHMARK_REPORT.md` §8.3) y si te vale la estrategia de privacidad (DEC-09) o prefieres un índice ya enmascarado (opción C).
@@ -247,5 +303,5 @@ navegador ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) �
 | `pyproject.toml`, `uv.lock` | `fastapi`, `uvicorn`; `httpx` en `dev` (DEC-15). |
 | `tests/test_api.py` | **Nuevo.** |
 | `docs/decisions.md` | **Nuevo.** Decisiones tomadas por necesidad. |
-| `src/rag/domain_rules.py`, `tests/test_domain_rules.py` | Número de ejemplo ficticio en lugar de tu teléfono real (DEC-18). Sin cambios de lógica. |
+| `src/rag/domain_rules.py`, `tests/test_domain_rules.py` | Datos de ejemplo ficticios (DEC-18). Sin cambios de lógica. |
 | `web/README.md` | Sustituye la plantilla de Vite. |

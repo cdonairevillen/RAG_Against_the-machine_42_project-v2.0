@@ -49,3 +49,27 @@ def test_domain_rules_extend_the_system_prompt() -> None:
     assert ruled[0]["content"].startswith(plain[0]["content"])
     assert ruled[0]["content"].endswith("7. Answer in the third person.")
     assert build_messages("q", [], "en", "  ")[0] == plain[0]
+
+
+def test_not_found_message_follows_the_question_language() -> None:
+    from src.rag.generator import NOT_FOUND_MESSAGE, not_found_for
+
+    assert not_found_for("How do I enable LoRA?") == NOT_FOUND_MESSAGE
+    spanish = not_found_for("Háblame de su trabajo actual")
+    assert spanish.startswith("No se encuentra") and is_not_found(spanish)
+
+
+def test_spanish_not_available_refusal_is_detected() -> None:
+    assert is_not_found("La información sobre donde trabaja ahora no está "
+                        "disponible en los fuentes proporcionadas.")
+
+
+def test_short_keyword_questions_get_a_language() -> None:
+    # Seen in the web: "Experiencia laboral de Chrystian" had no marker,
+    # so no answer language was requested and Qwen3-1.7B wrote English.
+    for question in ("Experiencia laboral de Chrystian", "Aficiones y gustos",
+                     "Proyectos en 42 Madrid", "Música favorita"):
+        assert detect_language(question) == "es", question
+    for question in ("Work experience of Chrystian", "LoRA adapters in vLLM",
+                     "Who is Chrystian?"):
+        assert detect_language(question) == "en", question

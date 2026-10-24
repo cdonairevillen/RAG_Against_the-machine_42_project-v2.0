@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional, Sequence
 
 from src.rag.generator import (
-    NOT_FOUND_MESSAGE, Generator, clean_output, is_not_found,
+    Generator, clean_output, is_not_found, not_found_for,
 )
 from src.config import get_config
 from src.rag.domain_rules import DomainRules
@@ -89,7 +89,7 @@ class RagPipeline:
         """The "not found" answer of the domain the question went to."""
         return self.rules.not_found_message(
             self.answered_domain(), question
-        ) or NOT_FOUND_MESSAGE
+        ) or not_found_for(question)
 
     def answer(self, question: str, k: int = 5,
                on_piece: Optional[Callable[[str], None]] = None,

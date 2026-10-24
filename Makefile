@@ -93,8 +93,17 @@ web-stop:
 
 # ── Phase 6: API + React web + deployment ───────────────────────────────
 # API (FastAPI) on http://127.0.0.1:8000; it also serves web/dist if built.
+# API_MODELS: the LLMs the web offers (rag.toml profiles). Qwen3-4B is left
+# out: with retrieval on the GPU it does not fit in 12 GB (measured).
+API_MODELS ?= default,llm-qwen3-1.7b,llm-phi4-mini
+# The web lets the LLM write what it needs (rag.toml keeps 150 so
+# gen-bench stays comparable): the longest legit answer measured was 464
+# tokens, so 1024 is only a safety net against loops; the Stop button cuts
+# them and a capped answer is trimmed at its last sentence.
+API_MAX_TOKENS ?= 1024
 api: db-up
-	$(ENV) $(UV) run --project . $(PY) -m src.api
+	RAG_API_MODELS=$(API_MODELS) RAG_GENERATION_MAX_NEW_TOKENS=$(API_MAX_TOKENS) \
+		$(ENV) $(UV) run --project . $(PY) -m src.api
 
 # React web in development (Vite, http://localhost:5173, talks to make api).
 web-dev:

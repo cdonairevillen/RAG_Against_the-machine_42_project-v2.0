@@ -236,12 +236,12 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 
 > ✅ **Completada (2026-10-23).** Detalle en `changelog/FASE_4.md` (4b) y `BENCHMARK_REPORT.md` §7.
 > - **Indexado:** CV (`.docx`, EN), LinkedIn (`.pdf`, ES) y biografía (ES + versión EN), con Docling.
-> - **Privacidad:** el teléfono y el Hotmail se enmascaran al responder, sin tocar los ficheros. 0 fugas en todas las pruebas.
+> - **Privacidad:** los datos de contacto privados se enmascaran al responder, sin tocar los ficheros. 0 fugas en todas las pruebas.
 > - **Sin dato**, responde: *"No dispongo de esa información, ¡pero puedes preguntárselo tú! cdonairevillen@gmail.com"*.
-> - **Prompt del modo CV** con tercera persona, sin mezclar trabajos, mundo literario secreto y contacto. Chunks de 800, 8 fuentes y umbral −3.0.
+> - **Prompt del modo CV** con tercera persona, sin mezclar trabajos, temas reservados y contacto. Chunks de 800, 8 fuentes y umbral −3.0.
 > - **Resultado:** contiene la respuesta correcta en el 73 % (EN) y el 80 % (ES); el router manda el 100 % de las preguntas del CV a su dominio.
 
-- **Futuro, módulo de textos propios:** algunos relatos tuyos podrán ingestarse como parte del modo CV (o como dominio aparte). El mundo literario que estás creando es secreto por ahora: la biografía solo dice que existe, y el RAG no debe inventar detalles sobre él.
+- **Futuro, módulo de textos propios:** algunos relatos tuyos podrán ingestarse como parte del modo CV (o como dominio aparte).
 
 ### 4c — Multimedia: *Los viajes de Gulliver* (1939) frente a la novela de Swift (1726)
 
@@ -405,4 +405,4 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-23**: datasets de 42 movidos de `data/datasets/` a `bench/datasets/public/`: `bench/` queda para lo versionado y `data/` para lo local (DEC-01). El evaluador de 42 se conserva como métrica de referencia.
 - **2026-10-24**: redes de seguridad del agente (DEC-03) y benchmark de agente frente a directo con cuatro modelos (`BENCHMARK_REPORT.md` §8). Fase 5 completada, pendiente de revisión.
 - **2026-10-24**: Fase 6 preparada hasta el punto de despliegue (API, web React, bundle del índice, imagen del Space, workflow de Pages), sin commits ni publicación. Decisiones tomadas por necesidad en `docs/decisions.md`.
-- **2026-10-23**: biografía del modo CV, borrador v1 en `data/raw/cv/autobiography.md` (ignorado por git), con los datos pendientes marcados. Notas originales en `data/private_notes/`.
+- **2026-10-23**: biografía del modo CV, borrador v1 en `data/raw/cv/autobiography.md` (ignorado por git), con los datos pendientes marcados.

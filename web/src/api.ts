@@ -110,13 +110,16 @@ export interface ChatRequest {
   depth: number | null;
 }
 
-// POST /chat answers as Server-Sent Events: "token" pieces while the
-// answer is generated, then "done" with the final answer and sources
-// (or "error"). EventSource only does GET, so the stream is read here.
+// POST /chat answers as Server-Sent Events: "start" with the session id,
+// "token" pieces while the answer is generated, then "done" with the
+// final answer and sources (or "error"). EventSource only does GET, so
+// the stream is read here. Aborting `signal` (the Stop button) closes the
+// connection, and the API stops generating.
 export async function chat(
   request: ChatRequest,
   onToken: (piece: string) => void,
   signal?: AbortSignal,
+  onStart?: (sessionId: string) => void,
 ): Promise<ChatResult> {
   const response = await fetch(`${API_URL}/chat`, {
     method: "POST",
@@ -142,7 +145,8 @@ export async function chat(
       const data = /^data: (.*)$/m.exec(message)?.[1];
       if (!event || data === undefined) continue;
       const payload = JSON.parse(data);
-      if (event === "token") onToken(payload as string);
+      if (event === "start") onStart?.(payload.session_id as string);
+      else if (event === "token") onToken(payload as string);
       else if (event === "done") return payload as ChatResult;
       else if (event === "error") throw new Error(payload.detail);
     }

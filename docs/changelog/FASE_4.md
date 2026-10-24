@@ -20,7 +20,7 @@ Aplazada: 4c (Gulliver).
 
 ### Decisiones (tuyas)
 - **Se indexa todo tal cual:** el CV (`.docx`, en inglés), el perfil de LinkedIn (`.pdf`, en español) y la biografía (`.md`, en español). Cada fichero va en su idioma, sin traducir ni limpiar.
-- **El teléfono y el correo de Hotmail** se quedan en los ficheros, pero **nunca se muestran**: hay guardarraíles al responder.
+- **Los datos de contacto privados** se quedan en los ficheros, pero **nunca se muestran**: hay guardarraíles al responder.
 - **Sin el dato**, el modo CV responde: *"No dispongo de esa información, ¡pero puedes preguntárselo tú! cdonairevillen@gmail.com"* (y su versión en inglés).
 - **Las preguntas de evaluación van a git.**
 
@@ -36,7 +36,7 @@ Aplazada: 4c (Gulliver).
 - **Fuente `cv`** en `rag.toml`: 15 padres y 56 hijos (biografía 8, LinkedIn 4, CV 3).
 - **Benchmark** (`bench/datasets/cv/`, en git):
   - 30 preguntas escritas a mano, iguales en inglés y en español. La fuente correcta es el fragmento exacto de la biografía que responde, y `make`/`build_cv_bench` comprueba que sigue ahí.
-  - 10 preguntas sobre ti sin respuesta en los datos (`ood`): de contacto privado, sobre el mundo literario secreto y de datos que faltan.
+  - 10 preguntas sobre ti sin respuesta en los datos (`ood`): de contacto privado, sobre temas reservados y de datos que faltan.
 - **`.gitignore`:** la regla `cv/` pasa a `/cv/`, que es la carpeta de la raíz. Antes ignoraba cualquier carpeta llamada `cv`, incluida la del benchmark. `data/` sigue ignorada entera.
 
 ### Resultados (primera medición)
@@ -61,13 +61,13 @@ Aplazada: 4c (Gulliver).
 | Contiene la respuesta correcta | 0.50 | 0.57 |
 | "No encontrado" (con la respuesta en el contexto) | 0.23 (0.13) | 0.13 (0.03) |
 | Cita la fuente correcta | 0.57 | 0.88 |
-| **Fugas de teléfono o Hotmail** | **0** | **0** |
+| **Fugas de datos privados** | **0** | **0** |
 | Sin dato → tu mensaje (faltan datos / contacto privado) | 1.00 / 1.00 | 0.86 / 0.50 |
-| Mundo literario secreto → tu mensaje | **0 / 1** | **0 / 1** |
+| Tema reservado → tu mensaje | **0 / 1** | **0 / 1** |
 
 **Problemas observados** (revisados a mano en `data/output/gen_bench/30-cv-base/answers.json`):
 1. **Mezcla de hechos:** "hizo su Erasmus en De La Luna Luna Studio", "trabaja en Lion's Roar Games en De La Luna Luna", "props para Secret 6 (empresa alemana)". Los chunks juntan varios trabajos seguidos y el modelo de 0.6B cruza los datos.
-2. **Inventa el mundo literario secreto:** lo describe como fantasía e introspección y le atribuye *Dune*, *El Señor de los Anillos*… como obras suyas.
+2. **Inventa detalles de un tema reservado** y te atribuye obras ajenas (*Dune*, *El Señor de los Anillos*…).
 3. **Preguntas en inglés sin respuesta:** esquí, Star Wars, Linkin Park, Europa… El contexto recuperado es el CV en inglés, que no tiene esos datos, y el modelo dice "no encontrado", que es correcto con ese contexto.
 4. **Repite el contexto** ("[1] --- file: … ---") en algunas respuestas, en vez de contestar.
 5. **Copia el marcador de dato privado:** en una respuesta aparece "(privado; contacto: …)" porque estaba en el chunk de LinkedIn. No es una fuga, pero mete ruido.
@@ -76,7 +76,7 @@ Aplazada: 4c (Gulliver).
 
 Cada cambio se mide por separado con el `gen-bench` del CV (60 preguntas más 20 sin dato, ~4 min):
 
-| Ejecución | Cambio | Contiene EN / ES | Cita la correcta EN / ES | "No encontrado" EN / ES | Mundo secreto EN / ES | Fugas |
+| Ejecución | Cambio | Contiene EN / ES | Cita la correcta EN / ES | "No encontrado" EN / ES | Tema reservado EN / ES | Fugas |
 |---|---|---|---|---|---|---|
 | `30-cv-base` | — | 0.50 / 0.57 | 0.57 / 0.88 | 0.23 / 0.13 | ✗ / ✗ | 0 |
 | `31-cv-prompt` | prompt del CV + marcador `[dato privado]` | 0.40 / 0.67 | 0.30 / 0.77 | 0.33 / 0.10 | ✓ / ✓ | 0 |
@@ -86,7 +86,7 @@ Cada cambio se mide por separado con el `gen-bench` del CV (60 preguntas más 20
 | **`34-cv-chunks800-gate3`** | **+ umbral −3.0** | **0.57 / 0.70** | **0.62 / 0.92** | 0.37 / 0.13 | **✓ / ✓** | **0** |
 
 **Qué aporta cada cambio:**
-- **Prompt del CV** (`prompt_rules`): respuestas en tercera persona, cada dato con su empresa, sus gustos no son obras suyas y el mundo literario es secreto. **Arregla el mundo secreto** en los dos idiomas: ahora responde que es secreto o da tu mensaje, y ya no lo inventa.
+- **Prompt del CV** (`prompt_rules`): respuestas en tercera persona, cada dato con su empresa, sus gustos no son obras suyas y los temas reservados no se desarrollan. **Arregla los temas reservados** en los dos idiomas: ahora responde que es reservado o da tu mensaje, y ya no inventa.
 - **Patrones de "no encontrado"** (`src/generator.py`): el modelo también se niega con frases como "No se proporciona…", "no se menciona…" o "No se encuentra en los proporcionados", que el detector no reconocía. Ahora acaban en tu mensaje.
   - **En vLLM** cambia dos respuestas, y las dos eran negativas reales: un rechazo en *code* español y uno *near* español (que pasa de 0.70 a 0.80 de rechazo correcto). El resto, igual (`22-fase4b-vllm-check`).
 - **`answer_k = 8`:** más fuentes para que entre la biografía cuando la pregunta va en inglés. Con chunks de 2 000 caracteres no cabían en el presupuesto de tokens y metían ruido (en español bajó de 0.67 a 0.57).
@@ -101,17 +101,17 @@ Cada cambio se mide por separado con el `gen-bench` del CV (60 preguntas más 20
 
 - **`data/raw/cv/autobiography_en.md`:** traducción fiel de la biografía, con las mismas secciones. Se indexa junto al original (62 padres, 162 hijos).
 - **Benchmark:** las preguntas en inglés apuntan a su evidencia en la versión inglesa (`evidence_en` en `questions.json`), y las españolas al original. Así el ground truth está en el idioma de la pregunta.
-- **Regla 11 del prompt:** el único contacto público es cdonairevillen@gmail.com. Si piden un teléfono u otro dato, se dice que es privado y se da ese correo.
+- **Regla 11 del prompt:** el único contacto público es cdonairevillen@gmail.com. Si piden otro dato de contacto, se dice que es privado y se da ese correo.
 - **Umbral recalibrado** (`gate_scores --label bio-en`): −3.0 sigue siendo válido. Pasa el 93 % de las válidas en los dos idiomas y ninguna pregunta fuera de dominio *far*/*near*.
 
-| Ejecución | Recuperación EN @1/@3/@5/@10 | Contiene EN / ES | Cita la correcta EN / ES | "No encontrado" EN / ES | Sin dato → tu mensaje o "es secreto" | Fugas |
+| Ejecución | Recuperación EN @1/@3/@5/@10 | Contiene EN / ES | Cita la correcta EN / ES | "No encontrado" EN / ES | Sin dato → tu mensaje o "es reservado" | Fugas |
 |---|---|---|---|---|---|---|
 | `34` (antes) | 0.13 / 0.43 / 0.57 / 0.70 | 0.57 / 0.70 | 0.62 / 0.92 | 0.37 / 0.13 | EN 9/10 · ES 9/10 | 0 |
 | **`35-cv-bio-en`** | **0.47 / 0.80 / 0.93 / 0.97** | **0.73 / 0.80** | 0.73 / 0.89 | **0.10 / 0.07** | **EN 10/10 · ES 9/10** | **0** |
 | `36-cv-rule12` (descartado) | igual | 0.60 / 0.73 | 0.74 / 0.89 | 0.17 / 0.07 | EN 10/10 · ES 9/10 | 0 |
 
 - **La versión en inglés resuelve el hueco de las preguntas en inglés:** los "no encontrado" bajan del 37 % al 10 % y "contiene la respuesta" sube de 0.57 a 0.73. El español también mejora (de 0.70 a 0.80).
-- **Los datos de contacto privados acaban en tu mensaje** en los dos idiomas: ya no da el Gmail como si fuera el Hotmail.
+- **Los datos de contacto privados acaban en tu mensaje** en los dos idiomas: ya no da el Gmail como si fuera otro contacto.
 - **Lo que falla:** "¿Está casado?" → "No está casado". Se lo inventa, porque el dato no está.
 - **`36`, descartado:** probé una regla 12 ("no respondas sí o no a datos personales que no estén"). Arregla esa pregunta, pero las respuestas correctas bajan 13 puntos en inglés y 7 en español, y una pregunta de contacto deja de dar tu mensaje. Se revierte.
 
@@ -120,8 +120,8 @@ Cada cambio se mide por separado con el `gen-bench` del CV (60 preguntas más 20
 **Lo que quedaba abierto en la ronda anterior** (antes de la biografía en inglés):
 - **Preguntas en inglés sobre datos que solo están en la biografía:** nacimiento, barrio, instituto, Eastbourne, Estambul, guitarra, esquí, reubicarse en Europa, LanguageCert… (11 de 30 acaban en "no encontrado"). El contexto que llega es el del CV en inglés, que no los tiene. Es un límite de la recuperación entre idiomas, no del LLM; la solución directa sería una versión en inglés de la biografía.
 - **Datos de contacto privados:**
-  - A "¿Cuál es su teléfono?" responde "es [dato privado]". No hay fuga, pero no da tu mensaje.
-  - A "What is his Hotmail address?" da tu Gmail como si fuera el Hotmail. No hay fuga, pero la afirmación es falsa.
+  - A una pregunta por un dato de contacto privado responde "es [dato privado]". No hay fuga, pero no da tu mensaje.
+  - A otra, da tu Gmail como si fuera el contacto pedido. No hay fuga, pero la afirmación es falsa.
   - Posible arreglo en el prompt: "el único contacto público es cdonairevillen@gmail.com".
 - **Router con los tres dominios** (`46-router-cv`): el 100 % de las preguntas de 42 y del CV llegan a su dominio. XQuAD se queda en el 98 %, y solo 5 de 2 380 van al CV.
 

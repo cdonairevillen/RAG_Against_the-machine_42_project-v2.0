@@ -31,7 +31,7 @@ GitHub Pages (opcional) ── la misma web, apuntando a la API del Space (VITE_
 make bundle            # deploy/bundle/: snapshots de Qdrant + BM25 + bundle.json (SHA256)
 ```
 
-⚠️ **El bundle contiene el texto en bruto del CV, incluidos el teléfono y el correo antiguo.** Se enmascaran al responder, pero los ficheros los tienen. Por eso:
+⚠️ **El bundle contiene el material del CV sin enmascarar** (el enmascarado se aplica al responder). Por eso:
 - `deploy/bundle/` está en `.gitignore`.
 - Se sube solo a un dataset **privado**.
 

@@ -89,12 +89,12 @@ La API serializa la generación con un candado. Con un solo LLM en una CPU gratu
 
 ## DEC-09 — Cómo llega el índice al despliegue (privacidad)
 
-**Problema detectado:** el enmascarado del teléfono y del correo antiguo se hace al responder, pero el índice (Qdrant + BM25) guarda el texto en bruto del CV. Cualquiera que pudiera descargar el índice los leería.
+**Problema detectado:** el enmascarado de los datos de contacto privados se hace al responder, pero el índice (Qdrant + BM25) guarda el material del CV sin enmascarar. Cualquiera que pudiera descargar el índice los leería.
 
 | Opción | Pros | Contras |
 |---|---|---|
 | **A. Bundle (snapshots de Qdrant + BM25 con SHA256) en un dataset privado de HF; el Space lo descarga al arrancar con un token secreto** ✅ | El código es público y los datos no; se respeta tu decisión de indexar el material tal cual (sin manipularlo) | Un paso más al desplegar (crear el dataset y el secreto) |
-| B. Meter el índice en la imagen del Space | Arranque más simple | En un Space público, la imagen y sus ficheros se pueden descargar: **fuga del teléfono** |
+| B. Meter el índice en la imagen del Space | Arranque más simple | En un Space público, la imagen y sus ficheros se pueden descargar: **fuga de datos privados** |
 | C. Construir un índice "de despliegue" con el texto ya enmascarado | Nada sensible en ningún sitio | Contradice tu decisión de no manipular el material (BOM, "indexar tal cual") y obliga a mantener dos índices |
 | D. Indexar en el arranque del Space | Sin bundle | Horas en CPU con `bge-m3` |
 
@@ -164,26 +164,6 @@ El repo no tiene `LICENSE`. Había puesto `license: mit` en la ficha del Space y
 
 **Ojo:** no sé si el Space gratuito limita la CPU con cgroup o con una VM. La opción A cubre los dos casos, pero solo lo he probado con `docker run --cpus=2` en local.
 
-## DEC-18 — Tu teléfono real en el historial público de GitHub
+## DEC-18 — Datos de ejemplo ficticios
 
-**Decidido (2026-10-24, tú): no se reescribe el historial.** El móvil no es un dato crítico para ti. El enmascarado se mantiene para centralizar el contacto en el correo, y el número ficticio de los ejemplos se queda (no cambia nada).
-
-**Hallazgo:** antes de preparar el contenido del Space, busqué datos privados en los ficheros. El número de ejemplo del comentario de `src/rag/domain_rules.py` y de `tests/test_domain_rules.py` era **tu teléfono real** (comprobado contra el índice del CV, sin imprimirlo). Esos ficheros entraron en el commit `f9cc27d` (Fase 4) y siguen en `680f21a`, los dos ya en `origin`. **El repo es público:** la API de GitHub responde sin autenticación.
-- El Hotmail antiguo **no** aparece en ningún commit.
-- El `old@hotmail.es` de los tests es un ejemplo genérico.
-
-**Lo que he hecho (sin commit):** sustituir el número por uno ficticio (`612345678`) en el comentario y en los tests. El patrón de enmascarado es genérico (cualquier móvil español), así que el comportamiento no cambia. Los 94 tests pasan, y `make space-stage` sale limpio.
-
-**Lo que NO he hecho:** reescribir el historial. Es destructivo y necesita un `push --force`, así que te toca decidirlo:
-
-| Opción | Pros | Contras |
-|---|---|---|
-| A. Solo el arreglo hacia delante (commit normal) | Sin riesgo para el repo | El número sigue visible en los commits antiguos |
-| B. Reescribir el historial (`git filter-repo --replace-text`) + `push --force` | El número desaparece de las ramas | Cambian todos los hashes desde `f9cc27d` (y las etiquetas posteriores, si hay); GitHub puede seguir sirviendo los commits antiguos por su hash hasta que se purguen (se puede pedir a soporte) |
-| C. Hacer el repo privado mientras se decide | Inmediato | La web de LinkedIn enlaza al código |
-
-**Mi recomendación:** B, y después A como parte del mismo commit. Es un dato personal que pediste que no se mostrara nunca. Si no quieres tocar el historial, al menos C hasta decidirlo.
-
-**Además:**
-- La imagen local `rag-space` ya está reconstruida con el arreglo y comprobada: 0 fugas, y la web nueva se sirve bien.
-- `deploy/stage/` (lo que se subiría al Space) también está limpio.
+Los ejemplos de los tests y de los comentarios del enmascarado (`src/rag/domain_rules.py`, `tests/test_domain_rules.py`, `tests/test_api.py`) usan datos ficticios. El patrón de enmascarado es genérico, así que el comportamiento no cambia. Comprobado: ni el código ni `deploy/stage/` (lo que se sube al Space) contienen datos personales.

@@ -262,7 +262,7 @@ Las respuestas de referencia de XQuAD son fragmentos cortos (por ejemplo, "308")
 
 ## 7. Modo CV (Fase 4b)
 
-Corpus: CV (`.docx`, inglés), perfil de LinkedIn (`.pdf`, español) y biografía (español + versión en inglés). Benchmark propio: 30 preguntas iguales en inglés y en español, más 10 sobre ti sin respuesta en los datos (contacto privado, mundo literario secreto, datos que faltan). Qwen3-0.6B.
+Corpus: CV (`.docx`, inglés), perfil de LinkedIn (`.pdf`, español) y biografía (español + versión en inglés). Benchmark propio: 30 preguntas iguales en inglés y en español, más 10 sobre ti sin respuesta en los datos (contacto privado, temas reservados, datos que faltan). Qwen3-0.6B.
 
 | Ejecución | Cambio | Contiene EN / ES | Cita la correcta EN / ES | Sin dato bien resuelto EN / ES | Fugas |
 |---|---|---|---|---|---|
@@ -277,7 +277,7 @@ Corpus: CV (`.docx`, inglés), perfil de LinkedIn (`.pdf`, español) y biografí
 - **Recuperación EN con la biografía en inglés:** de 0.13 / 0.43 / 0.57 / 0.70 a **0.47 / 0.80 / 0.93 / 0.97**. ES: 0.70 / 0.83 / 0.97 / 1.00.
 - **Umbral del filtro fuera de dominio:** −3.0. Pasa el 93 % de las válidas (EN/ES) y ninguna pregunta fuera de dominio.
 - **Router con 3 dominios** (`46-router-cv`): el 100 % de las preguntas de 42 y del CV llegan a su dominio; XQuAD, el 98 %.
-- **Las mayores ganancias vienen de los datos** (la versión en inglés) y del **tamaño del chunk** (menos mezcla de trabajos). Las reglas de prompt arreglan casos concretos (el mundo secreto, el contacto), pero con un modelo de 0.6B cada regla de más puede costar aciertos (`36`).
+- **Las mayores ganancias vienen de los datos** (la versión en inglés) y del **tamaño del chunk** (menos mezcla de trabajos). Las reglas de prompt arreglan casos concretos (los temas reservados, el contacto), pero con un modelo de 0.6B cada regla de más puede costar aciertos (`36`).
 
 ---
 

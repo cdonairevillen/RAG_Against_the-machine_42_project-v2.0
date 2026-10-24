@@ -25,7 +25,7 @@ from src.agent.memory import Session, Turn
 from src.agent.toolcalls import SEARCH_TOOL, parse_tool_calls, render
 from src.models import MinimalSource
 from src.rag.generator import (
-    NOT_FOUND_MESSAGE, Generator, clean_output, is_not_found,
+    Generator, clean_output, is_not_found, not_found_for,
 )
 from src.rag.language import detect_language
 from src.rag.pipeline import build_context_blocks
@@ -239,7 +239,7 @@ class Agent:
         if not found:
             domain = searches[-1][1]["domain"]
             text = rules.not_found_message(domain, question) \
-                or NOT_FOUND_MESSAGE
+                or not_found_for(question)
             if on_piece:
                 on_piece(text)
             return self.remember(AgentAnswer(
@@ -281,7 +281,7 @@ class Agent:
                                                    language)
         not_found = is_not_found(text)
         text = (rules.not_found_message(domain, question)
-                or NOT_FOUND_MESSAGE) if not_found \
+                or not_found_for(question)) if not_found \
             else rules.redact_all(text)
         return self.remember(AgentAnswer(
             question, text, sources, not_found, domain,

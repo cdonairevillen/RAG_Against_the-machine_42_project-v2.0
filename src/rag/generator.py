@@ -1,5 +1,5 @@
 import re
-from threading import Thread
+from threading import Event, Thread
 from typing import Any, Iterator, Optional
 
 import torch
@@ -22,12 +22,21 @@ NOT_FOUND_PATTERNS = (
     r"no se (menciona|proporciona|encuentra en (los|las) "
     r"(proporcionad|fuente|source))",
     r"not (mentioned|provided|found) in the (provided )?sources",
+    # Seen with Qwen3-1.7B in the web (2026-10-24).
+    r"no est[áa] disponible en (los|las) fuentes",
     # Domain messages (rag.toml not_found_message, e.g. the CV mode).
     r"no dispongo de esa información",
     r"i don't have that information",
 )
 
 NOT_FOUND_MESSAGE = "Not found in the provided sources."
+# The generic "not found" answer in the user's language (domains can set
+# their own: rag.toml not_found_message). The prompt keeps the English
+# one, which is what the model is told to reply.
+NOT_FOUND_MESSAGES = {
+    "en": NOT_FOUND_MESSAGE,
+    "es": "No se encuentra en las fuentes proporcionadas.",
+}
 
 SYSTEM_PROMPT = (
     "You are a technical assistant that answers questions using ONLY the "
@@ -97,6 +106,12 @@ def build_messages(question: str, sources: list[str],
     ]
 
 
+def not_found_for(question: str) -> str:
+    """The generic "not found" answer in the question's language."""
+    return NOT_FOUND_MESSAGES.get(detect_language(question),
+                                  NOT_FOUND_MESSAGE)
+
+
 def clean_output(text: str) -> str:
     """Remove reasoning traces and normalise "not found" answers."""
     text = THINK_BLOCK.sub("", text)
@@ -147,6 +162,10 @@ class Generator:
         self.max_new_tokens = config.max_new_tokens
         self.max_input_tokens = config.max_input_tokens
         self.eos_token_ids = self.stop_token_ids()
+        # Set to stop the generation in progress (the web's Stop button
+        # or a closed tab); the API gives each request its own Event.
+        # Never set elsewhere, so answers and benchmarks are unchanged.
+        self.cancel = Event()
         print("Model loaded.")
 
     def stop_token_ids(self) -> list[int]:
@@ -338,7 +357,24 @@ class Generator:
             "do_sample": False,
             "pad_token_id": self.tokenizer.pad_token_id,
             "eos_token_id": self.eos_token_ids,
+            "stopping_criteria": self.stopping_criteria(),
         }
+
+    def stopping_criteria(self) -> Any:
+        """Stop generating as soon as `cancel` is set (checked per token,
+        read when it runs, so the API can swap the Event per request)."""
+        from transformers import StoppingCriteria, StoppingCriteriaList
+
+        generator = self
+
+        class Cancelled(StoppingCriteria):
+            def __call__(self, input_ids: Any, scores: Any,
+                         **kwargs: Any) -> Any:
+                stop = generator.cancel.is_set()
+                return torch.full((input_ids.shape[0],), stop,
+                                  dtype=torch.bool, device=input_ids.device)
+
+        return StoppingCriteriaList([Cancelled()])
 
     def generate(self, **kwargs: Any) -> Any:
         """Run the model's generate() without gradients."""

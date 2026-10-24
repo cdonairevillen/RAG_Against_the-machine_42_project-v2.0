@@ -38,6 +38,12 @@ interface Turn {
 }
 
 function traceLine(trace: Record<string, unknown>): string {
+  const line = traceBody(trace);
+  if (trace.cut) return `${line} · cut at the length limit`;
+  return line;
+}
+
+function traceBody(trace: Record<string, unknown>): string {
   if (trace.mode === "no-filter") return "";
   const model = trace.model ? `${trace.model} · ` : "";
   if (trace.mode === "agent") {
@@ -78,6 +84,25 @@ function SourceCard({ source, cited }: { source: Source; cited: boolean }) {
   );
 }
 
+// Corner accents for a card: a 3x3 grid of dots per corner, fading
+// towards the inside. Drawn for the top-left corner and rotated 90° for
+// each of the others. The parent needs `position: relative`.
+const DOT_OPACITY = [1, 1, 1, 1, 0.6, 0.3, 1, 0.3, 0];
+
+function CornerDots() {
+  return (
+    <span className="corner-dots" aria-hidden>
+      {[0, 90, 180, 270].map((angle) => (
+        <span key={angle} className={`corner corner-${angle}`}>
+          {DOT_OPACITY.map((opacity, i) => (
+            <span key={i} className="corner-dot" style={{ opacity }} />
+          ))}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 // One domain's results, one source at a time with arrows.
 function RetrievalPanel({ retrieval }: { retrieval: Retrieval }) {
   const [at, setAt] = useState(0);
@@ -85,6 +110,7 @@ function RetrievalPanel({ retrieval }: { retrieval: Retrieval }) {
   const source = retrieval.sources[at];
   return (
     <div className={`retrieval ${retrieval.used ? "used" : ""}`}>
+      <CornerDots />
       <div className="retrieval-head">
         <span className="retrieval-domain">{retrieval.domain}</span>
         {retrieval.score !== null && <span className="retrieval-score">score {retrieval.score.toFixed(2)}</span>}
@@ -102,6 +128,27 @@ function RetrievalPanel({ retrieval }: { retrieval: Retrieval }) {
       ) : (
         <div className="source-empty">No relevant results in this domain.</div>
       )}
+    </div>
+  );
+}
+
+// The domain the answer came from; the other searched domains stay
+// folded in one line (they show how the router chose).
+function Retrievals({ retrievals }: { retrievals: Retrieval[] }) {
+  const [showOthers, setShowOthers] = useState(false);
+  const used = retrievals.filter((r) => r.used);
+  const others = retrievals.filter((r) => !r.used);
+  const summary = others.map((r) => (r.score === null ? r.domain : `${r.domain} (${r.score.toFixed(2)})`)).join(", ");
+  return (
+    <div className="retrievals">
+      <div className="section-label">Retrieval</div>
+      {used.map((r) => <RetrievalPanel key={r.domain} retrieval={r} />)}
+      {others.length > 0 && (
+        <button type="button" className="link-button others-toggle" onClick={() => setShowOthers(!showOthers)}>
+          {showOthers ? "▾" : "▸"} also searched: {summary}
+        </button>
+      )}
+      {showOthers && others.map((r) => <RetrievalPanel key={r.domain} retrieval={r} />)}
     </div>
   );
 }
@@ -224,6 +271,7 @@ export default function App() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
   const sessionId = useRef<string | null>(null);
+  const controller = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
 
@@ -279,12 +327,17 @@ export default function App() {
     const update = (patch: Partial<Turn>) =>
       setTurns((t) => t.map((turn, i) => (i === t.length - 1 ? { ...turn, ...patch } : turn)));
     let streamed = "";
+    controller.current = new AbortController();
     try {
       const result = await chat(
         { message, session_id: sessionId.current, agent: useAgent, domains, model, depth },
         (piece) => {
           streamed += piece;
           update({ answer: streamed });
+        },
+        controller.current.signal,
+        (id) => {
+          sessionId.current = id;
         },
       );
       sessionId.current = result.session_id;
@@ -298,11 +351,18 @@ export default function App() {
       // The first answer with a model loads it: refresh "loaded".
       getConfig().then(setConfig).catch(() => undefined);
     } catch (error) {
-      update({ pending: false, error: String(error) });
+      if (controller.current?.signal.aborted) {
+        update({ pending: false, answer: streamed ? `${streamed} …` : "", trace: "stopped" });
+      } else {
+        update({ pending: false, error: String(error) });
+      }
     } finally {
+      controller.current = null;
       setBusy(false);
     }
   };
+
+  const stop = () => controller.current?.abort();
 
   const toggleDomain = (name: string) =>
     setDomains((d) => (d.includes(name) ? d.filter((x) => x !== name) : [...d, name]));
@@ -352,34 +412,30 @@ export default function App() {
                   {turn.error ? `Error: ${turn.error}` : turn.answer || (turn.pending ? "Searching…" : "")}
                 </div>
                 {turn.trace && <div className="trace">{turn.trace}</div>}
-                {turn.retrievals.length > 0 && (
-                  <div className="retrievals">
-                    <div className="section-label">Retrievals</div>
-                    {turn.retrievals.map((r) => <RetrievalPanel key={r.domain} retrieval={r} />)}
-                  </div>
-                )}
+                {turn.retrievals.length > 0 && <Retrievals retrievals={turn.retrievals} />}
               </div>
             ))}
             <div ref={bottom} />
           </div>
 
           <div className="examples-bar">
+            {/* Floats above the switch: opening it moves nothing. */}
+            {showExamples && (
+              <div className="examples">
+                {domains.flatMap((d) => EXAMPLES[d] ?? []).map((example) => (
+                  <button key={example} type="button" className="example" disabled={!loaded || busy} onClick={() => ask(example)}>
+                    {example}
+                  </button>
+                ))}
+                {domains.length === 0 && <span className="examples-empty">Turn on a filter to see its examples.</span>}
+              </div>
+            )}
             <label className="switch small" title="Show example questions for the active filters">
               <span className="switch-label">Example questions</span>
               <input type="checkbox" checked={showExamples} onChange={(e) => setShowExamples(e.target.checked)} />
               <span className="switch-track"><span className="switch-thumb" /></span>
             </label>
           </div>
-          {showExamples && (
-            <div className="examples">
-              {domains.flatMap((d) => EXAMPLES[d] ?? []).map((example) => (
-                <button key={example} type="button" className="example" disabled={!loaded || busy} onClick={() => ask(example)}>
-                  {example}
-                </button>
-              ))}
-              {domains.length === 0 && <span className="examples-empty">Turn on a filter to see its examples.</span>}
-            </div>
-          )}
 
           <form
             className="composer"
@@ -425,9 +481,15 @@ export default function App() {
               <button type="button" className="composer-new" onClick={newConversation} disabled={busy || !turns.length}>
                 New chat
               </button>
-              <button type="submit" className="composer-send" aria-label="Send" disabled={!loaded || busy || !question.trim()}>
-                {busy ? "…" : "↑"}
-              </button>
+              {busy ? (
+                <button type="button" className="composer-send stop" aria-label="Stop" title="Stop generating" onClick={stop}>
+                  ■
+                </button>
+              ) : (
+                <button type="submit" className="composer-send" aria-label="Send" disabled={!loaded || !question.trim()}>
+                  ↑
+                </button>
+              )}
             </div>
           </form>
         </main>

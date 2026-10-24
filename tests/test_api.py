@@ -44,9 +44,16 @@ class FakeRouter:
         return {(PARENT.file_path, 0): PARENT}
 
 
+class FakeTokenizer:
+    def encode(self, text: str) -> list[str]:
+        return text.split()
+
+
 class FakeGenerator:
     def __init__(self, model_name: str) -> None:
         self.model_name = model_name
+        self.tokenizer = FakeTokenizer()
+        self.max_new_tokens = 400
 
 
 class FakePipeline:
@@ -120,7 +127,8 @@ def test_direct_chat_streams_tokens_then_the_answer(
     response = client.post("/chat", json={"message": "When was he born?",
                                           "agent": False})
     stream = events(response)
-    assert [e for e, _ in stream] == ["token", "token", "done"]
+    assert [e for e, _ in stream] == ["start", "token", "token", "done"]
+    assert stream[0][1]["session_id"] == stream[-1][1]["session_id"]
     done = stream[-1][1]
     assert done["answer"] == "He was born in 1996 [1]."
     assert done["trace"]["mode"] == "direct" and done["session_id"]
@@ -244,3 +252,28 @@ def test_switching_model_releases_the_old_one_first(
     service.models.get = load
     service.generator_for("llm-qwen3-1.7b")
     assert seen_while_loading == [None]
+
+
+def test_trim_to_sentence() -> None:
+    from src.api.app import trim_to_sentence
+
+    text = "First sentence [1]. Second one is long. Third is cut in the mi"
+    assert trim_to_sentence(text) == (
+        "First sentence [1]. Second one is long. …")
+    # An open code block is closed.
+    assert trim_to_sentence("Run it:\n```bash\nvllm serve") == (
+        "Run it:\n```bash\nvllm serve\n``` …")
+
+
+def test_a_stopped_request_does_nothing(client: TestClient) -> None:
+    import threading
+
+    from src.api.app import ChatRequest
+
+    service = client.app.state.service  # type: ignore[attr-defined]
+    cancel = threading.Event()
+    cancel.set()
+    result = service.chat(ChatRequest(message="q", agent=False),
+                          lambda p: None, cancel)
+    assert result["trace"] == {"mode": "stopped"}
+    assert service.tools.pipeline.calls == []

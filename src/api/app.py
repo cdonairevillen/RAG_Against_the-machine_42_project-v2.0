@@ -331,9 +331,14 @@ class RagService:
                            "used": True, "sources": used})
         return out
 
-    def chat(self, request: ChatRequest,
-             on_piece: Any) -> dict[str, Any]:
-        """Answer one message (blocking); pieces go to on_piece."""
+    def chat(self, request: ChatRequest, on_piece: Any,
+             cancel: Optional[threading.Event] = None) -> dict[str, Any]:
+        """Answer one message (blocking); pieces go to on_piece.
+
+        Setting `cancel` stops the generation (the web's Stop button or
+        a closed tab): the answer keeps what was written so far.
+        """
+        cancel = cancel or threading.Event()
         session_id = request.session_id or uuid.uuid4().hex
         domains = self.domains_for(request)
         if domains == []:
@@ -345,8 +350,15 @@ class RagService:
                     "retrievals": [], "trace": {"mode": "no-filter"}}
         model = self.models.resolve(request.model)
         with self.lock, self.depth(request.depth):
+            if cancel.is_set():
+                # Stopped while waiting for its turn: nothing to do.
+                return {"session_id": session_id, "answer": "",
+                        "not_found": True, "domain": None, "sources": [],
+                        "retrievals": [], "trace": {"mode": "stopped"}}
             if request.agent:
                 agent = self.agent_for(session_id, model)
+                generator = agent.generator
+                generator.cancel = cancel
                 answer = agent.ask(request.message, domains,
                                    on_piece=on_piece)
                 trace = {"mode": "agent", "queries": answer.queries,
@@ -358,6 +370,8 @@ class RagService:
                 not_found, domain = answer.not_found, answer.domain
             else:
                 pipeline = self.pipeline_for(model)
+                generator = pipeline.generator
+                generator.cancel = cancel
                 result = pipeline.answer(request.message, k=request.k,
                                          domains=domains,
                                          on_piece=on_piece)
@@ -372,6 +386,11 @@ class RagService:
                 domain = pipeline.answered_domain()
             used = [] if not_found else self.describe_sources(sources)
             retrievals = self.retrievals(domain, used)
+            if cancel.is_set():
+                trace["stopped"] = True
+            elif not not_found and reached_limit(text, generator):
+                text = trim_to_sentence(text)
+                trace["cut"] = True
         return {
             "session_id": session_id, "answer": text,
             "not_found": not_found, "domain": domain,
@@ -395,6 +414,24 @@ class RagService:
                     else None,
                 }
         raise KeyError(chunk_id)
+
+
+def reached_limit(text: str, generator: Any) -> bool:
+    """Whether an answer used (nearly) all of max_new_tokens."""
+    tokens = len(generator.tokenizer.encode(text))
+    return tokens >= int(generator.max_new_tokens * 0.95)
+
+
+def trim_to_sentence(text: str) -> str:
+    """Cut an answer that hit the token limit at its last complete
+    sentence (if one ends past half of it), marked with an ellipsis."""
+    end = max(text.rfind(mark) for mark in (". ", ".\n", "! ", "? ",
+                                            "]\n", ".)"))
+    if end > len(text) // 2:
+        text = text[:end + 1].rstrip()
+    if text.count("```") % 2:
+        text += "\n```"
+    return text + " …"
 
 
 def short_path(file_path: str) -> str:
@@ -454,11 +491,16 @@ def create_app(config: Optional[RagConfig] = None,
     @app.post("/chat")
     def chat(request: ChatRequest) -> StreamingResponse:
         pieces: "queue.Queue[tuple[str, Any]]" = queue.Queue()
+        # Sent first, so a conversation stopped before its first answer
+        # ends still keeps its session (and memory).
+        request.session_id = request.session_id or uuid.uuid4().hex
+        pieces.put(("start", {"session_id": request.session_id}))
+        cancel = threading.Event()
 
         def work() -> None:
             try:
                 result = service.chat(
-                    request, lambda p: pieces.put(("token", p))
+                    request, lambda p: pieces.put(("token", p)), cancel
                 )
                 pieces.put(("done", result))
             except Exception as exc:  # reported to the client
@@ -467,11 +509,19 @@ def create_app(config: Optional[RagConfig] = None,
         threading.Thread(target=work, daemon=True).start()
 
         def stream() -> Iterator[str]:
-            while True:
-                event, data = pieces.get()
-                yield sse(event, data)
-                if event in ("done", "error"):
-                    return
+            finished = False
+            try:
+                while True:
+                    event, data = pieces.get()
+                    yield sse(event, data)
+                    if event in ("done", "error"):
+                        finished = True
+                        return
+            finally:
+                # The client left (Stop button, closed tab): stop the
+                # generation instead of blocking the next visitor.
+                if not finished:
+                    cancel.set()
 
         return StreamingResponse(stream(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache"})
