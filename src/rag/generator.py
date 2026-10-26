@@ -4,6 +4,7 @@ from typing import Any, Iterator, Optional
 
 import torch
 from llm_sdk import Small_LLM_Model
+from transformers import StoppingCriteria
 
 from src.config import GenerationConfig
 from src.rag.language import LANGUAGE_NAMES, detect_language
@@ -56,6 +57,32 @@ SYSTEM_PROMPT = (
 )
 
 THINK_BLOCK = re.compile(r"<think>.*?</think>", flags=re.DOTALL)
+# A repeated prompt in an answer (see strip_echo). Small models
+# sometimes copy the sources back, with their "[n] --- file: path ---"
+# headers, before (or instead of) answering.
+ANSWER_LABEL = re.compile(r"^[ \t]*answer:[ \t]*",
+                          flags=re.IGNORECASE | re.MULTILINE)
+# Only a whole sentence: "The answer in Spanish, citing the sources by
+# number, is: [1] ..." keeps its answer.
+INSTRUCTION_ECHO = re.compile(
+    r"[^.:\n]*\b(?:citing the sources by number|answer is in "
+    r"(?:english|spanish))\b[^.:\n]*(?:\.|$)",
+    flags=re.IGNORECASE | re.MULTILINE)
+SOURCE_HEADER = re.compile(
+    r"\[(\d{1,2})\]\s*--- file: *([^\n]*?) *(?:---)?[ \t]*(?=\n|$)")
+# An answer that opens by copying the prompt (a source header or a
+# section label; checked on the first characters only) and then copies
+# a second one: Phi-4-mini then copies every source and may never
+# answer (FASE_7.md 7b.7). A single copied header (the 0.6B) is left to
+# strip_echo, which already recovers those answers.
+ECHO_START = re.compile(r"^\s*(?:\[\d{1,2}\]\s*-{2,}|(?:SOURCES|QUESTION):)")
+ECHO_MARK = re.compile(r"\[\d{1,2}\]\s*-{2,}|\b(?:SOURCES|QUESTION):")
+ECHO_MARKS = 2
+ECHO_CHECK_CHARS = 40
+# What the retry may not write: source headers and section labels
+# (besides opening with "[").
+ECHO_BANNED = ("--- file", " --- file", "SOURCES:", "QUESTION:",
+               " QUESTION:", "\nQUESTION:")
 
 
 def is_not_found(text: str) -> bool:
@@ -113,17 +140,88 @@ def not_found_for(question: str) -> str:
                                   NOT_FOUND_MESSAGE)
 
 
+def strip_echo(text: str) -> str:
+    """Remove a repeated prompt from an answer.
+
+    - After a copy of the sources, keep what follows the last "ANSWER:"
+      label.
+    - Drop a repeated closing instruction ("...citing the sources by
+      number.").
+    - An answer that opens by copying a source keeps that source's
+      text, without its header, cited as [n]; source headers elsewhere
+      become "[n] (path)".
+
+    Only answers that repeat the prompt change (FASE_7.md 7b.3: 25 of
+    1,554 benchmark answers, none of them losing the reference answer).
+    """
+    original = text
+    labels = list(ANSWER_LABEL.finditer(text))
+    if labels:
+        text = text[labels[-1].end():]
+    text = INSTRUCTION_ECHO.sub("", text).strip()
+    if not text:
+        # Nothing but the echo: better the raw text than an empty answer.
+        return original.strip()
+    lead = SOURCE_HEADER.match(text)
+    if lead:
+        body = text[lead.end():].strip()
+        number = lead.group(1)
+        if body and f"[{number}]" not in body:
+            body += f" [{number}]"
+        text = body
+    return SOURCE_HEADER.sub(
+        lambda m: f"[{m.group(1)}] ({m.group(2).strip(' -')})", text
+    ).strip()
+
+
 def clean_output(text: str) -> str:
-    """Remove reasoning traces, cut a generation loop where it starts
-    (src/rag/loops.py) and normalise "not found" answers."""
+    """Remove reasoning traces and a repeated prompt (strip_echo), cut
+    a generation loop where it starts (src/rag/loops.py) and normalise
+    "not found" answers."""
     text = THINK_BLOCK.sub("", text)
     if "</think>" in text:
         # A reasoning trace without its opening tag: keep what follows.
         text = text.rsplit("</think>", 1)[1]
-    text = cut_loop(text.strip())
+    text = cut_loop(strip_echo(text.strip()))
     if is_not_found(text):
         return NOT_FOUND_MESSAGE
     return text
+
+
+class EchoStart(StoppingCriteria):
+    """Stopping criterion: the answer opens by copying the prompt
+    (ECHO_START within its first ECHO_CHECK_CHARS characters: sets
+    `started`) and copies ECHO_MARKS headers or labels in all. Sets
+    `hit`, which echo_started() reads to retry."""
+
+    def __init__(self, tokenizer: Any, prompt_length: int) -> None:
+        self.tokenizer = tokenizer
+        self.prompt_length = prompt_length
+        self.started = False
+        self.hit = False
+        self.done = False
+
+    def __call__(self, input_ids: Any, scores: Any, **kwargs: Any) -> Any:
+        stop = False
+        if not self.done:
+            text = self.tokenizer.decode(
+                input_ids[0, self.prompt_length:], skip_special_tokens=True)
+            if not self.started:
+                self.started = bool(ECHO_START.match(text))
+                self.done = not self.started and \
+                    len(text.lstrip()) > ECHO_CHECK_CHARS
+            if self.started and len(ECHO_MARK.findall(text)) >= ECHO_MARKS:
+                self.hit = stop = self.done = True
+        return torch.full((input_ids.shape[0],), stop, dtype=torch.bool,
+                          device=input_ids.device)
+
+
+def echo_started(kwargs: dict[str, Any], hit: bool = True) -> bool:
+    """Whether the generation run with these arguments stopped because
+    it copied the prompt (see EchoStart), or, with hit=False, opened by
+    copying it (and may still stop)."""
+    return any(isinstance(c, EchoStart) and (c.hit if hit else c.started)
+               for c in kwargs.get("stopping_criteria", []))
 
 
 class Generator:
@@ -168,6 +266,7 @@ class Generator:
         # or a closed tab); the API gives each request its own Event.
         # Never set elsewhere, so answers and benchmarks are unchanged.
         self.cancel = Event()
+        self._bracket_ids: Optional[list[int]] = None
         print("Model loaded.")
 
     def stop_token_ids(self) -> list[int]:
@@ -249,14 +348,34 @@ class Generator:
                                         extra_rules, language)
             return
 
+        prompt = self.build_prompt(question, context_blocks, extra_rules,
+                                   language)
+        kwargs = self.generate_kwargs(prompt)
+        # The opening is held back until it is clearly not an echo (an
+        # echo, to the end), so copied sources never reach the screen.
+        held: list[str] = []
+        released = False
+        for piece in self.stream(kwargs):
+            if released:
+                yield piece
+                continue
+            held.append(piece)
+            if len("".join(held).lstrip()) > ECHO_CHECK_CHARS and \
+                    not echo_started(kwargs, hit=False):
+                released = True
+                yield from held
+        if not echo_started(kwargs):
+            if not released:
+                yield from held
+            return
+        yield from self.stream(self.generate_kwargs(prompt, retry=True))
+
+    def stream(self, kwargs: dict[str, Any]) -> Iterator[str]:
+        """Pieces of one generation with these arguments, as they come."""
         from transformers import TextIteratorStreamer
 
         streamer = TextIteratorStreamer(
             self.tokenizer, skip_prompt=True, skip_special_tokens=True
-        )
-        kwargs = self.generate_kwargs(
-            self.build_prompt(question, context_blocks, extra_rules,
-                              language)
         )
         worker = Thread(target=self.generate, kwargs={
             **kwargs, "streamer": streamer,
@@ -329,6 +448,9 @@ class Generator:
         """
         kwargs = self.generate_kwargs(prompt)
         output_ids = self.generate(**kwargs)
+        if echo_started(kwargs):
+            kwargs = self.generate_kwargs(prompt, retry=True)
+            output_ids = self.generate(**kwargs)
         new_ids = output_ids[0][kwargs["input_ids"].shape[1]:]
         return str(self.model.decode(new_ids)).strip()
 
@@ -339,7 +461,7 @@ class Generator:
         <tool_call> or <|tool_call|>, which decode() would drop. Only
         the end-of-turn tokens are removed.
         """
-        kwargs = self.generate_kwargs(prompt)
+        kwargs = self.generate_kwargs(prompt, echo_guard=False)
         kwargs["max_new_tokens"] = max_new_tokens
         output_ids = self.generate(**kwargs)
         new_ids = [int(i) for i in output_ids[0][
@@ -348,27 +470,66 @@ class Generator:
         text = self.tokenizer.decode(new_ids, skip_special_tokens=False)
         return str(THINK_BLOCK.sub("", text)).strip()
 
-    def generate_kwargs(self, prompt: str) -> dict[str, Any]:
-        """Arguments for greedy generation of `prompt`."""
+    def generate_kwargs(self, prompt: str, retry: bool = False,
+                        echo_guard: bool = True) -> dict[str, Any]:
+        """Arguments for greedy generation of `prompt`.
+
+        Args:
+            prompt: The full prompt.
+            retry: A second attempt after an echo (echo_started): the
+                answer may not open with "[" nor write a source header
+                or a section label.
+            echo_guard: Stop early when the answer opens with an echo
+                (not for the agent's raw completions).
+        """
         inputs = self.tokenizer(prompt, return_tensors="pt").to(
             self.model._device
         )
-        return {
+        kwargs = {
             **inputs,
             "max_new_tokens": self.max_new_tokens,
             "do_sample": False,
             "pad_token_id": self.tokenizer.pad_token_id,
             "eos_token_id": self.eos_token_ids,
             "stopping_criteria": self.stopping_criteria(
-                inputs["input_ids"].shape[1]
+                inputs["input_ids"].shape[1],
+                echo_guard=echo_guard and not retry,
             ),
         }
+        if retry:
+            kwargs["bad_words_ids"] = self.echo_banned_ids()
+            kwargs["begin_suppress_tokens"] = self.bracket_ids()
+        return kwargs
 
-    def stopping_criteria(self, prompt_length: int) -> Any:
+    def echo_banned_ids(self) -> list[list[int]]:
+        """Token sequences of ECHO_BANNED for this tokenizer."""
+        sequences: list[list[int]] = []
+        for text in ECHO_BANNED:
+            ids = self.tokenizer.encode(text, add_special_tokens=False)
+            if ids and ids not in sequences:
+                sequences.append(ids)
+        return sequences
+
+    def bracket_ids(self) -> list[int]:
+        """Tokens that start with "[" (a retry may not open with one).
+        Computed once per model: it reads the whole vocabulary."""
+        if self._bracket_ids is None:
+            vocab = self.tokenizer.convert_ids_to_tokens(
+                list(range(len(self.tokenizer))))
+            self._bracket_ids = [
+                i for i, token in enumerate(vocab) if token and
+                self.tokenizer.convert_tokens_to_string([token])
+                .lstrip().startswith("[")]
+        return self._bracket_ids
+
+    def stopping_criteria(self, prompt_length: int,
+                          echo_guard: bool = False) -> Any:
         """Stop generating as soon as `cancel` is set (checked per token,
-        read when it runs, so the API can swap the Event per request), or
+        read when it runs, so the API can swap the Event per request),
         when the answer falls into a loop (checked each time a line or a
-        sentence ends; clean_output then cuts the repeated part)."""
+        sentence ends; clean_output then cuts the repeated part) or, with
+        echo_guard, when it opens by copying the prompt (see
+        echo_started)."""
         from transformers import StoppingCriteria, StoppingCriteriaList
 
         generator = self
@@ -393,7 +554,10 @@ class Generator:
                 return torch.full((input_ids.shape[0],), stop,
                                   dtype=torch.bool, device=input_ids.device)
 
-        return StoppingCriteriaList([Cancelled(), Looping()])
+        criteria = [Cancelled(), Looping()]
+        if echo_guard:
+            criteria.append(EchoStart(generator.tokenizer, prompt_length))
+        return StoppingCriteriaList(criteria)
 
     def generate(self, **kwargs: Any) -> Any:
         """Run the model's generate() without gradients."""

@@ -1,0 +1,61 @@
+{
+  "label": "79-about-c-off",
+  "mode": "smart",
+  "suite": "about",
+  "k": 10,
+  "timestamp": "2026-10-25T02:22:41",
+  "commit": "02ff464",
+  "dirty": true,
+  "domain": "about",
+  "profile": "default",
+  "chunking": {
+    "code_chunk_size": 2000,
+    "doc_chunk_size": 2000,
+    "code_child_size": 600,
+    "doc_child_size": 600
+  },
+  "chunkers": {
+    ".py": "python_ast",
+    ".md": "markdown_headers_packed"
+  },
+  "retrieval": {
+    "classifier_margin": 0.5,
+    "code_signal_weight": 0.5,
+    "doc_signal_weight": 0.5,
+    "skip_rerank_score": Infinity,
+    "bm25_score_floor": 5.5,
+    "reranker_model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    "rerank_fusion": "rrf",
+    "rrf_k": 60,
+    "doc_signal_languages": [
+      "en",
+      "es"
+    ],
+    "relevance_threshold": 0.0,
+    "rerank_doc_branch": false,
+    "code_aware_tokens": "code"
+  },
+  "device": "cuda",
+  "datasets": {
+    "en": {
+      "recall_at_k": {
+        "1": 0.2778,
+        "3": 0.4444,
+        "5": 0.5,
+        "10": 0.7222
+      },
+      "seconds": 0.72,
+      "questions": 18
+    },
+    "es": {
+      "recall_at_k": {
+        "1": 0.3333,
+        "3": 0.4444,
+        "5": 0.6111,
+        "10": 0.6667
+      },
+      "seconds": 1.05,
+      "questions": 18
+    }
+  }
+}

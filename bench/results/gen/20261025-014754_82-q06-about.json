@@ -1,0 +1,49 @@
+{
+  "label": "82-q06-about",
+  "suite": "about",
+  "domain": "about",
+  "k": 5,
+  "limit": null,
+  "sample": null,
+  "timestamp": "2026-10-25T01:47:54",
+  "commit": "02ff464",
+  "dirty": true,
+  "profile": "default",
+  "generator": "Qwen/Qwen3-0.6B",
+  "max_new_tokens": 150,
+  "device": "cuda",
+  "sets": {
+    "about/en": {
+      "questions": 18,
+      "f1": 0.0633,
+      "f1_answered": 0.0759,
+      "contains_answer": 0.5556,
+      "false_not_found": 0.1667,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.5556,
+      "cites": 0.8,
+      "citation_correct": 0.25,
+      "language_match": 1.0,
+      "leaks": 0,
+      "echo": 0.0556,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 1.83
+    },
+    "about/es": {
+      "questions": 18,
+      "f1": 0.0652,
+      "f1_answered": 0.0838,
+      "contains_answer": 0.4444,
+      "false_not_found": 0.2222,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.5,
+      "cites": 0.7857,
+      "citation_correct": 0.2727,
+      "language_match": 0.9286,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 1.58
+    }
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "label": "81-phi4-mini-vllm",
+  "suite": "vllm",
+  "domain": "vllm",
+  "k": 5,
+  "limit": 25,
+  "sample": null,
+  "timestamp": "2026-10-25T01:06:26",
+  "commit": "02ff464",
+  "dirty": true,
+  "profile": "llm-phi4-mini",
+  "generator": "microsoft/Phi-4-mini-instruct",
+  "max_new_tokens": 150,
+  "device": "cuda",
+  "sets": {
+    "public/docs": {
+      "questions": 25,
+      "f1": 0.4923,
+      "f1_answered": 0.4923,
+      "contains_answer": 0.04,
+      "false_not_found": 0.0,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.88,
+      "cites": 0.4,
+      "citation_correct": 0.5,
+      "language_match": 0.96,
+      "leaks": 0,
+      "echo": 0.12,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 3.98
+    },
+    "public/code": {
+      "questions": 25,
+      "f1": 0.3338,
+      "f1_answered": 0.4166,
+      "contains_answer": 0.0,
+      "false_not_found": 0.24,
+      "refused_with_answer": 0.12,
+      "answer_in_context": 0.76,
+      "cites": 0.5263,
+      "citation_correct": 0.9,
+      "language_match": 0.6842,
+      "leaks": 0,
+      "echo": 0.08,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 2.13
+    },
+    "es/docs": {
+      "questions": 10,
+      "f1": 0.2806,
+      "f1_answered": 0.2806,
+      "contains_answer": 0.0,
+      "false_not_found": 0.0,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.9,
+      "cites": 0.3,
+      "citation_correct": 1.0,
+      "language_match": 0.6,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 1.97
+    },
+    "es/code": {
+      "questions": 10,
+      "f1": 0.1854,
+      "f1_answered": 0.1854,
+      "contains_answer": 0.0,
+      "false_not_found": 0.0,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.8,
+      "cites": 0.8,
+      "citation_correct": 1.0,
+      "language_match": 0.8,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 2.16
+    },
+    "ood/en-far": {
+      "questions": 10,
+      "correct_not_found": 1.0
+    },
+    "ood/en-near": {
+      "questions": 10,
+      "correct_not_found": 0.9
+    },
+    "ood/es-far": {
+      "questions": 10,
+      "correct_not_found": 1.0
+    },
+    "ood/es-near": {
+      "questions": 10,
+      "correct_not_found": 0.8
+    }
+  }
+}

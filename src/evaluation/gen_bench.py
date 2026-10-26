@@ -22,6 +22,23 @@ OOD_PATH = "bench/datasets/ood/questions.json"
 
 FILE_PATTERN = re.compile(r"[\w./-]+\.(?:py|pyi|md|rst|txt)\b")
 INDEX_CITATION = re.compile(r"\[(\d{1,2})\]")
+# The answer repeats the prompt instead of answering: a copied source
+# header or section label, or the closing instruction itself.
+ECHO = re.compile(r"--- file:|^\s*(?:SOURCES|QUESTION|ANSWER):|citing the "
+                  r"sources by number|answer in (?:english|spanish)",
+                  re.IGNORECASE | re.MULTILINE)
+# A citation written as a Markdown link target ("[langchain](1)").
+BAD_CITATION = re.compile(r"\]\(\d{1,2}\)")
+# How a finished answer can end: a sentence, a citation, code, a table
+# or a list item ending in a closing mark.
+FINISHED = re.compile(r"[.!?:;)\]`*|\"'»…]\s*$")
+
+
+def is_cut(text: str, tokens: int, max_new_tokens: int) -> bool:
+    """An answer that stops mid-sentence or at the token limit."""
+    return tokens >= int(max_new_tokens * 0.95) \
+        or not FINISHED.search(text.strip())
+
 
 # Sets of each generation suite: (dataset suite, dataset, answer
 # language, whether --limit applies), the domain they are asked to and
@@ -54,6 +71,15 @@ GEN_SUITES: dict[str, dict[str, Any]] = {
         "domain": "cv",
         "sets": [("cv", "en", "en", True), ("cv", "es", "es", True)],
         "ood": "cv",
+        "sample": None,
+    },
+    # The project itself (Phase 7a): 18 questions in English and Spanish
+    # with short reference answers.
+    "about": {
+        "domain": "about",
+        "sets": [("about", "en", "en", True),
+                 ("about", "es", "es", True)],
+        "ood": None,
         "sample": None,
     },
 }
@@ -153,6 +179,19 @@ def in_domain_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         # Answers showing private data (phone, private e-mails); the
         # pipeline masks it, so anything but 0 is a bug.
         "leaks": sum(r.get("leak", False) for r in rows),
+        # Answers that repeat the prompt, and citations written as links.
+        "echo": round(sum(r.get("echo", False) for r in rows) / n, 4),
+        "bad_citation": round(
+            sum(r.get("bad_citation", False) for r in rows) / n, 4
+        ),
+        # Form (Phase 7b): answers cut mid-sentence or at the limit, and
+        # answer length in tokens (mean and longest).
+        "cut": round(sum(r.get("cut", False) for r in answered)
+                     / len(answered), 4) if answered else 0.0,
+        "tokens": round(sum(r.get("tokens", 0) for r in answered)
+                        / len(answered), 1) if answered else 0.0,
+        "tokens_max": max((r.get("tokens", 0) for r in answered),
+                          default=0),
         "seconds_per_answer": round(
             sum(r["t_gen"] + r["t_ret"] for r in rows) / n, 2
         ),
@@ -220,6 +259,7 @@ def run_gen_bench(label: str, k: int = 5, limit: Optional[int] = None,
                 for gt in gt_ranges for src in sources
             )
             cited = cited_files(text, sources)
+            tokens = generator.count_tokens(text)
             row = {
                 "set": f"{dataset_suite}/{name}",
                 "question": q["question"],
@@ -234,6 +274,11 @@ def run_gen_bench(label: str, k: int = 5, limit: Optional[int] = None,
                 "language": detect_language(text),
                 "language_match": detect_language(text) == lang,
                 "leak": pipeline.rules.redact_all(text) != text,
+                "echo": bool(ECHO.search(text)),
+                "bad_citation": bool(BAD_CITATION.search(text)),
+                "tokens": tokens,
+                "cut": not result.not_found and is_cut(
+                    text, tokens, generator.max_new_tokens),
                 "t_ret": result.seconds_retrieval,
                 "t_gen": result.seconds_generation,
             }
@@ -364,5 +409,9 @@ def print_gen_table(run: dict[str, Any]) -> None:
                   f"{m.get('refused_with_answer', 0):.2f}) | cites "
                   f"{m['cites']:.2f} "
                   f"| citation ok {m['citation_correct']:.2f} | lang "
-                  f"{m['language_match']:.2f} | "
+                  f"{m['language_match']:.2f} | echo "
+                  f"{m.get('echo', 0):.2f} | bad cite "
+                  f"{m.get('bad_citation', 0):.2f} | cut "
+                  f"{m.get('cut', 0):.2f} | tokens {m.get('tokens', 0):.0f}"
+                  f"/{m.get('tokens_max', 0)} | "
                   f"{m['seconds_per_answer']:.2f}s  (n={m['questions']})")

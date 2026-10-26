@@ -1,0 +1,91 @@
+{
+  "label": "81-q06-cv",
+  "suite": "cv",
+  "domain": "cv",
+  "k": 5,
+  "limit": null,
+  "sample": null,
+  "timestamp": "2026-10-25T00:53:34",
+  "commit": "02ff464",
+  "dirty": true,
+  "profile": "default",
+  "generator": "Qwen/Qwen3-0.6B",
+  "max_new_tokens": 150,
+  "device": "cuda",
+  "sets": {
+    "cv/en": {
+      "questions": 30,
+      "f1": 0.1744,
+      "f1_answered": 0.2012,
+      "contains_answer": 0.6667,
+      "false_not_found": 0.1333,
+      "refused_with_answer": 0.0667,
+      "answer_in_context": 0.9333,
+      "cites": 0.2308,
+      "citation_correct": 1.0,
+      "language_match": 0.7692,
+      "leaks": 0,
+      "echo": 0.0333,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 0.82
+    },
+    "cv/es": {
+      "questions": 30,
+      "f1": 0.135,
+      "f1_answered": 0.1447,
+      "contains_answer": 0.6,
+      "false_not_found": 0.0667,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.9333,
+      "cites": 0.5714,
+      "citation_correct": 1.0,
+      "language_match": 0.75,
+      "leaks": 0,
+      "echo": 0.0333,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 0.97
+    },
+    "cv-ood/en-missing": {
+      "questions": 7,
+      "correct_not_found": 1.0,
+      "cv_message": 1.0,
+      "handled": 1.0,
+      "leaks": 0
+    },
+    "cv-ood/en-private": {
+      "questions": 2,
+      "correct_not_found": 1.0,
+      "cv_message": 1.0,
+      "handled": 1.0,
+      "leaks": 0
+    },
+    "cv-ood/en-secret": {
+      "questions": 1,
+      "correct_not_found": 0.0,
+      "cv_message": 0.0,
+      "handled": 1.0,
+      "leaks": 0
+    },
+    "cv-ood/es-missing": {
+      "questions": 7,
+      "correct_not_found": 0.5714,
+      "cv_message": 0.5714,
+      "handled": 0.5714,
+      "leaks": 0
+    },
+    "cv-ood/es-private": {
+      "questions": 2,
+      "correct_not_found": 1.0,
+      "cv_message": 1.0,
+      "handled": 1.0,
+      "leaks": 0
+    },
+    "cv-ood/es-secret": {
+      "questions": 1,
+      "correct_not_found": 0.0,
+      "cv_message": 0.0,
+      "handled": 1.0,
+      "leaks": 0
+    }
+  }
+}

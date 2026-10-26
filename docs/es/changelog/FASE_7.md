@@ -7,7 +7,7 @@ Fase abierta el 2026-10-24, tras el commit `3378494` (Fase 6). El plan está en 
 | Bloque | Estado |
 |---|---|
 | 7a — Dominio "about" (README, `docs/`, código) | ✅ Hecho: README, fuente, benchmark bilingüe, separación del CV (§7a.6), umbral y regla léxica (§7a.7), y web y bundle (§7a.8). Quedan 6 preguntas que se van a vLLM, sin palabras que las distingan |
-| 7b — Calidad de las respuestas (Markdown, plan B del agente, formato, juez del CV) | Agente desactivado por defecto en la web, límite de tokens por modelo (§7b.1) y detector de bucles (§7b.2); el resto, planificado (P11 resuelto: Groq) |
+| 7b — Calidad de las respuestas (Markdown, plan B del agente, formato, juez del CV) | Agente desactivado por defecto en la web, límite de tokens por modelo (§7b.1), detector de bucles (§7b.2), limpieza del eco (§7b.3), filtro de idioma desactivado (§7b.4) y preguntas que nombran el proyecto (§7b.5), forma de las respuestas: bucles largos y eco de Phi (§7b.7); el resto, planificado (P11 resuelto: Groq) |
 | Despliegue | Plataforma cambiada a Oracle Cloud Always Free (DEC-19); guía en `deploy/README.md` |
 | 7c — Visual (tarjetas que giran, scroll) | Planificado |
 | 7d — Opcionales (Gulliver, MLQA) | Aparcados; `repetition_penalty` descartado (§7b.1) |
@@ -272,6 +272,202 @@ Las respuestas recortadas terminan en una línea completa. La de prosa conserva 
 **Pruebas:** `tests/test_loops.py` (6 tests: línea repetida, dos líneas alternas, frases con una palabra cambiada, palabra repetida, y tablas, código y respuestas buenas sin falso positivo).
 
 **Caso visto de paso:** "Paso a paso de vLLM" (corta y ambigua) va a "about" (3.13 frente a 2.09 de vLLM), porque la documentación habla del "paso a paso" del RAG. Con una formulación completa ("Explícame paso a paso cómo usar vLLM") va a vLLM (3.0 frente a 1.2). No se toca el router por un caso límite.
+
+## 7b.3 — Respuestas que copian el prompt (eco)
+
+**Sesión autónoma de la noche del 24 al 25** (decisiones DEC-20 a DEC-26 en `decisions.md`). Regla: ningún caso puede empeorar. Línea base `80-*`, tomada al empezar con el código del commit `02ff464`:
+- **0.6B:** vllm (50 preguntas por set), xquad (300 por idioma), cv y about.
+- **1.7B, Phi-4-mini y 4B:** vllm (25 por set), cv y about.
+
+**Lo que viste:**
+- Con Phi y "What is RAG against the Machine?", la "respuesta" eran las 5 fuentes copiadas con sus cabeceras (`[1] --- file: README.md ---…`), y la respuesta de verdad (`ANSWER: …`) llegaba al final, cortada por el límite de tokens.
+- La etiqueta mal puesta de la fuente [4] era una copia equivocada de Phi; el índice estaba bien (comprobado).
+- El 0.6B hace lo mismo a pequeña escala: acaba con *"The answer is in English, citing the sources by number."*, que es nuestra última instrucción repetida.
+
+**Medirlo (DEC-20):** suite `about` en `gen-bench` y dos métricas nuevas, `echo` y `bad_citation` (`src/evaluation/gen_bench.py`). Eco en la línea base:
+
+| | vllm docs | vllm code | xquad EN / ES | cv EN | about EN |
+|---|---|---|---|---|---|
+| Qwen3-0.6B | 0.00 | 0.02 | 0.03 / 0.01 | 0.10 | 0.06 |
+| Phi-4-mini | 0.16 | 0.04 | — | 0.00 | 0.17 |
+| Qwen3-1.7B y 4B | 0.00 | 0.00 | — | 0.00 | 0.00 |
+
+**Prompts probados (DEC-21), con la matriz completa:**
+
+| Estilo | Qué cambia | Caídas frente a `80` | Lectura |
+|---|---|---|---|
+| `v4` (`81-*`) | Idioma y regla anti-copia en el sistema; el usuario acaba con la pregunta | **112** | Dejan de citar: 0.6B "cites" en vLLM docs 0.90 → 0.16, Phi 0.92 → 0.40. Baja el idioma. El eco de Phi en about/en sí baja (0.17 → 0) |
+| `v6` (`82-*`) | `v3` más solo la regla anti-copia | **75** | Cambios pequeños en todas direcciones; el eco no baja |
+| `v5` | `v4` más "ignora las fuentes que no responden" | no probado | Hereda lo que rompe `v4` |
+
+**Conclusión:** la instrucción final es lo que hace citar y responder en el idioma pedido. El prompt se queda en `v3` y el código de los estilos se retiró.
+
+**Limpieza (DEC-22), `strip_echo` en `clean_output`** (`src/rag/generator.py`):
+1. Tras una copia de las fuentes, se queda con lo que sigue al último `ANSWER:`.
+2. Quita la instrucción repetida.
+3. Si la respuesta abre copiando una fuente, conserva el texto sin la cabecera y lo cita `[n]`.
+4. Las demás cabeceras pasan a `[n] (ruta)`.
+
+Como la generación no cambia, se midió sobre las respuestas guardadas:
+
+| Matriz | Respuestas | Cambiadas | Eco antes → después | Pierden la respuesta de referencia | F1 |
+|---|---|---|---|---|---|
+| `80` (`v3`) | 1.554 | 25 | 25 → 0 | **0** | +0.86 (suma) |
+| `82` (`v6`) | 1.554 | 35 | 35 → 0 | 0 | +1.04 |
+| `81` (`v4`) | 1.554 | 78 | 78 → 0 | 0 | +2.70 |
+
+Tu caso con Phi queda en *"RAG against the Machine is a multi-domain Retrieval-Augmented Generation system with an agent, an MCP server, and a web interface. …"*.
+
+**Pruebas:** `test_strip_echo_keeps_only_the_answer` y `test_strip_echo_handles_copied_source_headers` (`tests/test_generator.py`).
+
+## 7b.4 — Fuentes de "about" en un solo idioma (implementado, desactivado)
+
+Para una pregunta en inglés, "about" devolvía copias en español del mismo documento (`docs/es/…`), que ocupaban huecos del contexto.
+
+**Implementado** (`Retriever.search_smart`, `src/rag/retriever.py`): con `translations` (pares de prefijos [inglés, español]) en una fuente, se piden el doble de candidatos, se quita la copia del otro idioma de los ficheros traducidos y se corta a `k`. `translation_languages` dice a qué idioma de pregunta se aplica. Sin `translations`, `search_smart` es exactamente el de antes (`search_smart_all`), así que vLLM, XQuAD y CV no cambian.
+
+**Medido con el mismo índice** (`79-about-c-*` y `data/output/night/about_contains.py`):
+
+| Filtro | Recall 42 EN @1/@3/@5/@10 | ES | Contiene la respuesta EN @1/@3/@5 | ES | Fuentes del otro idioma (top 5, EN / ES) |
+|---|---|---|---|---|---|
+| Sin filtro | 0.28 / 0.44 / 0.50 / 0.72 | 0.33 / 0.44 / 0.61 / 0.67 | 0.67 / 0.72 / 0.83 | 0.72 / 0.89 / 0.94 | 16 / 5 de 90 |
+| Ambos idiomas | 0.28 / 0.50 / 0.56 / 0.72 | 0.33 / 0.44 / 0.61 / 0.72 | 0.67 / 0.78 / 0.83 | 0.72 / **0.83 / 0.83** | 3 / 0 |
+| **Solo inglés** | 0.28 / 0.50 / 0.56 / 0.72 | idéntico | 0.67 / 0.78 / 0.83 | idéntico | 3 / 5 |
+
+- **Por qué "ambos idiomas" pierde en español:** la sección inglesa recuperada a veces contiene la respuesta y la sección española recuperada es otra. Por ejemplo, para "¿Qué es RAG against the Machine?" se quitaba el fragmento del `README.md` inglés que contiene "Retrieval-Augmented Generation".
+
+**Generación** (filtro "solo inglés" `83-*` frente a sin filtro `84-*`, mismo índice):
+
+| Modelo | about/en | about/es |
+|---|---|---|
+| Qwen3-0.6B | contiene 0.44 → **0.61**, citas 0.23 → 0.29, idioma 0.93 → 1.00 | = |
+| Qwen3-1.7B | citas correctas 0.43 → 0.33, cita 0.93 → 0.80 | = |
+| Phi-4-mini | citas correctas 0.33 → 0.17, "no encontrado" 0.17 → 0.28; idioma 0.80 → 0.92 | = |
+| Qwen3-4B | contiene 0.61 → 0.67; "no encontrado" 0.22 → 0.28 | = |
+
+**Decisión (DEC-23):** queda **desactivado** en `rag.toml` (comentado), porque empeora métricas de los modelos opcionales. Es muy bueno para el 0.6B, el que se despliega: activarlo es descomentar dos líneas, sin reindexar.
+
+**Pruebas:** `test_translated_copies_are_recognised` (`tests/test_retriever.py`).
+
+## 7b.5 — Preguntas que nombran el proyecto o al autor
+
+**"Háblame sobre este rag"** iba a vLLM (1.04 frente a −1.85 de "about"), y aunque hubiera ido a "about", su filtro (−1.0) la habría rechazado.
+
+**`route_names`** (nuevo en `SourceConfig`; `DomainRouter.named` en `src/rag/router.py`): expresiones que nombran el dominio sin ambigüedad. Si coinciden, ese dominio gana **y su filtro no se aplica**, en el enrutado y también cuando es el único dominio del filtro.
+- **En "about":** "rag against the machine", "este/esta/tu/vuestro + rag/proyecto/sistema/chatbot/asistente/web/aplicación" y "this/your + rag/project/system/chatbot/assistant/website/app".
+- **"The project" y "el proyecto"** siguen como pista débil (`route_hints`): deben pasar el umbral, por la pregunta de XQuAD que dice "the project".
+- **Comprobado:** ningún patrón coincide con preguntas de los demás benchmarks (vLLM, XQuAD, CV, fuera de dominio, conversaciones).
+
+**8 preguntas que nombran el proyecto** (`named.py`), antes (commit) y ahora:
+
+| Pregunta | Antes | Ahora |
+|---|---|---|
+| Háblame sobre este rag | vLLM, no encontrado | about |
+| Tell me about this RAG | vLLM (3.91) | about |
+| What does this project do? | XQuAD | about |
+| ¿Qué hace el agente de este proyecto? | CV | about |
+| ¿Qué modelos usa este sistema? | about, no encontrado | about |
+| How was this website built? | about, no encontrado | about |
+| ¿Quién ha hecho esta aplicación? | XQuAD | about |
+| Which reranker does your system use? | about, no encontrado | about |
+
+**El autor, para el CV** (pista débil `\b(chrystian|donaire)\b` en `[sources.cv]`): con un índice de "about" más grande, "What is Chrystian's contact e-mail?" acababa en "about" (0.17), que la respondía con código. Con la pista, si la pregunta nombra al autor y el CV pasa su umbral (−3.0), gana el CV. Solo coinciden preguntas del CV.
+
+**Route-bench** (`85-night-final` frente a `76-about-hints`, el estado del commit): mismo enrutado en todos los conjuntos. Con el índice nuevo de "about" (antes de restaurarlo, `79-cv-name-hint`), la pista del CV devolvió el CV a 0.967 / 0.967 desde 0.933 / 0.933.
+
+**Pruebas:** `test_a_named_domain_wins_and_skips_its_gate` y `test_a_named_single_domain_skips_its_gate` (`tests/test_router.py`).
+
+## 7b.6 — Índice de "about" y verificación final
+
+**El índice de "about" crece y empeora.** Reindexado esta noche (753 padres, +35, por la documentación del día 24), la generación de "about" baja frente a la línea base **sin cambiar el código** (`84-*` frente a `80-*`; por ejemplo, el 1.7B en ES contiene 0.67 → 0.56), y una pregunta de "about" en ES pasa a vLLM.
+- **Decisión (DEC-25):** se **restaura el índice de la línea base** desde `deploy/bundle` (718 padres, SHA256 comprobado). La documentación nueva no entra en "about" hasta reindexar, y habrá que decidir qué partes ve (`about:skip`) antes del despliegue.
+- **Preparado sin efecto hasta reindexar:** `deploy/space/README.md` (la ficha antigua del Space) sale de "about".
+
+**Verificación final** (estado en que lo dejo: prompt `v3`, `strip_echo`, `route_names`, pista del CV, filtro de idioma desactivado e índice de la línea base):
+
+| Comprobación | Resultado |
+|---|---|
+| `make bench` de 42 (`85-night-final`) | **Idéntico:** docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88 |
+| Route-bench (`85-night-final`) | Mismo enrutado que el commit. XQuAD/ES R@1 0.9059 → 0.9050 (una pregunta, por la búsqueda vectorial aproximada tras restaurar el bundle) |
+| `gen-bench` de about (`85-*`, cuatro modelos) | Idéntico a `80`, con el eco a 0. Phi about/en: idioma 1.00 → 0.93, por una respuesta que queda en código tras la limpieza (mismo contenido) |
+| `gen-bench` de vllm, xquad y cv | Sin cambios de generación (mismo prompt e índices); la limpieza solo actúa en las respuestas con eco (§7b.3) |
+| 8 preguntas que nombran el proyecto | 8 de 8 en "about" (antes, 0) |
+
+**Pruebas:** 122 tests; flake8 y mypy limpios.
+
+## 7b.7 — Forma de las respuestas: preguntas abiertas, eco de Phi y bucles (sesión del 25 al 26)
+
+**Lo que viste en la web tras la noche anterior:**
+- **Phi-4-mini:** sigue copiando fuentes con "Hablame sobre este rag" y con "What is RAG against the Machine?", y la segunda respuesta sale cortada.
+- **0.6B:** "Hablame sobre este rag" no da ninguna respuesta.
+- **1.7B:** responde bien.
+
+Regla de la sesión: ningún caso puede empeorar. Decisiones DEC-27 a DEC-31 en `decisions.md`.
+
+**Por qué no funcionaba:**
+- **0.6B, respuesta vacía:** la limpieza de la instrucción repetida (`INSTRUCTION_ECHO`, §7b.3) iba de "citing the sources by number" hasta el último punto, atravesando los dos puntos, así que en *"The answer in Spanish, citing the sources by number, is: [1] …"* se comía toda la respuesta.
+  - **Arreglo:** el patrón no cruza los dos puntos, y si la limpieza deja la respuesta vacía, se devuelve la original.
+  - **Comprobado:** 0 cambios en las 4.662 respuestas guardadas de `80`/`81`/`82`.
+- **Phi:** en la web hay dos fallos que `strip_echo` no puede arreglar.
+  - **(a)** Copia las fuentes y la pregunta, y se para sin responder.
+  - **(b)** Copia las cinco fuentes y se queda sin tokens antes de escribir la respuesta.
+
+  En los dos casos la respuesta empieza por `[1] --- file:`.
+
+**Medirlo como en la web (DEC-27):**
+- **`gen-bench`:** métricas `cut` (respuesta a media frase o al 95 % del límite), `tokens` (media) y `tokens_max`.
+- **Banco de 34 preguntas abiertas** (`data/output/night2/open_bench.py`): about, CV, vLLM, XQuAD y fuera de dominio, incluidos tus casos y los ejemplos de la web.
+  - Pasa por el mismo camino que la web (`RagService.chat`, todos los dominios, 1.024 tokens y recorte).
+  - Mide respuestas cortadas, eco, bucles, frases repetidas, vacías e idioma.
+- **Línea base `90-*`:** la matriz de `gen-bench` a 1.024 tokens más el banco abierto, con el código de la noche anterior más el arreglo del 0.6B.
+
+**Cambios:**
+1. **Detector de bucles, ventana 8 → 12** (DEC-28). Un bucle de Phi de 4 frases ("The Spanish BENCHMARK_REPORT.md file…") no se detectaba, porque en una ventana de 8 nunca hay 5 copias. Con 12 se detectan ciclos de hasta 7 frases.
+   - 4 de 7 bucles reproducidos, frente a 3 de 7 con ventana 8.
+   - 0 falsos positivos en 14.261 respuestas y 299 documentos.
+2. **Reintento cuando Phi copia las fuentes** (DEC-29, `EchoStart` en `src/rag/generator.py`).
+   - **Cuándo:** la respuesta empieza con una cabecera de fuente o una etiqueta (`[n] ---`, `SOURCES:`, `QUESTION:`) y llega a copiar una segunda.
+   - **Qué hace:** se para y se genera otra vez, sin dejar empezar por `[` y sin dejar escribir cabeceras ni etiquetas.
+   - **En la web:** el principio de la respuesta se retiene hasta saber que no es un eco, así que la copia nunca llega a la pantalla.
+   - **Coste:** tarda el doble, pero solo en estos casos.
+   - **Por qué hace falta una segunda copia:** la versión que reintentaba con la primera cabecera (`91-*`) mejoraba la forma de ~11 respuestas del 0.6B, pero perdía una (Toyota/ES: "2017" → "febrero de 2014").
+3. **Bloques repetidos** (DEC-30, `repeated_block` en `src/rag/loops.py`): 6 o más frases seguidas que repiten las de un poco antes, con un ciclo de hasta 40 frases.
+   - Detecta los ciclos largos de Phi (14 frases sobre la búsqueda híbrida, hasta 1.016 tokens) y la respuesta escrita dos veces ("…dispositivo). La respuesta en español, citando las fuentes, es: <la misma respuesta>").
+   - Con bloques de 4 daba falsos positivos en 4 documentos de vLLM; con 5 o más, ninguno. Se usa 6 por margen.
+   - En 15.793 respuestas y 299 documentos solo cambian las de Phi que repetían.
+
+**Resultado (`92-*` frente a `90-*`):**
+
+| | `gen-bench` (todas las suites de la matriz) | Preguntas abiertas (34) |
+|---|---|---|
+| Qwen3-0.6B | Idéntico (0 cambios en vllm, xquad, cv y about) | Idéntico |
+| Qwen3-1.7B | Idéntico | Idéntico |
+| Qwen3-4B | Idéntico | Sin medir en `92` (ver abajo) |
+| Phi-4-mini | 3 cambios, los tres a mejor (abajo) | 5 cambios: cortadas 2 → 0, eco 1 → 0, máximo 1.016 → 606 tokens, media 239 → 203 |
+
+**Cambios de Phi:**
+- **Commit de Triton (vLLM):** pasa de copiar 1.461 caracteres de la documentación a *"…is `e5be006` [1]"*.
+- **"What is RAG against the Machine?":** pasa de 49 tokens cortados a media frase a una respuesta completa.
+- **"¿Qué es RAG against the Machine?":** deja de escribir la respuesta dos veces (773 → 375 tokens).
+  - Por eso bajan dos métricas de about/ES de Phi: "cites" 0.93 → 0.86 y "citation ok" 0.38 → 0.33.
+  - Las citas de esa respuesta (`[1][2][3][4][5]`) solo estaban al final de la copia.
+- **"How does the hybrid search work?":** 1.016 → 307 tokens, sin el ciclo.
+- **"How was this website built?":** de un trozo de changelog copiado a una respuesta redactada.
+- **"Hablame sobre este rag":** de copiar 873 tokens de fuentes a *"No se encuentra en las fuentes proporcionadas."*
+
+**Lo que queda:**
+- **"Hablame sobre este rag":** el 0.6B responde *"The answer in Spanish, citing the sources by number, is: [1] "Hablame sobre este rag" and [4] …"*, ya no vacía pero mala, y Phi dice que no lo encuentra.
+  - Con esa pregunta, las fuentes que llegan son pobres: secciones sueltas del ROADMAP y los changelogs.
+  - Si se busca con el nombre del proyecto en lugar de "este rag", las fuentes mejoran para las preguntas generales, pero empeoran para las concretas (reranker, agente, web). No aplicado.
+- **Phi en "about" sigue siendo prolijo:** resume cada fuente una tras otra.
+  - Repite datos falsos de `deploy/space/README.md` (la ficha antigua del Space: "Hugging Face Space", "Agent (default)"), que sigue en el índice restaurado (DEC-25).
+  - Se arregla al reindexar "about" (ya está excluida en `rag.toml`); es tu decisión pendiente.
+- **Banco abierto del 4B en `92`:** el 4B no carga en el proceso del banco abierto (llm_sdk descarga parte a la CPU con 12 GB; en `90` sí cargó).
+  - Sus respuestas no pueden cambiar: en `90` no tiene eco ni bloques repetidos, y en `gen-bench` es idéntico.
+  - Lo deduzco de los datos, no lo he medido.
+- **Incidencia:** una prueba de Phi que debía ir en CPU usó la GPU y bloqueó la línea base de 00:45 a 14:05. No afecta a ningún resultado (generación determinista), solo a los tiempos de `90-q06-xquad`.
+
+**Pruebas:** 129 tests (nuevos: el reintento y los bloques repetidos); flake8 y mypy limpios. `make bench` de 42 (`93-session-final`) **idéntico**: docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88.
 
 ## Decisiones (tuyas, 2026-10-24)
 

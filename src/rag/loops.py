@@ -17,13 +17,22 @@ from typing import Optional
 
 # A loop: among the last WINDOW units (lines and sentences), REPEATS or
 # more are near-copies (>= SIMILARITY) of an earlier one in the window.
-WINDOW = 8
+# 12 catches cycles of up to 7 sentences (8 missed Phi's 4-sentence
+# cycle; FASE_7.md 7b.7), with no new false positives.
+WINDOW = 12
 REPEATS = 5
 SIMILARITY = 0.95
 # Units shorter than this (in words) are not compared.
 MIN_WORDS = 3
 # The same word this many times in a row ("step step step...").
 WORD_RUN = 12
+# A repeated block: this many units in a row, each a near-copy of the
+# unit the same distance back. Catches cycles longer than WINDOW allows
+# and an answer written twice (FASE_7.md 7b.8).
+BLOCK = 6
+# Longest cycle looked for, in units (an answer of 1024 tokens has ~40
+# sentences).
+MAX_PERIOD = 40
 
 LIST_MARK = re.compile(r"^\s*(?:\d+[.)]|[-*•]|#+)\s*")
 CITATION = re.compile(r"\(source:?\s*\[\d+\]\)|\[\d+\]", re.IGNORECASE)
@@ -77,12 +86,42 @@ def find_loop(text: str) -> Optional[int]:
         if len(copies) >= REPEATS:
             at = offsets[first + copies[0]]
             return at if word_at is None else min(at, word_at)
+        block = repeated_block(units)
+        if block is not None:
+            at = offsets[block]
+            return at if word_at is None else min(at, word_at)
     return word_at
+
+
+def repeated_block(units: list[str]) -> Optional[int]:
+    """Index of the unit where a repeated block starts: the last BLOCK
+    or more units each match the unit `period` back. When the unit just
+    before also contains its counterpart ("The answer in Spanish is:
+    <first sentence again>"), the copy starts there."""
+    last = len(units) - 1
+    for period in range(BLOCK, min(MAX_PERIOD, len(units) // 2) + 1):
+        run = 0
+        while run <= last - period and similar(
+                units[last - run], units[last - run - period]):
+            run += 1
+        if run >= BLOCK:
+            start = last - run + 1
+            if start > period and \
+                    units[start - 1 - period] in units[start - 1]:
+                return start - 1
+            return start
+    return None
 
 
 def similar(a: str, b: str) -> bool:
     """Near-copies: equal, or at least SIMILARITY alike."""
-    return a == b or SequenceMatcher(None, a, b).ratio() >= SIMILARITY
+    if a == b:
+        return True
+    # The ratio is at most 2 * shorter / (both lengths): skip the work
+    # when the lengths alone rule it out.
+    if 2 * min(len(a), len(b)) < SIMILARITY * (len(a) + len(b)):
+        return False
+    return SequenceMatcher(None, a, b).ratio() >= SIMILARITY
 
 
 def cut_loop(text: str) -> str:

@@ -1,0 +1,91 @@
+{
+  "label": "82-phi4-mini-cv",
+  "suite": "cv",
+  "domain": "cv",
+  "k": 5,
+  "limit": null,
+  "sample": null,
+  "timestamp": "2026-10-25T02:02:57",
+  "commit": "02ff464",
+  "dirty": true,
+  "profile": "llm-phi4-mini",
+  "generator": "microsoft/Phi-4-mini-instruct",
+  "max_new_tokens": 150,
+  "device": "cuda",
+  "sets": {
+    "cv/en": {
+      "questions": 30,
+      "f1": 0.1855,
+      "f1_answered": 0.1987,
+      "contains_answer": 0.9,
+      "false_not_found": 0.0667,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.9333,
+      "cites": 1.0,
+      "citation_correct": 0.8571,
+      "language_match": 0.9286,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 1.2
+    },
+    "cv/es": {
+      "questions": 30,
+      "f1": 0.1461,
+      "f1_answered": 0.1566,
+      "contains_answer": 0.9,
+      "false_not_found": 0.0667,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.9333,
+      "cites": 1.0,
+      "citation_correct": 0.9643,
+      "language_match": 1.0,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 1.4
+    },
+    "cv-ood/en-missing": {
+      "questions": 7,
+      "correct_not_found": 0.8571,
+      "cv_message": 0.8571,
+      "handled": 0.8571,
+      "leaks": 0
+    },
+    "cv-ood/en-private": {
+      "questions": 2,
+      "correct_not_found": 1.0,
+      "cv_message": 1.0,
+      "handled": 1.0,
+      "leaks": 0
+    },
+    "cv-ood/en-secret": {
+      "questions": 1,
+      "correct_not_found": 0.0,
+      "cv_message": 0.0,
+      "handled": 1.0,
+      "leaks": 0
+    },
+    "cv-ood/es-missing": {
+      "questions": 7,
+      "correct_not_found": 1.0,
+      "cv_message": 1.0,
+      "handled": 1.0,
+      "leaks": 0
+    },
+    "cv-ood/es-private": {
+      "questions": 2,
+      "correct_not_found": 0.0,
+      "cv_message": 0.0,
+      "handled": 0.0,
+      "leaks": 0
+    },
+    "cv-ood/es-secret": {
+      "questions": 1,
+      "correct_not_found": 0.0,
+      "cv_message": 0.0,
+      "handled": 1.0,
+      "leaks": 0
+    }
+  }
+}

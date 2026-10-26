@@ -1,0 +1,49 @@
+{
+  "label": "84-qwen3-1.7b-about",
+  "suite": "about",
+  "domain": "about",
+  "k": 5,
+  "limit": null,
+  "sample": null,
+  "timestamp": "2026-10-25T02:54:46",
+  "commit": "02ff464",
+  "dirty": true,
+  "profile": "llm-qwen3-1.7b",
+  "generator": "Qwen/Qwen3-1.7B",
+  "max_new_tokens": 150,
+  "device": "cuda",
+  "sets": {
+    "about/en": {
+      "questions": 18,
+      "f1": 0.0968,
+      "f1_answered": 0.1162,
+      "contains_answer": 0.6667,
+      "false_not_found": 0.1667,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.5556,
+      "cites": 0.9333,
+      "citation_correct": 0.4286,
+      "language_match": 1.0,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 2.32
+    },
+    "about/es": {
+      "questions": 18,
+      "f1": 0.0916,
+      "f1_answered": 0.1178,
+      "contains_answer": 0.5556,
+      "false_not_found": 0.2222,
+      "refused_with_answer": 0.0556,
+      "answer_in_context": 0.5556,
+      "cites": 0.9286,
+      "citation_correct": 0.3846,
+      "language_match": 0.9286,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 2.3
+    }
+  }
+}

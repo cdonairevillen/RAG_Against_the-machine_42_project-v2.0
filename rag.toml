@@ -128,6 +128,10 @@ The SOURCES describe one person, Chrystian Donaire Villén: his CV, his LinkedIn
 # -3.0 accepts 83% (en) / 90% (es) and no out-of-domain question.
 # Rejections still end in the CV message below.
 relevance_threshold = -3.0
+# Questions that name the author go to the CV when it passes its gate,
+# even if "about" (whose docs and code mention him) scores higher
+# (FASE_7.md 7b.5; only CV benchmark questions match).
+route_hints = ['\b(chrystian|donaire)\b']
 # The English CV comes first for English questions and lacks the
 # biography-only facts: more sources bring the biography in too.
 answer_k = 8
@@ -154,19 +158,37 @@ exclude_dirs = [
     "node_modules", "PLANING.md", "RESPUESTA.md", "Elements_frontend.md",
     "CLAUDE.md",
 ]
-exclude_paths = ["deploy/stage", "deploy/bundle"]
+# deploy/space/README.md is the old Hugging Face Space card (it still
+# says the agent is on by default): the project's README covers it.
+exclude_paths = ["deploy/stage", "deploy/bundle", "deploy/space/README.md"]
+# The working docs exist in Spanish (docs/es/) and English (docs/). The
+# filter below gives English questions only the English copy (Spanish
+# ones keep both). Measured (FASE_7.md 7b.4, DEC-23): better retrieval
+# and much better answers with Qwen3-0.6B, but fewer correct citations
+# with the larger models, so it stays off until the author decides.
+# translations = [
+#     ["README.md", "docs/es/README.md"],
+#     ["docs/", "docs/es/"],
+# ]
+# translation_languages = ["en"]
 # Test transcripts quoting CV answers, marked inside the changelogs, are
 # left out (they made the router pick "about" for CV questions).
 skip_marked = true
 # Own gate (`gate_scores`, FASE_7.md 7a.7): -1.0 accepts 83% (en) /
 # 78% (es) of the questions about the project; the global 0.0 only 67%.
 relevance_threshold = -1.0
-# Questions that name the project go to "about" when it passes its gate
-# (a hint alone never decides: XQuAD also has "the project").
+# Questions that hint at the project go to "about" when it passes its
+# gate (a hint alone never decides: XQuAD also has "the project").
 route_hints = [
-    '\b(this|the|your) project\b',
-    '\b(este|el|tu) proyecto\b',
+    '\b(the|el) (project|proyecto)\b',
+]
+# Questions that name it beyond doubt go to "about" whatever its score,
+# and skip its gate (FASE_7.md 7b.5; no other benchmark question
+# matches them).
+route_names = [
     'rag against the machine',
+    '\b(este|esta|tu|vuestro) (rag|proyecto|sistema|chatbot|asistente|web|aplicaci[oó]n)\b',
+    '\b(this|your) (rag|project|system|chatbot|assistant|website|app)\b',
 ]
 # The web always searches it (chip always on, it joins every filter).
 pinned = true

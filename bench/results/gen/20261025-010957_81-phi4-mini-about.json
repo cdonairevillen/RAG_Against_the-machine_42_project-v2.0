@@ -1,0 +1,49 @@
+{
+  "label": "81-phi4-mini-about",
+  "suite": "about",
+  "domain": "about",
+  "k": 5,
+  "limit": null,
+  "sample": null,
+  "timestamp": "2026-10-25T01:09:56",
+  "commit": "02ff464",
+  "dirty": true,
+  "profile": "llm-phi4-mini",
+  "generator": "microsoft/Phi-4-mini-instruct",
+  "max_new_tokens": 150,
+  "device": "cuda",
+  "sets": {
+    "about/en": {
+      "questions": 18,
+      "f1": 0.1165,
+      "f1_answered": 0.1398,
+      "contains_answer": 0.6667,
+      "false_not_found": 0.1667,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.5556,
+      "cites": 0.4,
+      "citation_correct": 0.5,
+      "language_match": 0.9333,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 2.47
+    },
+    "about/es": {
+      "questions": 18,
+      "f1": 0.0934,
+      "f1_answered": 0.1201,
+      "contains_answer": 0.5,
+      "false_not_found": 0.2222,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.5,
+      "cites": 0.7857,
+      "citation_correct": 0.3636,
+      "language_match": 0.9286,
+      "leaks": 0,
+      "echo": 0.0556,
+      "bad_citation": 0.0,
+      "seconds_per_answer": 1.98
+    }
+  }
+}

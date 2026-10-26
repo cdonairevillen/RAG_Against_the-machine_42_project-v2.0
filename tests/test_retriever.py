@@ -143,3 +143,22 @@ def test_orphan_child_maps_to_itself() -> None:
 
     assert (source.first_character_index,
             source.last_character_index) == (20, 40)
+
+
+def test_translated_copies_are_recognised() -> None:
+    from src.rag.retriever import Retriever
+
+    r = object.__new__(Retriever)
+    r.translations = [("README.md", "docs/es/README.md"),
+                      ("docs/", "docs/es/")]
+    files = {"README.md", "docs/es/README.md", "docs/ROADMAP.md",
+             "docs/es/ROADMAP.md", "docs/es/ONLY_ES.md", "src/rag/x.py"}
+    # An English question leaves out the Spanish copies, and vice versa.
+    assert r.translated_copy("docs/es/ROADMAP.md", "en", files)
+    assert r.translated_copy("docs/es/README.md", "en", files)
+    assert r.translated_copy("docs/ROADMAP.md", "es", files)
+    assert r.translated_copy("README.md", "es", files)
+    assert not r.translated_copy("docs/ROADMAP.md", "en", files)
+    # Files without a translation, and code, always stay.
+    assert not r.translated_copy("docs/es/ONLY_ES.md", "en", files)
+    assert not r.translated_copy("src/rag/x.py", "es", files)

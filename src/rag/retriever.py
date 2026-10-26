@@ -10,6 +10,7 @@ from src.rag.ingestion.pipeline import load_bm25
 from src.rag.ingestion.tokens import (
     corpus_part_types, query_uses_parts, tokenize,
 )
+from src.rag.language import detect_language
 from src.models import MinimalSource
 from src.rag.storage.base import ChunkStore
 
@@ -163,6 +164,13 @@ class Retriever:
         # Patterns that name this domain in a question (rag.toml
         # route_hints), used by the DomainRouter.
         self.route_hints: list[re.Pattern[str]] = []
+        # Patterns that name it beyond doubt (rag.toml route_names).
+        self.route_names: list[re.Pattern[str]] = []
+        # [English, Spanish] path prefixes of translated files (rag.toml
+        # translations), longest first, and the question languages the
+        # filter applies to (translation_languages).
+        self.translations: list[tuple[str, str]] = []
+        self.translation_languages: list[str] = ["en", "es"]
 
         self.chunk_map: dict = {}
         self.parent_chunk_map: dict = {}
@@ -338,6 +346,16 @@ class Retriever:
             re.compile(hint, re.IGNORECASE)
             for hint in (source.route_hints if source else [])
         ]
+        retriever.route_names = [
+            re.compile(name, re.IGNORECASE)
+            for name in (source.route_names if source else [])
+        ]
+        retriever.translations = sorted(
+            ((english, spanish) for english, spanish in
+             (source.translations if source else [])),
+            key=lambda pair: -max(len(pair[0]), len(pair[1])))
+        if source is not None:
+            retriever.translation_languages = source.translation_languages
         retriever.embeddings = config.embeddings
         if config.embeddings.enabled:
             retriever.load_embedder(manifest.get("embedding_model"),
@@ -452,6 +470,36 @@ class Retriever:
         return combined_code, combined_doc
 
     def search_smart(self, query: str, k: int = 10) -> list[MinimalSource]:
+        """search_smart_all() without the other language's copies of
+        translated files (rag.toml translations), when the question's
+        language is clear and listed in translation_languages. Otherwise
+        it is exactly search_smart_all().
+        """
+        language = detect_language(query) if self.translations else "?"
+        if language not in ("en", "es") \
+                or language not in self.translation_languages:
+            return self.search_smart_all(query, k)
+        files = {c.file_path for c in self.parent_chunks}
+        kept = [s for s in self.search_smart_all(query, k * 2)
+                if not self.translated_copy(s.file_path, language, files)]
+        return kept[:k]
+
+    def translated_copy(self, file_path: str, language: str,
+                        files: set[str]) -> bool:
+        """Whether a file is the other-language copy of an indexed
+        file, for a question in `language`."""
+        for english, spanish in self.translations:
+            if file_path.startswith(spanish):
+                return (language == "en"
+                        and english + file_path[len(spanish):] in files)
+        for english, spanish in self.translations:
+            if file_path.startswith(english):
+                return (language == "es"
+                        and spanish + file_path[len(english):] in files)
+        return False
+
+    def search_smart_all(self, query: str,
+                         k: int = 10) -> list[MinimalSource]:
         """Classifier-guided retrieval: doc index for docs, reranker
         for code.
 

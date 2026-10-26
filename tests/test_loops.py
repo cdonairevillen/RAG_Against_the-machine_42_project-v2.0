@@ -49,3 +49,39 @@ def test_good_answers_tables_and_code_are_not_loops() -> None:
 
 def test_clean_output_cuts_a_loop() -> None:
     assert clean_output(GOOD + "step " * 20) == GOOD.rstrip()
+
+
+PARAGRAPH = [
+    "The hybrid search fuses BM25 with dense vectors [1].",
+    "Each branch has its own tokenizer for code or prose.",
+    "Reciprocal rank fusion merges both lists before reranking.",
+    "A cross-encoder then scores the best fifty candidates [2].",
+    "Children chunks are mapped back to their parent sections.",
+    "The router picks the domain whose reranker score is highest.",
+    "Every domain keeps a threshold calibrated with gate scores.",
+    "Questions below it get the not-found message instead [3].",
+    "Qdrant stores the vectors next to the payload of each chunk.",
+    "The benchmark of 42 measures recall at one, three, five and ten.",
+]
+
+
+def test_a_long_repeated_block_is_cut_where_the_copy_starts() -> None:
+    # A 10-sentence cycle: too long for the window, caught as a block.
+    first = " ".join(PARAGRAPH)
+    text = f"{first} {first} {first}"
+    assert cut_loop(text) == first
+
+
+def test_an_answer_written_twice_is_cut_before_its_framing() -> None:
+    # Phi-4-mini: the answer, then "The answer in Spanish ... is:" and
+    # the same answer again. The framing goes with the copy.
+    first = " ".join(PARAGRAPH)
+    text = f"{first} The answer in Spanish, citing the sources, is: {first}"
+    assert cut_loop(text) == first
+
+
+def test_a_short_repeated_block_is_not_a_loop() -> None:
+    # Five sentences repeated (vLLM docs repeat short steps): kept.
+    block = " ".join(PARAGRAPH[:5])
+    text = f"{block} Then the second server: {block}"
+    assert find_loop(text) is None
