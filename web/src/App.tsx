@@ -14,7 +14,8 @@ const BLURB =
 const MODEL_NOTES: Record<string, string> = {
   default: "Base model · fastest",
   "llm-qwen3-1.7b": "Better answers · a bit slower",
-  "llm-qwen3-4b": "Best agent · slowest",
+  "llm-qwen3-4b": "Best answers · slowest · direct RAG only",
+  "llm-granite-micro": "IBM Granite · best answers · slowest",
 };
 
 function depthLabel(depth: number): string {
@@ -154,13 +155,15 @@ function Retrievals({ retrievals }: { retrievals: Retrieval[] }) {
 
 // A dropdown that opens upwards from the composer, like the model
 // pickers of AI chat apps.
-function Picker<T>({ value, options, render, note, onChange, title }: {
+function Picker<T>({ value, options, render, note, onChange, title, disabled }: {
   value: T;
   options: T[];
   render: (option: T) => ReactNode;
   note: (option: T) => string;
   onChange: (option: T) => void;
   title: string;
+  // Options shown but not selectable right now.
+  disabled?: (option: T) => boolean;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -191,6 +194,7 @@ function Picker<T>({ value, options, render, note, onChange, title }: {
               aria-selected={option === value}
               key={i}
               className={`picker-option ${option === value ? "selected" : ""}`}
+              disabled={disabled?.(option)}
               onClick={() => {
                 onChange(option);
                 setOpen(false);
@@ -284,6 +288,7 @@ export default function App() {
             getConfig().then((c) => {
               setConfig(c);
               setUseAgent(c.agent_default);
+              setModel(c.model_default ?? "default");
               setDepth(c.depth_default ?? 5);
               setDomains(c.domains.map((d) => d.name));
             });
@@ -353,7 +358,7 @@ export default function App() {
       if (controller.current?.signal.aborted) {
         update({ pending: false, answer: streamed ? `${streamed} …` : "", trace: "stopped" });
       } else {
-        update({ pending: false, error: String(error) });
+        update({ pending: false, error: error instanceof Error ? error.message : String(error) });
       }
     } finally {
       controller.current = null;
@@ -371,6 +376,13 @@ export default function App() {
 
   const models = config?.models ?? [{ id: "default", label: config?.model ?? "Qwen3-0.6B", model: "", loaded: true }];
   const modelInfo = (id: string) => models.find((m) => m.id === id);
+  const agentAllowed = (id: string) => modelInfo(id)?.agent !== false;
+  // Turning the agent on with a direct-only model selected (Qwen3-4B)
+  // switches to the web's default model.
+  const toggleAgent = (on: boolean) => {
+    setUseAgent(on);
+    if (on && !agentAllowed(model)) setModel(config?.model_default ?? "default");
+  };
 
   return (
     <div className="page">
@@ -399,7 +411,7 @@ export default function App() {
             <div className="agent-toggle">
               <label className="switch" title="The agent remembers the conversation and rewrites follow-up questions">
                 <span className="switch-label">{useAgent ? "With agent (memory)" : "Direct RAG"}</span>
-                <input type="checkbox" checked={useAgent} onChange={(e) => setUseAgent(e.target.checked)} />
+                <input type="checkbox" checked={useAgent} onChange={(e) => toggleAgent(e.target.checked)} />
                 <span className="switch-track"><span className="switch-thumb" /></span>
               </label>
               {/* Floats under the switch, so turning it on moves nothing. */}
@@ -478,7 +490,12 @@ export default function App() {
                 value={model}
                 options={models.map((m) => m.id)}
                 render={(id) => modelInfo(id)?.label ?? id}
-                note={(id) => `${MODEL_NOTES[id] ?? ""}${modelInfo(id)?.loaded ? "" : " · loads on first use"}`}
+                note={(id) =>
+                  useAgent && !agentAllowed(id)
+                    ? "Turn the agent off to use it"
+                    : `${MODEL_NOTES[id] ?? ""}${modelInfo(id)?.loaded ? "" : " · loads on first use"}`
+                }
+                disabled={(id) => useAgent && !agentAllowed(id)}
                 onChange={setModel}
               />
               <Picker

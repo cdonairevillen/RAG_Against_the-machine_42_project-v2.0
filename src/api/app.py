@@ -104,6 +104,12 @@ def model_label(name: str) -> str:
     return name.rsplit("/", 1)[-1]
 
 
+def env_list(name: str) -> list[str]:
+    """A comma-separated environment variable as a list."""
+    return [m.strip() for m in os.environ.get(name, "").split(",")
+            if m.strip()]
+
+
 def parse_max_tokens(value: str, models: list[str]) -> dict[str, int]:
     """Per-model token caps from "512" (every model) or
     "default=512,llm-qwen3-1.7b=768" (unknown ids are ignored)."""
@@ -128,8 +134,17 @@ class ModelPool:
     by default: a free CPU Space or a 12 GB GPU does not hold them all);
     loading another one unloads the least recently used.
 
+    Each option also keeps where its profile runs the retrieval models
+    ([profiles.<id>.models] device in rag.toml): Qwen3-4B puts the
+    embedder and the reranker on the CPU to make room on the GPU, as it
+    does outside the web.
+
     Environment:
         RAG_API_MODELS: comma-separated ids to offer (default: all).
+        RAG_API_DEFAULT_MODEL: the id the web starts with and that loads
+            at startup (default: "default", the base model).
+        RAG_API_DIRECT_ONLY: ids offered only without the agent (their
+            memory does not leave room for it).
         RAG_API_MAX_LOADED: models kept loaded at once (default 1).
         RAG_API_MAX_TOKENS: answer length cap, one number for every model
             or per model ("default=512,llm-qwen3-1.7b=768"); models not
@@ -139,14 +154,17 @@ class ModelPool:
     def __init__(self, config: RagConfig) -> None:
         self.options: "OrderedDict[str, GenerationConfig]" = OrderedDict()
         self.options["default"] = config.generation
+        self.retrieval_device = {"default": config.models.resolved_device()}
         # The Qwen3 family first (the project's base), then the others.
         llm_profiles = sorted(
             (p for p in config.available_profiles if p.startswith("llm-")),
             key=lambda p: ("qwen" not in p, p))
         for profile in llm_profiles:
-            self.options[profile] = load_config(profile=profile).generation
-        wanted = [m.strip() for m in os.environ.get(
-            "RAG_API_MODELS", "").split(",") if m.strip()]
+            profile_config = load_config(profile=profile)
+            self.options[profile] = profile_config.generation
+            self.retrieval_device[profile] = (
+                profile_config.models.resolved_device())
+        wanted = env_list("RAG_API_MODELS")
         if wanted:
             self.options = OrderedDict(
                 (k, v) for k, v in self.options.items()
@@ -156,6 +174,10 @@ class ModelPool:
         for key, cap in caps.items():
             self.options[key] = self.options[key].model_copy(
                 update={"max_new_tokens": cap})
+        self.default_id = self.resolve(
+            os.environ.get("RAG_API_DEFAULT_MODEL", "").strip(), "default")
+        self.direct_only = {m for m in env_list("RAG_API_DIRECT_ONLY")
+                            if m in self.options and m != self.default_id}
         self.max_loaded = max(1, int(os.environ.get(
             "RAG_API_MAX_LOADED", "1")))
         self.loaded: "OrderedDict[str, Any]" = OrderedDict()
@@ -163,12 +185,25 @@ class ModelPool:
     def describe(self) -> list[dict[str, Any]]:
         """The options as /config shows them."""
         return [{"id": key, "label": model_label(gen.model),
-                 "model": gen.model, "loaded": key in self.loaded}
+                 "model": gen.model, "loaded": key in self.loaded,
+                 "agent": key not in self.direct_only}
                 for key, gen in self.options.items()]
 
-    def resolve(self, model: Optional[str]) -> str:
-        """A valid model id (unknown ids fall back to the default)."""
-        return model if model and model in self.options else "default"
+    def resolve(self, model: Optional[str],
+                fallback: Optional[str] = None) -> str:
+        """A valid model id (unknown ids fall back to the web's default)."""
+        if model and model in self.options:
+            return model
+        return fallback or self.default_id
+
+    def label(self, model: str) -> str:
+        """Short name of an option: Qwen3-1.7B."""
+        return model_label(self.options[model].model)
+
+    def unload_all(self) -> None:
+        """Drop every loaded model and free its memory."""
+        self.loaded.clear()
+        free_memory()
 
     def get(self, model: str) -> Any:
         """The model's Generator, loading it (and unloading the least
@@ -231,6 +266,15 @@ class RagService:
         self.sessions: "OrderedDict[str, tuple[Any, float]]" = OrderedDict()
         self.lock = threading.Lock()
         self.load_lock = threading.Lock()
+        # Chats answering or waiting for the lock, and how many may be
+        # (RAG_API_MAX_QUEUE; 0 = no cap). With the web public, a cap keeps
+        # one visitor from queueing requests for everyone (Phase 8).
+        self.queued = 0
+        self.queue_lock = threading.Lock()
+        self.max_queue = int(os.environ.get("RAG_API_MAX_QUEUE") or 0)
+        # Where the embedder and the reranker are now (they load on the
+        # base configuration's device).
+        self.retrieval_device = config.models.resolved_device()
 
     def load(self) -> Any:
         """Load the RAG on first use (or at startup)."""
@@ -240,25 +284,48 @@ class RagService:
 
                 # RAG_API_DOMAINS: the domains the web serves (default:
                 # every indexed one), to keep one out until it is ready.
-                domains = [d.strip() for d in os.environ.get(
-                    "RAG_API_DOMAINS", "").split(",") if d.strip()]
+                domains = env_list("RAG_API_DOMAINS")
                 tools = RagTools.load(self.config, domains=domains or None)
-                self.models.get("default")
+                self.generator_for(self.models.default_id, tools)
                 self.tools = tools
         return self.tools
 
-    def generator_for(self, model: str) -> Any:
+    def generator_for(self, model: str, tools: Any = None) -> Any:
         """The chosen model's Generator.
 
         Before loading another model, every session's agent drops its
         LLM (each gets the current one on its next question): a model
         an agent still points to cannot be freed, and the new one would
         have to fit next to it (Qwen3-1.7B did not, on a 12 GB GPU).
+
+        If the model's profile runs the retrieval on another device
+        (Qwen3-4B: on the CPU), the loaded LLMs are dropped first and
+        the embedder and the reranker move before the model loads, so
+        it finds the room it needs.
         """
+        tools = tools or self.tools
         if model not in self.models.loaded:
             for agent, _ in self.sessions.values():
                 agent.generator = None
+            device = self.models.retrieval_device.get(
+                model, self.retrieval_device)
+            if tools is not None and device != self.retrieval_device:
+                self.models.unload_all()
+                self.place_retrieval(tools, device)
         return self.models.get(model)
+
+    def place_retrieval(self, tools: Any, device: str) -> None:
+        """Move the shared embedder and reranker to `device`."""
+        moved: set[int] = set()
+        for retriever in tools.router.retrievers.values():
+            embedder = getattr(retriever, "embedder", None)
+            for module in (getattr(embedder, "model", None),
+                           getattr(retriever, "reranker", None)):
+                if module is not None and id(module) not in moved:
+                    module.to(device)
+                    moved.add(id(module))
+        self.retrieval_device = device
+        free_memory()
 
     def pipeline_for(self, model: str) -> Any:
         """The direct answer flow with the chosen model."""
@@ -368,6 +435,22 @@ class RagService:
                            "used": True, "sources": used})
         return out
 
+    @contextmanager
+    def queue_slot(self) -> Iterator[None]:
+        """Count a chat while it waits or answers; refuse it when the
+        queue is full."""
+        with self.queue_lock:
+            if self.max_queue and self.queued >= self.max_queue:
+                raise RuntimeError(
+                    "The server is busy answering other questions: try "
+                    "again in a minute.")
+            self.queued += 1
+        try:
+            yield
+        finally:
+            with self.queue_lock:
+                self.queued -= 1
+
     def chat(self, request: ChatRequest, on_piece: Any,
              cancel: Optional[threading.Event] = None) -> dict[str, Any]:
         """Answer one message (blocking); pieces go to on_piece.
@@ -386,6 +469,10 @@ class RagService:
                     "not_found": True, "domain": None, "sources": [],
                     "retrievals": [], "trace": {"mode": "no-filter"}}
         model = self.models.resolve(request.model)
+        if request.agent and model in self.models.direct_only:
+            raise RuntimeError(
+                f"{self.models.label(model)} only runs without the agent: "
+                f"turn the agent off or pick another model.")
         with self.lock, self.depth(request.depth):
             if cancel.is_set():
                 # Stopped while waiting for its turn: nothing to do.
@@ -522,6 +609,7 @@ def create_app(config: Optional[RagConfig] = None,
                 for d in tools.list_domains()
             ],
             "models": service.models.describe(),
+            "model_default": service.models.default_id,
             "depths": DEPTHS,
             "depth_default": DEPTH_DEFAULT,
             "agent_default": AGENT_DEFAULT,
@@ -539,9 +627,10 @@ def create_app(config: Optional[RagConfig] = None,
 
         def work() -> None:
             try:
-                result = service.chat(
-                    request, lambda p: pieces.put(("token", p)), cancel
-                )
+                with service.queue_slot():
+                    result = service.chat(
+                        request, lambda p: pieces.put(("token", p)), cancel
+                    )
                 pieces.put(("done", result))
             except Exception as exc:  # reported to the client
                 pieces.put(("error", {"detail": str(exc)}))

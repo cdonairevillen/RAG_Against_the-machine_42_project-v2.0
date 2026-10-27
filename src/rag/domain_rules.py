@@ -61,10 +61,16 @@ class DomainRules:
             text = redact(text, source)
         return text
 
-    def prompt_rules(self, domain: Optional[str]) -> str:
-        """Extra system-prompt rules of a domain ('' when none)."""
+    def prompt_rules(self, domain: Optional[str], model: str = "") -> str:
+        """Extra system-prompt rules of a domain ('' when none), plus
+        the ones it sets for `model` (a Hugging Face id)."""
         source = self.sources.get(domain or "")
-        return source.prompt_rules if source else ""
+        if source is None:
+            return ""
+        own = source.model_rules.get(model, "").strip()
+        if not own:
+            return source.prompt_rules
+        return f"{source.prompt_rules.strip()}\n{own}".strip()
 
     def not_found_message(self, domain: Optional[str],
                           question: str) -> Optional[str]:

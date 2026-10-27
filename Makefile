@@ -93,9 +93,15 @@ web-stop:
 
 # ── Phase 6: API + React web + deployment ───────────────────────────────
 # API (FastAPI) on http://127.0.0.1:8000; it also serves web/dist if built.
-# API_MODELS: the LLMs the web offers (rag.toml profiles). Qwen3-4B is left
-# out: with retrieval on the GPU it does not fit in 12 GB (measured).
-API_MODELS ?= default,llm-qwen3-1.7b
+# API_MODELS: the LLMs the web offers (rag.toml profiles). The base model
+# stays Qwen3-0.6B (benchmarks, CLI); the web starts with
+# API_DEFAULT_MODEL. Granite 4.0 Micro replaces Qwen3-4B in the web (Phase
+# 8, FASE_8.md 8a): similar answers, and it fits in 12 GB next to the
+# retrieval with the agent on. API_DIRECT_ONLY lists models offered
+# without the agent only (the 4B, if added back: llm-qwen3-4b).
+API_MODELS ?= default,llm-qwen3-1.7b,llm-granite-micro
+API_DEFAULT_MODEL ?= llm-qwen3-1.7b
+API_DIRECT_ONLY ?=
 # Answer length cap in the web (rag.toml keeps 150 so gen-bench stays
 # comparable). A safety net only: generation loops stop by themselves
 # (src/rag/loops.py), and the longest legit answer measured was 464
@@ -105,9 +111,24 @@ API_MODELS ?= default,llm-qwen3-1.7b
 API_MAX_TOKENS ?= 1024
 # API_DOMAINS: the domains the web serves (empty: every indexed one).
 API_DOMAINS ?=
+# Chats waiting or answering at once (0: no cap) and the web origins
+# allowed to call the API (*: any). make api-public sets both.
+API_MAX_QUEUE ?= 0
+API_ORIGINS ?= *
 api: db-up
 	RAG_API_DOMAINS=$(API_DOMAINS) RAG_API_MODELS=$(API_MODELS) RAG_API_MAX_TOKENS=$(API_MAX_TOKENS) \
+		RAG_API_DEFAULT_MODEL=$(API_DEFAULT_MODEL) RAG_API_DIRECT_ONLY=$(API_DIRECT_ONLY) 		RAG_API_MAX_QUEUE=$(API_MAX_QUEUE) RAG_ALLOWED_ORIGINS='$(API_ORIGINS)' \
 		$(ENV) $(UV) run --project . $(PY) -m src.api
+
+# The web public from this PC through a tunnel (Phase 8d, deploy/local/).
+# Same API, plus a cap on queued chats (a "busy" message past it) and the
+# public address as the only web origin allowed to call it
+# (make api-public PUBLIC_ORIGIN=https://...). The tunnel runs apart and
+# points at http://127.0.0.1:8000.
+PUBLIC_ORIGIN ?= *
+api-public: API_MAX_QUEUE = 4
+api-public: API_ORIGINS = $(PUBLIC_ORIGIN)
+api-public: api
 
 # React web in development (Vite, http://localhost:5173, talks to make api).
 web-dev:
@@ -232,4 +253,4 @@ meme:
 
 .PHONY: install data data-vllm data-xquad db-up db-down db-reset run web web-stop index search-docs search-code \
         eval-docs eval-code bench route-bench agent-bench gen-bench judge mcp test lint clean meme \
-        api web-dev web-build bundle space-build space-run
+        api api-public web-dev web-build bundle space-build space-run

@@ -267,7 +267,8 @@ class Agent:
         blocks = build_context_blocks(
             sources, self.tools.router.get_parent_chunk_map(), rules
         )
-        extra = rules.prompt_rules(domain)
+        extra = rules.prompt_rules(
+            domain, getattr(self.generator, "model_name", ""))
         start = time.perf_counter()
         if on_piece:
             pieces = []

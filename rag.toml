@@ -136,6 +136,13 @@ answer_k = 8
 chunk_size = 800
 child_size = 400
 
+# Granite 4.0 Micro only (FASE_8.md 8a): it answered the Hotmail question
+# with the Gmail, presented as the Hotmail. The Qwen prompts stay as is.
+[sources.cv.model_rules]
+"ibm-granite/granite-4.0-micro" = """
+12. cdonairevillen@gmail.com is a Gmail address. If asked for his Hotmail, Outlook or any other e-mail, his phone, WhatsApp or home address, never answer with that Gmail as if it were the requested one: say that it is private, then give the Gmail as his public contact.
+"""
+
 [sources.cv.not_found_message]
 es = "No dispongo de esa información, ¡pero puedes preguntárselo tú! cdonairevillen@gmail.com"
 en = "I don't have that information, but you can ask him yourself! cdonairevillen@gmail.com"
@@ -225,3 +232,9 @@ model = "Qwen/Qwen3-4B"
 # retrieval runs on CPU (same results, measured in Phase 2).
 [profiles.llm-qwen3-4b.models]
 device = "cpu"
+
+# Another model family (Phase 8, DEC-32): IBM Granite 4.0 Micro, the
+# dense 3B (attention layers only), Apache 2.0, Spanish among its
+# languages. Being evaluated: FASE_8.md 8a.
+[profiles.llm-granite-micro.generation]
+model = "ibm-granite/granite-4.0-micro"

@@ -315,3 +315,83 @@ def test_a_pinned_domain_joins_every_filter(client: TestClient) -> None:
 def test_config_marks_pinned_domains(client: TestClient) -> None:
     [domain] = client.get("/config").json()["domains"]
     assert domain["name"] == "cv" and domain["pinned"] is False
+
+
+def test_the_web_default_and_direct_only_models(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.api.app import ModelPool
+
+    config = CONFIG.model_copy(
+        update={"available_profiles": ["default", "llm-a", "llm-b"]})
+    monkeypatch.setattr("src.api.app.load_config",
+                        lambda profile: CONFIG)
+    monkeypatch.setenv("RAG_API_DEFAULT_MODEL", "llm-a")
+    monkeypatch.setenv("RAG_API_DIRECT_ONLY", "llm-b,unknown")
+    pool = ModelPool(config)
+    assert pool.default_id == "llm-a"
+    # No model, or an unknown one: the web's default, not the base.
+    assert pool.resolve(None) == pool.resolve("nope") == "llm-a"
+    assert pool.direct_only == {"llm-b"}
+    assert {m["id"]: m["agent"] for m in pool.describe()} == {
+        "default": True, "llm-a": True, "llm-b": False}
+    # An unknown default falls back to the base model.
+    monkeypatch.setenv("RAG_API_DEFAULT_MODEL", "nope")
+    assert ModelPool(config).default_id == "default"
+
+
+def test_a_direct_only_model_refuses_the_agent(client: TestClient) -> None:
+    service = client.app.state.service  # type: ignore[attr-defined]
+    service.models.options["llm-big"] = CONFIG.generation.model_copy(
+        update={"model": "Qwen/Qwen3-4B"})
+    service.models.direct_only = {"llm-big"}
+    error = events(client.post("/chat", json={
+        "message": "q", "agent": True, "model": "llm-big"}))[-1]
+    assert error[0] == "error" and "without the agent" in error[1]["detail"]
+    done = events(client.post("/chat", json={
+        "message": "q", "agent": False, "model": "llm-big"}))[-1]
+    assert done[0] == "done" and service.models_used == ["llm-big"]
+
+
+def test_a_model_can_move_the_retrieval_to_the_cpu(
+        client: TestClient) -> None:
+    service = client.app.state.service  # type: ignore[attr-defined]
+    moves: list[str] = []
+
+    class Module:
+        def to(self, device: str) -> None:
+            moves.append(device)
+
+    shared = Module()
+    for retriever in service.tools.router.retrievers.values():
+        retriever.embedder = type("E", (), {"model": shared})()
+        retriever.reranker = shared  # shared modules move once
+    service.retrieval_device = "cuda"
+    service.models.retrieval_device.update(
+        {"llm-big": "cpu", "default": "cuda"})
+    service.models.loaded["default"] = FakeGenerator("Qwen/Qwen3-0.6B")
+    loading: list[tuple[str, str, int]] = []
+
+    def get(model: str) -> FakeGenerator:
+        # The old LLM is gone and the retrieval moved before loading.
+        loading.append((model, service.retrieval_device,
+                        len(service.models.loaded)))
+        service.models.loaded[model] = FakeGenerator(model)
+        return service.models.loaded[model]
+
+    service.models.get = get
+    service.generator_for("llm-big")
+    service.generator_for("default")
+    assert loading == [("llm-big", "cpu", 0), ("default", "cuda", 0)]
+    assert moves == ["cpu", "cuda"]
+
+
+def test_a_full_queue_refuses_the_chat(client: TestClient) -> None:
+    service = client.app.state.service
+    service.max_queue = 1
+    service.queued = 1  # another visitor's chat is answering
+    stream = events(client.post("/chat", json={"message": "Hi"}))
+    assert stream[-1][0] == "error"
+    assert "busy" in stream[-1][1]["detail"]
+    service.queued = 0
+    stream = events(client.post("/chat", json={"message": "Hi"}))
+    assert stream[-1][0] == "done" and service.queued == 0

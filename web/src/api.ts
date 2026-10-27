@@ -20,6 +20,8 @@ export interface ModelOption {
   label: string;
   model: string;
   loaded: boolean;
+  // False: offered only without the agent (Qwen3-4B: GPU memory).
+  agent?: boolean;
 }
 
 export interface Config {
@@ -29,6 +31,8 @@ export interface Config {
   // LLMs to choose from (rag.toml profiles) and depth options (sources
   // given to the LLM; null = each domain's default).
   models: ModelOption[];
+  // The model the web starts with (the base stays Qwen3-0.6B).
+  model_default?: string;
   depths: number[];
   depth_default: number;
   agent_default: boolean;

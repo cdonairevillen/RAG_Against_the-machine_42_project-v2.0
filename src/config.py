@@ -180,6 +180,10 @@ class SourceConfig(BaseModel):
     # Extra rules appended to the system prompt when answering from this
     # domain (e.g. the CV mode's persona and secrecy rules).
     prompt_rules: str = ""
+    # Rules for one model only (its Hugging Face id), after prompt_rules:
+    # a reminder one model needs and the others do not (Phase 8, Granite
+    # and the CV's private data). The other models' prompts stay as is.
+    model_rules: dict[str, str] = Field(default_factory=dict)
     # Sources given to the LLM when answering from this domain (None:
     # the caller's k). Retrieval benchmarks are not affected.
     answer_k: Optional[int] = None

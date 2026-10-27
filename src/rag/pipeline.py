@@ -126,7 +126,8 @@ class RagPipeline:
             return RagAnswer(question, message, [], True,
                              seconds_retrieval)
 
-        rules = self.rules.prompt_rules(self.answered_domain())
+        rules = self.rules.prompt_rules(
+            self.answered_domain(), getattr(self.generator, "model_name", ""))
         start = time.perf_counter()
         if on_piece:
             pieces = []

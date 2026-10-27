@@ -58,8 +58,9 @@ Dado que vamos a hacer un frontend real, podríamos plantear la **modularizació
 - Cada fase cierra con su `changelog/FASE_N.md`: qué se ha cambiado, lista de ficheros, por qué, en qué afecta y qué debes saber de la arquitectura.
 
 ```
-Fase 0 ─► Fase 1 ─► Fase 2 ─► Fase 3 ─► [Pruebas 42] ─► Fase 4 ─► Fase 5 ─► Fase 6 ─► Fase 7
-saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web +     opcionales
+Fase 0 ─► Fase 1 ─► Fase 2 ─► Fase 3 ─► [Pruebas 42] ─► Fase 4 ─► Fase 5 ─► Fase 6 ─► Fase 7 ─► Fase 8
+saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web +     opcionales  Granite,
+                                                                                                  despliegue
                                                                   MCP       deploy    y mejoras
 ```
 
@@ -393,6 +394,52 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 
 **Nota sobre el despliegue:** en el servidor (Oracle, 2 CPU y 12 GB) lo realista es el 0.6B y quizá el 1.7B (P12). Phi-4-mini ya no es una opción: se retiró el 2026-10-27 (DEC-32). En CPU tampoco cabía (~15 GB en float32).
 
+## Fase 8 — Granite, despliegue y pruebas extra
+
+**Objetivo:** un modelo opcional de otra familia (Granite), la web desplegada en Oracle y las pruebas que quedaron aparcadas. Fase abierta el 2026-10-27, tras el commit `477bff9` (cierre de la Fase 7). Changelog en `changelog/FASE_8.md`.
+
+**Decisiones tuyas (2026-10-27):**
+- **La base sigue siendo Qwen3-0.6B:** benchmarks, CLI y comparativas con 42.
+- **En la web, el modelo por defecto pasa a ser Qwen3-1.7B**, para lucir más el RAG.
+- **Qwen3-4B vuelve a la lista de la web, pero solo con el agente desactivado.**
+- **Las limitaciones de Granite se ven midiendo**, sin descartarlo de antemano.
+- **Las decisiones las tomas tú:** yo propongo, mido y documento.
+- **El plan B del agente entra en la Fase 8** (8f). El 4B queda sin agente por la memoria de la GPU, así que no le afecta.
+- **Memoria del 4B en la web: opción A** (2026-10-27): al elegir el 4B, la búsqueda pasa a la CPU, como fuera de la web; el 4B sigue generando en la GPU. Se vigila que los tiempos no se disparen.
+- **Granite: se empieza por Granite 4.0 Micro** (`ibm-granite/granite-4.0-micro`, la densa de 3B; la híbrida es `granite-4.0-h-micro`). Se prueba con la misma matriz que los Qwen. Si funciona como debe tras tu evaluación, se sigue con él; si no, se descarta.
+- **Despliegue: desde tu ordenador, como parche** (2026-10-27). La web se sirve desde local con un túnel; Oracle y Hugging Face PRO quedan como opciones probables para el futuro (tabla de abajo).
+
+**Dato a resolver (no es una decisión, es lo medido):** el 4B tampoco cargó en el modo directo de la web, sin agente (banco abierto de `92`, `100` y `101`: *"You can't move a model that has some modules offloaded"*). Con la recuperación (`bge-m3` y el reranker) en la GPU no cabe en 12 GB (comentario de `API_MODELS` en el `Makefile`). En `gen-bench` funciona porque su perfil pone la recuperación en la CPU (`[profiles.llm-qwen3-4b.models]`). Desactivar el agente no basta: hay que decidir cómo hacerle sitio (por ejemplo, la recuperación en la CPU cuando se elige el 4B, o el 4B en la CPU). En Oracle (CPU, 12 GB) está sin medir.
+
+**Plan propuesto** (orden 8a → 8e; pendiente de tus respuestas):
+
+| Bloque | Qué | Estado |
+|---|---|---|
+| 8w — Web | Modelo por defecto de la web: 1.7B. Qwen3-4B en el selector, deshabilitado con el agente encendido. Resolver la memoria del 4B (arriba) | ✅ Implementado (`FASE_8.md` §8w): con el 4B, primer token ~3.8 s y total 4.7–8.9 s, con la búsqueda en la CPU |
+| 8a — Granite | Perfil opcional `llm-granite-*` (Apache 2.0, español entre sus idiomas; variantes de 3B densa, 3B híbrida Mamba2 y 1B). Comprobar plantilla, tokens de parada, mensaje de sistema por defecto y formato de herramientas (`<tool_call>`); después la misma matriz que los Qwen (`gen-bench`, banco abierto, `agent-bench`, eco, bucles, idioma, latencia) | 🟡 Granite 4.0 Micro medido (`FASE_8.md` §8a, matriz `110`): calidad al nivel del 4B, buen agente y cabe en la GPU con el agente; peor con las preguntas privadas del CV (sin fugas). Pendiente de tu evaluación |
+| 8b — Umbral de "about" | Recalibrar con `gate_scores` sobre el índice limpio, para recuperar about-02, 04 y 11 (DEC-39), y repetir el `route-bench` | Propuesto |
+| 8c — Pista de idioma | Opción C de DEC-36 (el idioma en el mensaje de sistema). Solo si no baja nada | Propuesto, prioridad baja |
+| 8d — Despliegue en Oracle | Latencia y memoria en CPU de los modelos de la web (P12); `make bundle` con el índice limpio (DEC-38); regenerar `deploy/stage`; tú creas la máquina, subes el bundle por `scp`, pones el `.env` y activas Pages; pruebas contra la URL real | Cuándo, por decidir (pregunta 2) |
+| 8f — Plan B del agente | Cuando el modelo no hace una llamada válida, el agente busca con la consulta anterior más la nueva (Fase 5); hoy también le pasa esa mezcla al modelo, y el 0.6B responde a las dos preguntas juntas (`FASE_6.md`). Mejora: buscar con la mezcla y responder solo a la pregunta original. Se mide con `agent-bench` (0.6B y 1.7B) antes de adoptarlo; si funciona, se valora volver a encender el agente en la web | Entra (decisión tuya) |
+| 8e — Pruebas extra | Candidatas: MRR y nDCG@10, juez de Groq sobre el CV (P11), prueba de carga del servidor, volver a medir el chunker de LangChain | Cuáles, por decidir (pregunta 3) |
+
+**Preguntas abiertas:**
+1. ~~Granite~~ → Granite 4.0 Micro.
+2. ~~Despliegue~~ → desde local con un túnel, como parche; Oracle y Hugging Face PRO, más adelante.
+3. ~~Pruebas extra~~ → las mismas que con los Qwen, para evaluar Granite.
+4. ~~Plan B del agente~~ → entra (8f).
+5. ~~Memoria del 4B en la web~~ → opción A.
+
+**Despliegue: tres opciones a valorar** (sin decidir; lo que sigue es lo comprobado el 2026-10-27, con lo que falta por confirmar):
+
+| Opción | A favor | En contra / a confirmar |
+|---|---|---|
+| Oracle Cloud Always Free (DEC-19) | Gratis; 2 CPU ARM y 12 GB; ya preparado (`deploy/`) | Solo CPU (0.6B y quizá 1.7B; el 4B y Granite 3B, sin medir y difíciles en 12 GB). Crear la máquina puede fallar por falta de capacidad (*"Out of capacity"*, `deploy/README.md`) |
+| Servir desde tu ordenador (la 3080 Ti) con un túnel (por ejemplo, Cloudflare Tunnel) | Gratis; GPU, así que todos los modelos de la web (1.7B por defecto, 4B, Granite); sin abrir puertos del router | La web solo funciona con tu ordenador encendido; tu conexión limita el tráfico; los túneles rápidos cambian de URL en cada arranque (para una URL fija hace falta un dominio en Cloudflare); exponer tu máquina pide revisar la seguridad de la API |
+| Hugging Face PRO | Plataforma conocida por los recruiters | **De pago** (unos 9 $/mes según varias fuentes de 2026, sin confirmar en la página oficial), y choca con "no quiero gastar dinero" de `PLANING.md`. Lo que da PRO es sobre todo cuota de ZeroGPU; **falta confirmar** si ZeroGPU sirve para un Space de Docker como el nuestro y qué cuesta el hardware de un Space de Docker desde julio de 2026 (DEC-19) |
+
+Regla de siempre: cada paso se mide por separado, 42 no puede empeorar y las preguntas de prueba se citan por identificador (DEC-39).
+
 ---
 
 # Decisiones pendientes #
@@ -407,7 +454,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 | P3 | ~~Dominios nuevos~~ → resuelto: XQuAD (cultura general, en/es) y después MLQA | Hecho |
 | P4 | ~~Modularización: qué opciones se exponen en la web~~ → resuelto en la revisión de la Fase 6: filtros de dominio, agente sí/no, modelo y profundidad | Hecho |
 | P11 | ~~Juez de las respuestas del CV (Fase 7b)~~ → resuelto (2026-10-24, decisión tuya): **Groq**, también con las preguntas del CV, hasta agotar los tokens gratuitos. Si hace falta, se repite con Qwen3-4B como juez local | Hecho |
-| P12 | LLM del servidor: el 0.6B (la base) o el 1.7B (mejor agente; su latencia en CPU está sin medir). En Oracle, el 1.7B cabría en memoria (estimado ~9.5 GB de 12) | Antes del despliegue |
+| P12 | LLM del servidor: el 0.6B (la base) o el 1.7B (mejor agente; su latencia en CPU está sin medir). En Oracle, el 1.7B cabría en memoria (estimado ~9.5 GB de 12). **Avance (2026-10-27, decisión tuya):** en la web, el 1.7B por defecto y el 4B solo sin agente (Fase 8); falta medir la latencia y la memoria en la CPU de Oracle | Fase 8 (8d) |
 | P5 | ~~GPU de los ordenadores de 42~~ → resuelto: no aceptan CUDA (vLLM tarda ~10 h en indexarse). Se descarta indexar en 42 y el proyecto se sirve en línea | Hecho |
 | P10 | Hugging Face Datasets: usarlos como fuente de la ingesta y alojar allí los nuestros (los de 42, los derivados multimedia y quizá el índice). Falta revisar si la licencia de los datasets de 42 permite publicarlos. **Avance (2026-10-24):** con Oracle, el índice preconstruido va por `scp` a la máquina (DEC-19); el dataset **privado** de HF (DEC-09) queda como alternativa. Publicar los datasets de 42 sigue sin hacerse: la licencia no está revisada | A desarrollar; antes de la Fase 6 (despliegue) o de la 4c si se retoma |
 | P6 | Proveedor de la key gratuita para el juez LLM | Antes de la Fase 3 |
@@ -463,4 +510,5 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-26**: segunda sesión autónoma (DEC-27 a DEC-31): forma de las respuestas (cortadas, eco de Phi, bucles largos). Medido contra la línea base `90`: los Qwen idénticos y Phi mejor en todos sus casos; 42 idéntico. Checkpoint por petición tuya, con los pros y contras de volver atrás en `decisions.md` para discutirlo. Ver `changelog/FASE_7.md` §7b.7.
 - **2026-10-27**: tercera sesión autónoma (DEC-32 a DEC-38), sobre el commit `644c455`: limpieza en lugar de volver atrás (decisión tuya). Phi-4-mini retirado, trampas de enrutado quitadas, filtro de idioma de "about" encendido y toda la documentación sincronizada (también la traducción al inglés, que estaba parada en `8ff05d0`). Los Qwen, idénticos en vLLM, XQuAD y CV; 42 idéntico (`97-final`). Sin commits. Ver `changelog/FASE_7.md` §7b.8.
 - **2026-10-27**: **Fase 7 cerrada** (decisión tuya). Lo pendiente pasa a la Fase 8: Granite, despliegue y pruebas extra.
+- **2026-10-27**: **Fase 8 abierta** tras el commit `477bff9`. Decisiones tuyas: la base sigue siendo el 0.6B; en la web, el 1.7B por defecto y el 4B de vuelta, solo con el agente desactivado; las limitaciones de Granite se ven midiendo. El 4B no cabe en la GPU con la recuperación ni siquiera sin agente (medido): queda por resolver cómo hacerle sitio. Plan y preguntas abiertas en la Fase 8.
 - **2026-10-27**: fuera de la documentación indexada las citas de preguntas de prueba y de respuestas incorrectas (decisión tuya, DEC-39): la búsqueda devolvía esas notas en lugar de la respuesta. Lo literal se guarda en `RESPUESTAS_ARCHIVADAS.md`, excluido de "about". Ver `changelog/FASE_7.md` §7b.9.
