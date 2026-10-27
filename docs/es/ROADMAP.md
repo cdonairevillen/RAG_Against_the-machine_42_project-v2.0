@@ -10,6 +10,7 @@ Planificación del roadmap de la mejora del proyecto RAG. Todo lo que se discuta
 - `BENCHMARK_REPORT.md`: comparativa de modelos y configuraciones (se crea en la Fase 2).
 - `decisions.md`: decisiones tomadas por necesidad, con sus opciones.
 - `README.md`: traducción al español del README del proyecto.
+- `RESPUESTAS_ARCHIVADAS.md`: las preguntas de prueba y las respuestas incorrectas al pie de la letra, fuera del índice de "about" (DEC-39). Los demás documentos las nombran por su identificador (`A-NN`, `about-NN`, `L-N`). No se traduce.
 
 **Versión en inglés** (`docs/`, sin el `es/`): traducción de `ROADMAP.md`, `BENCHMARK_REPORT.md`, `decisions.md` y los changelogs, para GitHub y los recruiters. **Se trabaja en español** y la traducción se actualiza **al cerrar cada fase**. `PLANING.md`, `RESPUESTA.md` y `Elements_frontend.md` no se traducen (planteamiento inicial y notas de trabajo).
 
@@ -183,7 +184,7 @@ saneam.   ingesta   híbrido   generac.    checkpoint     modos    agente+   web
 > - **Prompt nuevo:** chat template oficial, citas `[n]`, idioma de la pregunta (ES: 90–100 %) y presupuesto en tokens (B9).
 > - **B15 resuelto:** filtro con el reranker; rechaza el 100 % de lo claramente ajeno.
 > - **Flujo único** (`src/rag.py`) para CLI, web y benchmark, con streaming.
-> - **LLM:** Qwen3-0.6B como base; Qwen3-1.7B, Qwen3-4B y Phi-4-mini como perfiles (SmolLM3 descartado).
+> - **LLM:** Qwen3-0.6B como base; Qwen3-1.7B, Qwen3-4B y Phi-4-mini como perfiles (SmolLM3 descartado). Phi-4-mini se retiró en la Fase 7 (DEC-32).
 > - Evaluadores agrupados en `src/evaluation/`.
 
 ## Pruebas 42 — Checkpoint
@@ -344,6 +345,8 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 
 **Objetivo:** pulir lo que ha salido al usar la web y recoger los opcionales aparcados. Fase abierta el 2026-10-24, tras el commit `3378494`. Changelog en `changelog/FASE_7.md`.
 
+> ✅ **Cerrada (2026-10-27, decisión tuya).** Hecho: 7a completo y 7b hasta §7b.9 (detector de bucles, limpieza del eco, filtro de idioma de "about", solo Qwen y sin trampas, y documentación sin citas de preguntas de prueba). 42 idéntico (docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88; `97-final` y `route-bench` `102`). **Pasa a la Fase 8:** Granite como modelo de otra familia (DEC-32), el despliegue en Oracle (rehacer el bundle antes, DEC-38), el umbral de "about" (DEC-39), la pista de idioma C (DEC-36) y las pruebas extra. Quedan aparcados 7c (visual), el plan B del agente, la regla de formato, el juez del CV y 7d.
+
 ### 7a — Dominio "about": el proyecto habla de sí mismo (lo primero)
 1. **Reescribir el `README.md`** (pendiente desde la Fase 0), pensado para GitHub y los recruiters. Será la fuente principal del dominio. Se revisa contigo antes de indexarlo.
 2. **Fuente `about` en `rag.toml`:**
@@ -371,10 +374,12 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - 🟡 **Libertad de longitud** (petición tuya, 2026-10-24): dejar que el LLM escriba lo que necesite sin quedarse en bucle. ✅ **Detector de bucles integrado** (`src/rag/loops.py`, `FASE_7.md` §7b.2): para la generación cuando el modelo empieza a repetir líneas o frases casi iguales. 0 falsos positivos en 11.550 respuestas, y los bucles de Phi pasan de 1.500 tokens a 419–661. Límite de la web subido a 1.024 tokens para todos los modelos (decisión tuya), ahora solo como red de seguridad.
 - **Agente desactivado por defecto en la web** (decisión tuya, 2026-10-24), marcado como trabajo en curso hasta mejorar el plan B.
 - ✅ **Respuestas que copian el prompt** (noche del 24 al 25, `FASE_7.md` §7b.3, DEC-21/22). Los prompts nuevos empeoraban las citas y el idioma, así que el prompt no cambia. Se limpian las respuestas: eco a 0 en las 4.662 respuestas medidas, sin perder ninguna.
-- ⏸️ **Fuentes de "about" en un solo idioma** (§7b.4, DEC-23): implementado y desactivado. Muy bueno para el 0.6B (EN contiene 0.44 → 0.61), peor en citas para los opcionales. **A decidir por ti.**
-- ✅ **Preguntas que nombran el proyecto** (§7b.5, DEC-24): "este rag", "this project"… van a "about" sin pasar su filtro (8 de 8; antes, 0), y el nombre del autor manda al CV.
-- 🟡 **Qué documentación ve "about"** (§7b.6, DEC-25): al crecer la documentación, la generación de "about" baja. Se ha restaurado el índice anterior; antes del despliegue hay que decidir qué partes nuevas se marcan con `about:skip`.
-- ✅ **Forma de las respuestas** (§7b.7, DEC-27 a DEC-31, sesión del 25 al 26): banco de preguntas abiertas como en la web, detector de bucles con ventana 12 y bloques repetidos, y reintento cuando Phi copia las fuentes. El 0.6B, el 1.7B y el 4B quedan idénticos; Phi pasa de 2 respuestas cortadas y 1 con eco a ninguna. Queda "Hablame sobre este rag" (las fuentes que llegan son pobres) y el índice de "about" (DEC-25). Pros y contras de volver a una versión anterior, al final de `decisions.md`.
+- ✅ **Fuentes de "about" en un solo idioma** (§7b.4, DEC-23): implementado y desactivado la noche del 24 al 25; **activado** el 2026-10-27 (§7b.8, DEC-34, decisión tuya).
+- ~~**Preguntas que nombran el proyecto**~~ (§7b.5, DEC-24): frases fijas que nombran el proyecto iban a "about" sin pasar su filtro, y el nombre del autor mandaba al CV. **Retirado** el 2026-10-27 (§7b.8, DEC-33, decisión tuya: eran trampas), aunque empeoren las preguntas poco concretas.
+- ✅ **Qué documentación ve "about"** (§7b.6, DEC-25): al crecer la documentación, la generación de "about" bajaba y se restauró el índice anterior. El 2026-10-27 se **reindexa** con la documentación sincronizada y sin la ficha antigua del Space (§7b.8, DEC-37). Marcar el historial con `about:skip` sigue siendo una opción tuya.
+- ✅ **Forma de las respuestas** (§7b.7, DEC-27 a DEC-31, sesión del 25 al 26): banco de preguntas abiertas como en la web, detector de bucles con ventana 12 y bloques repetidos, y reintento cuando Phi copia las fuentes. El 0.6B, el 1.7B y el 4B quedan idénticos; Phi pasa de 2 respuestas cortadas y 1 con eco a ninguna. Queda la pregunta abierta A-01, que pide hablar del RAG sin nombrarlo (las fuentes que llegan son pobres) y el índice de "about" (DEC-25). Pros y contras de volver a una versión anterior, al final de `decisions.md`. El reintento se retiró con Phi (DEC-32).
+- ✅ **Solo Qwen, sin trampas** (§7b.8, DEC-32 a DEC-38, sesión del 26 al 27, decisiones tuyas): fuera Phi-4-mini y su reintento, fuera `route_names` y la pista del nombre del autor, filtro de idioma de "about" encendido, `strip_echo` se queda (también actúa con los Qwen) y la pista de idioma en el prompt **no** se adopta (empeoraba el idioma del 0.6B). Documentación sincronizada en los dos idiomas y "about" reindexado. 42 idéntico. El historial dentro de "about" se resuelve en §7b.9.
+- ✅ **Fuera las citas de preguntas de prueba y respuestas incorrectas** (§7b.9, DEC-39, 2026-10-27, decisión tuya): los documentos indexados nombran las preguntas por su identificador (`A-NN`, `about-NN`, `L-N`) y lo literal pasa a `RESPUESTAS_ARCHIVADAS.md`, fuera del índice. El banco abierto deja de citar el historial (antes, 7 de 12 preguntas del proyecto). El `gen-bench` y el `route-bench` de "about" bajan en tres preguntas que solo pasaban el filtro gracias a su propia cita. **Propuesto para la Fase 8:** recalibrar el umbral de "about".
 
 ### 7c — Visual
 - Tarjetas de recall flotantes que giran al pasar de una a otra.
@@ -386,7 +391,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **Módulo de textos propios:** relatos del autor, como parte del modo CV o como dominio aparte.
 - ~~**`repetition_penalty`**~~ → **descartado** (2026-10-24, decisión tuya): en sus bucles, Phi-4-mini cambia palabras en cada vuelta, así que penalizar la repetición no los corta. La plantilla oficial y los tokens de parada se comprobaron y están bien (`FASE_7.md` §7b.1).
 
-**Nota sobre el despliegue:** Phi-4-mini no cabe en el Space gratuito (en CPU, en float32, ocuparía ~15 GB, y además está la búsqueda). Incluso cargado a media precisión, tardaría minutos por respuesta en 2 CPU (estimado, sin medir). En el Space, lo realista es el 0.6B y quizá el 1.7B. Phi sigue siendo una opción en local.
+**Nota sobre el despliegue:** en el servidor (Oracle, 2 CPU y 12 GB) lo realista es el 0.6B y quizá el 1.7B (P12). Phi-4-mini ya no es una opción: se retiró el 2026-10-27 (DEC-32). En CPU tampoco cabía (~15 GB en float32).
 
 ---
 
@@ -456,3 +461,6 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **2026-10-24**: **despliegue en Oracle Cloud Always Free** en lugar de Hugging Face, que desde julio de 2026 cobra por los Spaces de Docker. Separado de Google Cloud (decisión tuya). Medido: 5.0 GB de pico de RAM con 2 CPU y 12 GB (DEC-19, `deploy/README.md`).
 - **2026-10-25**: sesión autónoma nocturna (decisiones DEC-20 a DEC-26). Limpieza del eco, preguntas que nombran el proyecto y filtro de idioma (desactivado). Todo medido contra una línea base de los cuatro modelos; 42 idéntico. Sin commits. Ver `changelog/FASE_7.md` §7b.3–7b.6.
 - **2026-10-26**: segunda sesión autónoma (DEC-27 a DEC-31): forma de las respuestas (cortadas, eco de Phi, bucles largos). Medido contra la línea base `90`: los Qwen idénticos y Phi mejor en todos sus casos; 42 idéntico. Checkpoint por petición tuya, con los pros y contras de volver atrás en `decisions.md` para discutirlo. Ver `changelog/FASE_7.md` §7b.7.
+- **2026-10-27**: tercera sesión autónoma (DEC-32 a DEC-38), sobre el commit `644c455`: limpieza en lugar de volver atrás (decisión tuya). Phi-4-mini retirado, trampas de enrutado quitadas, filtro de idioma de "about" encendido y toda la documentación sincronizada (también la traducción al inglés, que estaba parada en `8ff05d0`). Los Qwen, idénticos en vLLM, XQuAD y CV; 42 idéntico (`97-final`). Sin commits. Ver `changelog/FASE_7.md` §7b.8.
+- **2026-10-27**: **Fase 7 cerrada** (decisión tuya). Lo pendiente pasa a la Fase 8: Granite, despliegue y pruebas extra.
+- **2026-10-27**: fuera de la documentación indexada las citas de preguntas de prueba y de respuestas incorrectas (decisión tuya, DEC-39): la búsqueda devolvía esas notas en lugar de la respuesta. Lo literal se guarda en `RESPUESTAS_ARCHIVADAS.md`, excluido de "about". Ver `changelog/FASE_7.md` §7b.9.

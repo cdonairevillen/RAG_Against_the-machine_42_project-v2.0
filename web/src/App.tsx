@@ -15,7 +15,6 @@ const MODEL_NOTES: Record<string, string> = {
   default: "Base model · fastest",
   "llm-qwen3-1.7b": "Better answers · a bit slower",
   "llm-qwen3-4b": "Best agent · slowest",
-  "llm-phi4-mini": "Microsoft · alternative family",
 };
 
 function depthLabel(depth: number): string {

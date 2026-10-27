@@ -262,7 +262,7 @@ browser ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) ─
 
 **Measured before deciding:**
 - With 6 complex questions and no practical limit, the longest valid answer was **464 tokens** (Phi-4-mini with 10 sources). The 1.7B did not go beyond 321.
-- Phi-4-mini went into a **loop** once with the "vLLM step by step": from step ~20 it repeats a template and makes up options (`--response-func`…) until it uses up the limit.
+- Phi-4-mini went into a **loop** once with L-3, a vLLM step-by-step (`docs/es/RESPUESTAS_ARCHIVADAS.md`): from step ~20 it repeats a template and makes up options until it uses up the limit.
 - **An automatic loop detector is not reliable:** a rule of "stop if the same sequence of N words repeats" fires on 32 of 3,933 good saved answers (code, lists…), and Phi's loop only repeats its sequence 5 times.
 - **Penalising repetition** would change every answer and force rerunning `gen-bench`. Discarded for now.
 

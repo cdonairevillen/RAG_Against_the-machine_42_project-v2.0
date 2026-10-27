@@ -1,8 +1,10 @@
-# Decisions taken out of necessity (autonomous session, 2026-10-23/24)
+# Decisions taken out of necessity (autonomous sessions)
 
 > English translation of [`es/decisions.md`](es/decisions.md), the working version. Updated at the end of each phase.
 
-The brief: finish Phases 5 and 6 up to the point of deployment while the author was asleep. This document records the decisions taken without consulting him, with the options considered and why each one was chosen, so they could be reviewed together.
+Four sessions: 2026-10-23/24 (DEC-01 to DEC-18), the night of 2026-10-24/25 (DEC-20 to DEC-26), 2026-10-25/26 (DEC-27 to DEC-31) 2026-10-26/27 (DEC-32 to DEC-38) and the morning of 2026-10-27 (DEC-39, at the end). DEC-19 (Oracle) was decided with the author.
+
+The first brief: finish Phases 5 and 6 up to the point of deployment while the author was asleep. This document records the decisions taken without consulting the author, with the options considered and why each one was chosen, so they could be reviewed together.
 
 **How to read it:**
 - **Chosen:** the option applied.
@@ -34,7 +36,7 @@ The author proposed unifying `data/` and `bench/`; this decision chose the direc
 
 ## DEC-03 — Safety nets for the agent (the author's two proposals, bounded)
 
-The author approved the first one ("if the rewrite finds nothing, search the original question"). He bounded the second one: never go beyond the filter the user chooses.
+The author approved the first one ("if the rewrite finds nothing, search the original question"). The author bounded the second one: never go beyond the filter the user chooses.
 
 | Option | Pros | Cons |
 |---|---|---|
@@ -100,7 +102,7 @@ The API serialises generation with a lock. With a single LLM on a free CPU, gene
 | C. Build a "deployment" index with the text already masked | Nothing sensitive anywhere | Goes against the author's decision not to alter the material ("index it as it is") and means maintaining two indices |
 | D. Index when the Space starts | No bundle | Hours on a CPU with `bge-m3` |
 
-**Why A:** it meets both privacy and the author's reproducibility criterion. The files carry SHA256 checksums, checked on restore. `deploy/bundle/` is in `.gitignore`. **Pending the author's decision:** if he prefers C (more cautious), it is a bounded change.
+**Why A:** it meets both privacy and the author's reproducibility criterion. The files carry SHA256 checksums, checked on restore. `deploy/bundle/` is in `.gitignore`. **Pending the author's decision:** if the author prefers C (more cautious), it is a bounded change.
 
 ## DEC-10 — Qdrant in the deployment: a server inside the container
 
@@ -174,3 +176,620 @@ The repo had no `LICENSE`. The Space card had `license: mit`, and **it was remov
 ## DEC-18 — Fictitious example data
 
 The examples in the tests and in the masking comments (`src/rag/domain_rules.py`, `tests/test_domain_rules.py`, `tests/test_api.py`) use fictitious data. The masking pattern is generic, so the behaviour does not change. Checked: neither the code nor `deploy/stage/` (what is uploaded to the Space) contains personal data.
+
+## DEC-19 — Deployment platform: Oracle Cloud Always Free (2026-10-24, the author's decision)
+
+**Problem:** since July 2026, Hugging Face requires a paid plan (PRO) to create Docker or Gradio Spaces; only static ones are free. The Phase 6 plan (a Docker Space on free CPU) stops being free. Google Cloud is also out: it already runs another service of the author's, and the author wants separate environments.
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. An Oracle Cloud Always Free ARM VM (2 OCPU, 12 GB, 200 GB of disk) with Docker + Caddy** ✅ | Free and always on; the same image as the Space; separate from Google | Needs a card for verification; ARM capacity is sometimes unavailable; the speed on ARM is not measured |
+| B. The author's PC + Cloudflare Tunnel | Free, with a GPU | Only works while the PC is on |
+| C. Google Cloud Run | The account already exists | The free quota gives few hours with 8–16 GB of RAM; it mixes with the other service |
+| D. Hugging Face PRO | What was prepared works unchanged | $9/month |
+
+**Measured to choose A:** the image with `--cpus=2 --memory=12g` takes 4.2 GB after loading and 5.0 GB at peak while answering. `uv.lock` has torch for `aarch64`, so the image is built on the ARM machine.
+
+**Changes to DEC-08 and DEC-09:**
+- **DEC-08:** the container still serves the API and the web, and Pages is still optional. Caddy goes in front and provides HTTPS (needed for Pages to call the API), with a free DuckDNS subdomain.
+- **DEC-09:** the bundle is copied to the machine with `scp` and mounted into the container. The private Hugging Face dataset is no longer needed, although `entrypoint.sh` still accepts it.
+
+**Files:** `deploy/oracle/` (`compose.yml`, `Caddyfile`, `.env.example`) and the guide `deploy/README.md` (in Spanish). `make space-stage` includes `deploy/oracle/`.
+
+**Reversible:** yes. `deploy/space/` is untouched, for a paid Space.
+
+---
+
+# Autonomous session 2026-10-24/25 (night)
+
+The brief: fix what the author saw in the web with Phi-4-mini (answers that copy the sources, A-02 sent to vLLM, "about" sources mixing languages), with a free hand and one rule: **no case may get worse than before**. No commits. Everything is measured against a baseline taken at the start, with the code of commit `02ff464` (`80-*`, `gen-bench` of the four models). Details in `changelog/FASE_7.md` §7b.3–7b.5.
+
+**Summary:**
+
+| DEC | What | Status |
+|---|---|---|
+| 20 | Measure before touching: an `about` suite and the `echo` and `bad_citation` metrics in `gen-bench` | ✅ Applied |
+| 21 | Prompt: `v3` is kept; the new prompts (`v4`, `v6`) are dropped and `v5` is not tested | ✅ Applied (nothing changes) |
+| 22 | Echo: clean the answer (`strip_echo`) instead of changing the prompt | ✅ Applied |
+| 23 | Language filter in "about" | ⏸️ Implemented and **disabled** for the author to decide (turned on in DEC-34) |
+| 24 | Questions that name the project (`route_names`) and the author's name for the CV | ✅ Applied (removed in DEC-33) |
+| 25 | "About" index: the baseline one is restored, not re-indexed with the new documentation | ✅ Applied, provisional (replaced in DEC-37) |
+| 26 | What was left untouched | — |
+
+## DEC-20 — Measure before touching
+
+`gen-bench` had no suite for "about" and no way to count answers that copy the prompt.
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Add the `about` suite (18 EN + 18 ES questions) and two metrics: `echo` (the answer copies a `--- file:` header, a `SOURCES:`/`QUESTION:`/`ANSWER:` label or the closing instruction) and `bad_citation` (citations like `[text](1)`)** ✅ | Turns the author's two examples into numbers comparable across models and versions | Only the measuring tool changes |
+| B. Try the author's two questions by hand | Fast | Does not tell whether a fix breaks something else |
+
+**Baseline (`80-*`):** the echo shows up in 16% of Phi's answers on vLLM docs, 17% of its English "about" answers, 10% of the 0.6B's CV answers (EN) and 3% of the XQuAD ones (EN). No malformed citation in the benchmarks: the `[langchain](1)` case came from an open question that is not in them.
+
+**Reversible:** yes, although there is no reason to: it does not touch the system.
+
+## DEC-21 — Prompt: `v3` is kept
+
+The author's first case (Phi copying the sources) pointed at the prompt: the user message ended with an instruction ("Answer in English, citing the sources by number."), and the 0.6B sometimes repeated it verbatim. Three variants were tested, each with the full matrix (0.6B on vllm, xquad, cv and about; 1.7B, Phi-4-mini and 4B on vllm, cv and about):
+
+| Option | What changes | Result (vs `80`) |
+|---|---|---|
+| **A. `v3`, the current one** ✅ | Nothing | — |
+| B. `v4` | The language and a "do not copy the sources or these rules" rule move to the system message; the user message ends with the question | **112 drops.** The models stop citing (0.6B on vLLM docs: "cites" 0.90 → 0.16), and the right language and "contains the answer" go down. Phi's echo on about/en does fall from 0.17 to 0 |
+| C. `v6` | `v3` untouched plus only the anti-copy rule | **75 drops**, and the echo does not even fall |
+| D. `v5` | `v4` plus "ignore the sources that do not answer" (against summaries of every source) | **Not tested:** it contains the `v4` change that breaks citations |
+
+**Why A:** with these small models, any change to the prompt moves the answers in every direction, and the no-worse rule rules out every variant tested. The closing instruction is exactly what makes them cite and answer in the right language. The echo is handled another way (DEC-22). The code of the styles was removed so as not to leave dead options; the results stay in `bench/results/gen/81-*` and `82-*`.
+
+**Reversible:** the variants can be rebuilt from the changelog.
+
+## DEC-22 — Echo: clean the answer
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. `strip_echo` in `clean_output` (for every answer): keep what follows the last `ANSWER:`; drop the repeated instruction; if the answer opens by copying a source, keep its text without the header and cite it as `[n]`; other headers become `[n] (path)`** ✅ | Only answers with an echo change. Measured on the stored answers of the three matrices (4,662): 25, 35 and 78 change, the echo goes to 0 and **none loses the reference answer** (F1 goes up) | If Phi copies all 5 sources and runs out of tokens before writing `ANSWER:`, the text of the sources remains without headers: better than before, but not an answer |
+| B. Change the prompt | Would address the cause | Ruled out by the data (DEC-21) |
+| C. Detect the echo when generation starts, stop and retry | Would avoid spending tokens on copying | Doubles the time exactly in the bad cases, and the retry may copy again. Not implemented (later DEC-29) |
+
+**Why A:** it is the only option measured without losses. The author's example, A-04 with Phi, becomes *"RAG against the Machine is a multi-domain Retrieval-Augmented Generation system with an agent, an MCP server, and a web interface. …"*.
+
+**Reversible:** yes, one line in `clean_output`.
+
+## DEC-23 — Language filter in "about": implemented and disabled
+
+For an English question, 2 of the 5 sources came out in Spanish: the same content in `docs/` and in `docs/es/`.
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Filter in both languages: if a file has a translation, the question only gets the copy in its language | Context in a single language | Loses Spanish answers: sometimes the retrieved English section holds the answer and the retrieved Spanish section is another one ("contains the answer" ES @5: 0.94 → 0.83) |
+| B. Filter English questions only | Better English "about" retrieval (R@3 0.44 → 0.50, R@5 0.50 → 0.56; sources in the other language 16 → 3 of 90); Spanish identical. Generation with the 0.6B: EN contains 0.44 → **0.61** | With the 1.7B, Phi and the 4B, correct citations go down in EN (for example, Phi 0.33 → 0.17), and Phi and the 4B say "not found" a bit more (0.17 → 0.28, 0.22 → 0.28) |
+| **C. Keep B implemented and disabled** ✅ | Meets the no-worse rule | The author's complaint (mixed sources) remains until it is turned on |
+
+**Why C:** B clearly improves the base model, the one to be deployed (P12), but worsens some metrics of the optional models, and that night's rule did not allow it. To turn it on, uncomment `translations` and `translation_languages` in `[sources.about]` of `rag.toml`; no re-indexing needed. **Recommendation:** turn it on if the server uses the 0.6B. *(Turned on in DEC-34.)*
+
+**Reversible:** yes, two lines of `rag.toml`.
+
+## DEC-24 — Questions that name the project or the author
+
+A-02 went to vLLM (1.04 vs −1.85 for "about"). Even if it had gone to "about", its gate (−1.0) would have rejected it.
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. `route_names`: expressions that name the domain unambiguously ("rag against the machine", "este/esta/tu rag, proyecto, sistema, chatbot, asistente, web, aplicación", "this/your rag, project, system, chatbot, assistant, website, app"). The domain wins and its gate does not apply, since the question is explicitly about it. "The project" and "el proyecto" stay as a weak hint (they must pass the threshold)** ✅ | The 8 test questions that name the project reach "about" and get an answer; **all 8 failed before** (4 "not found", 4 to vLLM, XQuAD or CV). Checked: no question of the other benchmarks matches | An absurd question that names the project reaches the LLM, which will say it cannot find it |
+| B. Lower the "about" threshold | Simple | Lets more unrelated questions through (measured in §7a.7) |
+| C. Add that way of naming the RAG to the weak hints | Minimal | Not enough: −1.85 does not pass the threshold |
+
+**Also, the author's name for the CV** (weak hint `chrystian|donaire`). After re-indexing "about", a CV question about the contact e-mail went to "about" (which answered it with code) instead of the CV. With the hint, if the question names the author and the CV passes its threshold, the CV wins. Only CV questions match (27 of 30 per language).
+
+**Result:** final route-bench (`85-night-final`) with the same routing as the commit on every set (42 0.99, XQuAD 0.981 / 0.975, CV 0.967 / 0.967, about 0.778 / 0.889). The only difference: XQuAD/ES R@1 0.9059 → 0.9050, one question one position down, because of Qdrant's approximate vector search after restoring the bundle (DEC-25), which is what the server will load.
+
+**Reversible:** yes, `rag.toml`. *(Removed in DEC-33.)*
+
+## DEC-25 — "About" index: the baseline one
+
+When "about" was re-indexed that night, ~35 new fragments came in: the documentation written on the 24th (§7a.8 tables with CV questions, `DETECTOR_BUCLES.md`, `loops.py`…). With that index, **without any code change**, "about" generation fell compared with the baseline (for example, the 1.7B in ES "contains" 0.67 → 0.56) and one Spanish "about" question changed domain.
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Restore the baseline index (from `deploy/bundle`, SHA256 checked) and not re-index "about" that night** ✅ | The next morning, exactly the previous day's state plus the code improvements | The day's documentation stays out of "about" until it is re-indexed |
+| B. Keep the new index | "About" knows the latest | Breaks the rule |
+| C. Mark the new competing parts with `about:skip` | Would fix the cause | It means deciding what documentation "about" sees, which is the author's call |
+
+**Why A:** that night's rule. But the underlying problem stays open: **"about" gets worse as the documentation grows**, because the changelogs repeat facts and quote questions. What goes in (option C) has to be decided before deployment. *(Resolved in DEC-37.)*
+
+**Already prepared, with no effect until re-indexing:** `deploy/space/README.md` leaves "about" (`exclude_paths`). It is the old Space card and says false things (that the agent is on by default).
+
+**Reversible:** yes, `make index SOURCE=about`.
+
+## DEC-26 — What was left untouched
+
+- **Phi's malformed citations** (a Markdown link instead of `[n]`) and **the contradictory ending** (saying there is no information after answering; verbatim in `docs/es/RESPUESTAS_ARCHIVADAS.md`). They came from the author's open question, not from the benchmarks (`bad_citation` = 0). The natural fix was the `v5` rule, which inherits the `v4` problem. Left to measure with more open questions.
+- **L-3** (a vLLM step-by-step in a few words; `docs/es/RESPUESTAS_ARCHIVADAS.md`), which goes to "about" (3.13 vs 2.09). It is a short, ambiguous question; phrased completely, it goes to vLLM.
+- **Retrying when an echo is detected** (DEC-22 C).
+- **Commits:** none, as requested.
+
+## Where everything stands (final check, `85-*`)
+
+| Check | Result |
+|---|---|
+| 42 `make bench` | **Identical:** docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88 |
+| Route-bench | Same as the commit (see DEC-24) |
+| `gen-bench` of vllm, xquad and cv | Generation identical to `80` (same prompt and same indices) plus the echo cleaning: the echo goes to 0 and no answer is lost |
+| `gen-bench` of about, the four models | Identical to `80`, with the echo at 0. The only difference: Phi on about/en, language 1.00 → 0.93, because one cleaned answer is left as a code fragment whose language cannot be detected (the content is the same) |
+| The 8 questions that name the project | 8 of 8 in "about", and answered (before, 0) |
+| Tests | 122; flake8 and mypy clean |
+
+# Autonomous session 2026-10-25/26
+
+The brief: Phi-4-mini still copied sources with A-01 and A-04 (the second one also cut off), and the 0.6B gave no answer at all to the first. The goal: answers correct in form and content (no rambling, no cut sentences). Same rule: **no case may get worse**. No commits during the session; a checkpoint at the end, at the author's request. Details in `changelog/FASE_7.md` §7b.7.
+
+**Summary:**
+
+| DEC | What | Status |
+|---|---|---|
+| 27 | Measure the form as in the web: `cut` and `tokens` metrics and a bank of 34 open questions | ✅ Applied |
+| 28 | Loop detector: window 8 → 12 | ✅ Applied |
+| 29 | Retry when Phi copies the sources | ✅ Applied, prudent variant (removed in DEC-32) |
+| 30 | Repeated blocks in the loop detector | ✅ Applied |
+| 31 | What was left untouched | — |
+
+First, a fix with no options: the cleaning of the repeated instruction (DEC-22) swallowed the 0.6B's whole answer to A-01 (the pattern crossed the colon). Now it does not cross it, and if it leaves the answer empty, the original is returned. 0 changes in the 4,662 stored answers.
+
+## DEC-27 — Measure the form as in the web
+
+The benchmarks did not see the author's cases. `gen-bench` uses single-domain questions and did not count cut answers, and the web goes another way (every domain, 1,024 tokens, trimming with " …").
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. `cut`, `tokens` and `tokens_max` metrics in `gen-bench` + a bank of 34 open questions through `RagService.chat` (the web's path) for the four models** ✅ | The author's cases and the web examples become comparable numbers; it detects cut answers, echo, loops, repeated sentences, empty answers and language | The open bank lives in `data/output/night2/` (ignored by git): it is a tool of the session, not of the project |
+| B. Try it by hand in the web | The most faithful | Does not scale, and does not tell what gets worse |
+
+**Baseline `90-*`:** the `gen-bench` matrix at 1,024 tokens + the open bank. In the open bank, Phi has 2 cut answers, 1 with an echo, 4 with repeated sentences and a maximum of 1,016 tokens. The 0.6B, the 1.7B and the 4B have no cut answers and no loops.
+
+**Reversible:** yes; it only measures.
+
+## DEC-28 — Loop detector: window 8 → 12
+
+A Phi loop of 4 repeated sentences reached the 1,024 tokens: with 8 units there are never 5 copies in the window.
+
+| Option | False positives (14,261 answers + 299 documents) | Loops detected |
+|---|---|---|
+| Window 8, 5 repeats (before) | 0 | 3 of 7 |
+| **Window 12, 5 repeats** ✅ | 0 | 4 of 7, including the new one |
+| Window 10, 5 repeats | 0 | 4 of 7 |
+| Window 10, 4 repeats | Yes | — |
+
+**Why 12:** it detects the same as 10, allows cycles of up to 7 sentences and has no false positives.
+
+**Reversible:** yes, one constant.
+
+## DEC-29 — Retry when Phi copies the sources
+
+Phi opens some answers by copying the prompt (`[1] --- file: …`) and goes on with every source. It either stops without answering, or runs out of tokens before answering. `strip_echo` (DEC-22) cannot get an answer out of that.
+
+| Option | Result |
+|---|---|
+| A. Retry as soon as the answer opens with a header (`91-*`) | Phi: fixes its cases. 0.6B: better form in ~11 XQuAD and CV answers (from a copied paragraph to a sentence), but **loses one** (XQuAD/ES: it switches to a wrong date). Also, XQuAD/EN "contains" falls from 0.637 to 0.633 because of another one, where the new answer falls short of the reference (verbatim in `docs/es/RESPUESTAS_ARCHIVADAS.md`). Breaks the rule |
+| **B. Retry only if it also copies a second header or label (`92-*`)** ✅ | 0.6B, 1.7B and 4B: **identical** to `90` over the whole matrix. Phi: 3 `gen-bench` answers and 5 open ones change, all for the better (`FASE_7.md` §7b.7) |
+| C. No retry, cleaning only | The author's cases keep failing |
+| D. Ban the headers from the first attempt (`bad_words_ids` always) | Not tested: it changes the generation of every answer of every model, and the rule asks not to touch what works |
+
+**How the retry works:**
+- It generates again without letting the answer open with `[` and without letting it write `--- file`, `SOURCES:` or `QUESTION:`.
+- Tested on CPU first: banning only the headers gives an answer made only of citations in a row, so the first `[` has to be banned too.
+- In the web, the opening of the answer is held back until it is clearly not an echo, so the copy never reaches the screen.
+
+**Why B:** it is the only option that makes nothing worse. In exchange, the 0.6B's single-header echo is still cleaned as before, by `strip_echo` (sometimes a copied paragraph of the source remains).
+
+**Reversible:** yes; removing the `EchoStart` criterion from `stopping_criteria` brings everything back. *(Removed with Phi in DEC-32.)*
+
+## DEC-30 — Repeated blocks in the loop detector
+
+The open bank showed two ways of repeating that the window does not see:
+- **A 14-sentence cycle** (Phi, A-15: 1,016 tokens, cut off).
+- **The answer written twice**, with the instruction repeated in between (Phi, A-05, 773 tokens; verbatim in `docs/es/RESPUESTAS_ARCHIVADAS.md`).
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Block rule: the last N sentences repeat, one by one, those a little earlier (a cycle of up to 40 sentences). If the sentence just before contains its counterpart (the repeated instruction ending with the answer's first sentence), the cut starts there** ✅ with N = 6 | Detects both cases and cuts where the copy starts. Over 15,793 answers and 299 documents, only the Phi answers that repeated change | An answer that really repeats 6 sentences in a row would be cut (there is none in everything stored) |
+| A with N = 4 | Detects the same | False positives in 4 vLLM documents (repeated installation steps) |
+| A with N = 5 | No false positives | Less margin than 6 |
+| B. A bigger window (40) | A single rule | More cost per token and more risk of comparing similar distant sentences |
+| C. Clean that repeated instruction with another pattern | Would fix the second case | Another text patch like `strip_echo`, and it does not fix the first one |
+
+**Side effect:** Phi's answer written twice loses its citations, which were only at the end of the copy (Phi about/ES: "cites" 0.93 → 0.86). Counted as an improvement (from 773 to 375 tokens without repetition), but it is a metric that goes down.
+
+**Reversible:** yes; `BLOCK` or the call to `repeated_block` in `find_loop`.
+
+## DEC-31 — What was left untouched
+
+- **A-01 still has no good answer.**
+  - The 0.6B gives a poor answer in English, and Phi says it cannot find it (it no longer dumps 873 tokens).
+  - The cause is retrieval: without the project's name, the sources that arrive are loose sections.
+  - Searching with the project's name instead was tried. It improves general questions (A-02, A-03, A-10) and worsens specific ones (reranker, agent, web).
+  - Not applied. Options to discuss: do it only for general questions, or search with both phrasings and fuse them.
+- **Phi in "about" is still verbose and repeats false facts** from the old Space card (the deployment and the default agent).
+  - They come from `deploy/space/README.md`, still in the restored index (DEC-25).
+  - Fixed by re-indexing "about", which was the author's pending decision.
+- **An odd Phi phrasing of "not found"** (badly translated; verbatim in `docs/es/RESPUESTAS_ARCHIVADAS.md`) is not recognised as "not found". Minor, left untouched.
+- **The 4B's open bank in `92`** could not run: the model does not load in that process with 12 GB. Its `gen-bench` is identical to `90`.
+
+## Going back to a more stable version? (for discussion, 2026-10-26)
+
+The author asked for the pros and cons of going back, separating real improvements from the "tricks" needed for the results. What follows is this reading, with the numbers of `90` (the day's baseline) and `92` (the final state). *(Outcome: DEC-32 to DEC-37.)*
+
+### What each point holds
+
+| Point | What it has | Known problems |
+|---|---|---|
+| `3378494` (Phase 6) | API, React web and deployment prepared. No "about" and no loop detector | Phi falls into loops of up to 1,500 tokens; the project cannot be asked about |
+| `8ff05d0` (Phase 7, "about" finished) | "About" in the web, Oracle deployment, cap per model (512; 640 for Phi) | Phi's loops are cut by the cap, mid-sentence; Phi's echo reaches the web; A-02 goes to vLLM |
+| `02ff464` (last commit before these sessions) | Loop detector and a 1,024-token cap | Phi's echo and long loops remain; A-02 does not reach "about" |
+| The day's checkpoint (DEC-20 to DEC-31) | What the next table lists | What DEC-31 lists |
+
+### Added since `02ff464`: improvement or patch?
+
+| Change | Kind | Why |
+|---|---|---|
+| Form metrics and the open-question bank (DEC-20, DEC-27) | **Improvement** | They only measure; no answer changes |
+| Loop detector: window 12 and repeated blocks (DEC-28, DEC-30) | **Improvement** | General rules (repeated text), measured without false positives over 15,793 answers and 299 documents. They depend on no particular question |
+| Retry when Phi copies two sources (DEC-29) | **Reasonable patch** | General (it does not depend on the question), but it treats a symptom of Phi, not the cause: the model copies the prompt. It never fires with the Qwen models in anything measured |
+| `strip_echo` (DEC-22) | **Patch** | Regular expressions over the generated text. Each new model may copy the prompt in its own way and need new patterns. That same day, one of them was swallowing the 0.6B's answer |
+| `route_names`: fixed phrases that name the project and send to "about" without its gate (DEC-24) | **Light trick** | A hand-written list: it fixes the 8 measured cases, but new phrasings stay out |
+| The author's name hint for the CV (DEC-24) | **Light trick** | A lexical rule for one specific case |
+| "About" index restored from the baseline (DEC-25) | **Trick** | It fixes nothing: it keeps the new documentation from worsening "about", and leaves in an outdated card that Phi repeats |
+| "About" language filter (DEC-23) | Disabled | Does not count |
+
+### Pros of going back
+
+- **Less special code.** Without `strip_echo`, `route_names`, the CV hint or the retry, the generator goes back to "prompt → model → minimal cleaning", easier to explain and maintain.
+- **Less risk with real questions.** Each patch is measured with our questions; users' questions may bring odd cases (for example, an absurd question that names the project reaches the LLM without a gate).
+- **The model that would be deployed barely needs it.** The 0.6B (P12) answers equally well in form in `90` and `92`: 0 cut answers and 0 loops. The patches are mostly for Phi.
+
+### Cons of going back
+
+- **Improvements that are not tricks are lost:** the metrics and the improved loop detector. Phi's long loops go back to ~1,000 tokens and to being cut mid-sentence.
+- **The failures seen in the web come back:**
+  - Phi answers A-04 with 49 tokens cut off, and A-01 with 873 tokens of copied sources.
+  - A-02 goes back to vLLM with every model.
+- **What really fails in "about" is not fixed by going back.** The underlying problem is the index: documentation that repeats facts and an outdated Space card. It is the same in `8ff05d0` and `02ff464`.
+
+### Recommendation
+
+Not going back entirely, but **keeping the improvements and deciding the patches one by one:**
+1. **Keep:** metrics, open bank and loop detector (window 12 and blocks).
+2. **Only if Phi stays in the web:** the retry (DEC-29) and `strip_echo` (DEC-22). If the web offers only the Qwen models, they can be removed without losing anything measured: the retry does not fire with them, and `strip_echo` only touches answers with an echo (mostly Phi's; for the 0.6B, a few XQuAD and CV ones).
+3. **The author's call:** `route_names` (useful but fragile) and the CV hint.
+4. **Fix for real:** re-index "about" without `deploy/space/README.md` and without what repeats facts (DEC-25 C). It is what most improves the content of "about" answers, and it is not a patch.
+
+If the simplest version is preferred, the reasonable point is **`02ff464` + metrics + loop detector** (no `strip_echo`, no retry, no `route_names`), **removing Phi from the web's models**. Phi is the only model that needs the patches to give clean answers.
+
+## Where everything stands (session 2026-10-25/26, `92-*`)
+
+| Check | Result |
+|---|---|
+| `gen-bench`, 0.6B, 1.7B and 4B (every suite) | **Identical** to `90`, answer by answer |
+| `gen-bench`, Phi-4-mini | 3 answers change, all three for the better. One about/ES metric goes down ("cites" 0.93 → 0.86) because of the answer that was written twice (DEC-30) |
+| Open questions | 0.6B and 1.7B identical. Phi: cut 2 → 0, echo 1 → 0, maximum 1,016 → 606 tokens. 4B not measured in `92` |
+| 42 `make bench` (`93-session-final`) | **Identical:** docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88 |
+| Tests | 129; flake8 and mypy clean |
+
+# Autonomous session 2026-10-26/27
+
+The brief (the author's words): *"Limpieza encima del commit actual. Vamos a quitar las trampas, aunque empeoren preguntas poco focalizadas. El filtro de idioma se queda. Si podemos darle pistas con él a los LLM de qué idioma estamos usando, mejor que mejor."* ("A cleanup on top of the current commit. Let's remove the tricks, even if less focused questions get worse. The language filter stays. If we can use it to give the LLMs hints about the language, all the better.") Earlier in the conversation, the author decided to drop Phi-4-mini ("beyond saving": the loop detector works, but the outputs do not) and to keep the Qwen models. No commits. Details in `changelog/FASE_7.md` §7b.8.
+
+**How it was measured:** one step at a time, on the same index and with the same matrix as the previous session (`gen-bench` at 1,024 tokens for the 0.6B, 1.7B and 4B, the bank of 34 open questions and `route-bench`):
+
+| Run | What changes from the previous one |
+|---|---|
+| `92` | The state of commit `644c455` (the previous session), with Phi |
+| `94` | Code cleanup: no Phi, no retry, no `route_names` and no CV hint. Language filter **off**, to measure only the cleanup |
+| `95` | `94` + language filter **on** (DEC-34). Every answer touched by `strip_echo` is logged (DEC-35) |
+| `96` | `95` + a language hint in the prompt (DEC-36) |
+| `97` | `95` + "about" re-indexed with the synced documentation (DEC-37) |
+| `98` | `97` with the "about" ground truth regenerated (DEC-37) |
+| `99` | Experiment: "about" without the history (changelogs, `decisions.md`, `DETECTOR_BUCLES.md`). Measured and **reverted** (DEC-37) |
+| `100` | Final state, after writing this documentation (DEC-37) |
+
+**Summary:**
+
+| DEC | What | State |
+|---|---|---|
+| 32 | Phi-4-mini out, and with it the echo retry (DEC-29) | ✅ Applied (the author's decision) |
+| 33 | Remove the tricks: `route_names` and the author's-name hint (DEC-24) | ✅ Applied (the author's decision) |
+| 34 | "About" language filter on (DEC-23) | ✅ Applied (the author's decision) |
+| 35 | `strip_echo` (DEC-22) stays without Phi: it also cleans 17 answers of the Qwen models | ✅ Applied |
+| 36 | Language hint in the prompt: measured and **not adopted** (it worsens the 0.6B's language) | ❌ Not adopted; option C open |
+| 37 | Synced documentation, "about" re-indexed (replaces DEC-25) and the "about" ground truth regenerated | ✅ Applied. The history inside "about": resolved in DEC-39 (it stays, without the quotes) |
+| 38 | What was left untouched | — |
+
+## DEC-32 — Phi-4-mini out
+
+**The author's decision.** What was left of Phi after the two previous sessions: wordy answers that summarise source by source, echo of the prompt and loops, contained by patches (`strip_echo`, the retry of DEC-29 and the loop detector). The author's reading: "the loop controller works, but the outputs are unbearable".
+
+**What is removed** (each file back to its `02ff464` version, plus what is kept from later):
+
+| File | Change |
+|---|---|
+| `rag.toml` | Profile `[profiles.llm-phi4-mini.generation]` removed; the comment on the optional LLMs updated |
+| `Makefile` | `API_MODELS ?= default,llm-qwen3-1.7b` (before, Phi as well) |
+| `src/rag/generator.py` | No retry (`EchoStart`, `echo_started`, the `ECHO_*` constants, `bad_words_ids`, `begin_suppress_tokens`, the held-back streaming and `echo_guard`). `strip_echo` stays (DEC-35), with the previous session's fix for the 0.6B |
+| `tests/test_generator.py` | The retry tests removed; the `strip_echo` ones stay |
+| `web/src/App.tsx` | Phi's note in the model picker removed (web rebuilt) |
+| `src/agent/toolcalls.py`, `src/api/app.py` | Only comments and examples in the code documentation |
+
+**What stays, although it was born for Phi:** the loop detector with a window of 12 and repeated blocks (DEC-28, DEC-30). They are general rules, measured without false positives, and they never compare code, tables or logs (§7b.7). It stays as a safety net for any model. Phi's tool format in `toolcalls.py` (`system_tools`) also stays: it is generic (any template that declares the tools in the system message uses it) and it has its tests.
+
+**Checked (`94` vs `92`):** the 0.6B, 1.7B and 4B are **identical in `gen-bench`**, answer by answer, in the ten runs of the matrix. The retry never fired with them (DEC-29 already said so), so removing it changes nothing for them.
+
+**Another model from a different family?** The author asked whether one could replace Phi. I have not tested any tonight; these are candidates to discuss:
+
+| Candidate | For | Doubts |
+|---|---|---|
+| IBM Granite (4.x, ~3B, or the "micro" variant) | Apache 2.0, multilingual with Spanish, built for RAG and tools | Not measured with our prompt or with llm_sdk/transformers |
+| Gemma 3 (1B / 4B) | Good quality at small sizes | Google's own licence (with usage terms); the 4B probably does not fit on the GPU next to the search, like the Qwen3-4B in the web |
+| Llama 3.2 (1B / 3B) | Widely used, well-known tool format | Meta's community licence; Spanish is not one of its strong languages at small sizes |
+
+My recommendation: if one is tested, with the same matrix (`gen-bench` at 1,024 tokens + open bank) and **no new patches**: if it needs patches to give clean answers, it does not get in.
+
+**Reversible:** yes, the profile and the retry are in `644c455`.
+
+## DEC-33 — Removing the tricks
+
+**The author's decision**, knowing that less focused questions get worse. What is removed (the "light tricks" of the table in "Going back to a more stable version?"):
+- **`route_names`** (DEC-24): fixed phrases that named the project and sent questions to "about" **without passing its gate**. The `SourceConfig` field (`src/config.py`), its compilation in `src/rag/retriever.py` and `DomainRouter.named` (`src/rag/router.py`, back to the `02ff464` version) are removed, along with their two tests.
+- **The author's-name hint** (`route_hints = ['\b(chrystian|donaire)\b']` in `[sources.cv]`).
+- **The weak hints of "about"** go back to those of `8ff05d0`: `\b(this|the|your) project\b`, `\b(este|el|tu) proyecto\b` and `rag against the machine`. They are still weak hints: they only decide whether "about" passes its threshold (−1.0).
+
+**What gets worse** (open bank, `94` vs `92`; 9 answers change with the 0.6B and the same 9 with the 1.7B, all from questions that named the project):
+
+| Question | Before (`92`) | Now (`94`) |
+|---|---|---|
+| A-01 / A-02 | about | vLLM: talks about the RAG technique in general, or "not found" |
+| A-03 | about | vLLM: the RAG technique with vLLM + LangChain |
+| A-06 | about | XQuAD: a construction contract |
+| A-10 | about | XQuAD: a climate report (0.6B) / a Greek philosopher (1.7B) |
+| A-07 | about | CV: describes the author's other agents project |
+| A-08 / A-09 / A-11 | about, answered | about, but its gate rejects them: "not found" |
+
+What fails is the retrieval: without the rule, these questions score higher in another domain, or do not reach the "about" threshold. Questions that name the project with "the project" or "RAG against the Machine" still go to "about".
+
+**What does not change:** the `route-bench` (`94-route`) is **identical** to `76-about-hints` and to `85-night-final` in every set (42, XQuAD, CV and about). No benchmark question depended on `route_names` or on the CV hint with the current index. `gen-bench` is identical (each suite goes to a single domain).
+
+**Reversible:** yes, everything is in `644c455`.
+
+## DEC-34 — "About" language filter on
+
+**The author's decision** ("the language filter stays"). In `[sources.about]` of `rag.toml`: `translations` ([`README.md`, `docs/es/README.md`] and [`docs/`, `docs/es/`]) and `translation_languages = ["en"]`. For a question in English, it removes the Spanish copy of the translated files from the sources; questions in Spanish see both languages (filtering them as well lost answers, DEC-23).
+
+**Measured (`95` vs `94`, same index):** only about/EN changes. vLLM, XQuAD, CV and about/ES are identical answer by answer.
+
+| | `94` (no filter) | `95` (filter) |
+|---|---|---|
+| Route-bench about/EN, R@1/@3/@5/@10 | 0.22 / 0.39 / 0.39 / 0.61 | 0.22 / 0.39 / **0.44** / 0.56 |
+| 0.6B about/EN: contains · cites · cites correctly | 0.50 · 0.87 · 0.23 | **0.56** · 0.80 · 0.17 |
+| 1.7B about/EN: contains · false "not found" · cites correctly | 0.61 · 0.17 · 0.43 | 0.61 · **0.11** · 0.27 |
+| 4B about/EN: contains · false "not found" · cites correctly | 0.67 · 0.22 · 0.64 | **0.72** · **0.17** · 0.47 |
+| Open bank (0.6B and 1.7B) | — | 2 answers change per model, both for the better or equal: A-04 now describes the whole project (the 0.6B used to give an unfinished sentence) |
+| Answers that switch language halfway (`lang_mix.py`) | 10 of 1,103 | 10 of 1,105 (the same ones) |
+
+**Reading:** what weighs most goes up (R@5 and "contains the answer"), and correct citations go down, as already seen in DEC-23. Part of that drop comes from the metric: "cites correctly" compares with the file of the reference answer, and with the filter other English sections that also contain it arrive. But there is a real loss: about-04 in English stops giving the model (`mmarco-mMiniLMv2`) with the 1.7B and the 4B, and the 0.6B switches to "not found". The R@10 of about/EN drops by one question (0.61 → 0.56).
+
+This is the state with the **old index**; the measurement that counts is the final one, with the re-indexed index (DEC-37). Also, 3 of the 18 reference passages were already out of place in these runs (DEC-37): they affect the recall and "cites correctly" of "about", not "contains".
+
+**Reversible:** yes, two lines of `rag.toml`, without re-indexing.
+
+## DEC-35 — `strip_echo` without Phi
+
+In the "Going back?" table, `strip_echo` (DEC-22) was a **patch**: regular expressions over the already generated text. I let the data decide: in `95`, every answer it changed was logged (`data/output/night2/95-echo.jsonl`).
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Keep it** ✅ | It also acts with the Qwen models: **17 answers** in `95`, all for the better | It is still a pattern patch |
+| B. Remove it | A simpler generator | Those 17 answers go back to starting with `[1] --- file: data/raw/...` in the web |
+
+**What it does in those 17** (XQuAD 12, CV 3, about 1 and vLLM 1; the log does not keep the model, but XQuAD is only measured with the 0.6B):
+- 16 start by copying the header of a source (`[2] --- file: data/raw/xquad/es/Victoria_(Australia).md ---`) and then give the answer: what is left is the answer cited as `[2]`.
+- 1 (vLLM) ends by listing the headers of its sources: they stay as `[1] (path)`.
+- None loses answer text. The previous session's fix for the 0.6B (never leave an empty answer) is kept.
+
+**Reversible:** yes, one line in `clean_output`.
+
+## DEC-36 — A language hint for the LLM
+
+The author asked to give the LLM hints about the language "if we can". The prompt already tells it the language (*"Answer in Spanish, citing the sources by number."*, in English even when the question is in Spanish). And the filter of DEC-34 is already a hint: a question in English only receives "about" sources in English.
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Write the final instruction in the question's language: *"Responde en español, citando las fuentes por su número."* (and teach `strip_echo` its Spanish echo) | The most direct hint: the last sentence the model reads is in Spanish | Measured in `96`: it gets worse (below) |
+| **B. Leave the prompt as it is** ✅ | Nothing gets worse; the language is already at 99–100% | No new hint |
+| C. Other ways (the language in the system message, a line "The question is in Spanish") | They might not have A's failures | Not measured. With the 0.6B, any prompt change moves many answers (DEC-21) |
+
+**Measured (`96` = `95` + option A; only the prompt of Spanish questions changes):** 22 metrics drop compared with `95`, with 158 changed answers in XQuAD/ES of the 0.6B alone.
+- **Language, exactly what was meant to improve:** about/ES of the 0.6B, 1.00 → **0.86**. To about-01 it answers with a single citation and no text, and to about-10, half in English. Answers that switch language halfway: 10 → 11.
+- **CV privacy:** no leaks in any case, but the 4B stops giving the CV message in 1 of the 2 private questions in Spanish (1.00 → 0.50), and the 0.6B in 1 of the 7 without an answer (0.86 → 0.71).
+- **XQuAD/ES (0.6B):** contains 0.59 → 0.56. Correct citations in vLLM/ES (0.6B): 0.90 → 0.80 (docs) and 1.00 → 0.89 (code).
+- **In favour:** 1.7B vLLM/ES, language 0.90 → 1.00 and correct citations 0.80 → 0.90; cv/ES of the 0.6B, contains 0.80 → 0.83.
+
+**Why B:** the rule is that nothing gets worse, and A worsens precisely the language with the base model. **C stays open**, to measure it with the same matrix if the author wants to continue down this path. A's implementation is in `data/output/night2/logged.py` (`RAG_EXP_LANG_HINT=1`, ignored by git); `generator.py` was not touched.
+
+**Reversible:** there is nothing to revert.
+
+## DEC-37 — Synced documentation and "about" re-indexed
+
+**The author's brief:** "update the documents (all of them) to avoid discrepancies". With that, the restored index of DEC-25 stopped making sense: it kept exactly the contradictions that were meant to go.
+
+**What was synced** (full list in `FASE_7.md` §7b.8):
+- README (EN and ES): four domains, Qwen only, deployment on Oracle, agent off in the web and the "about" chip pinned.
+- `deploy/README.md` and the Space card, `DETECTOR_BUCLES.md` (window 12), ROADMAP, `BENCHMARK_REPORT.md` and the changelogs, with notes wherever DEC-32 to DEC-36 leave something outdated.
+- The English translation, which had stopped at `8ff05d0`: ROADMAP, `decisions.md` (DEC-19 to DEC-38) and `FASE_7.md` (§7a.6 to §7b.8).
+
+**Re-indexed** (`make index SOURCE=about`):
+
+| | DEC-25 index (bundle of the 24th) | Re-indexed |
+|---|---|---|
+| Chunks (children) | 2,008 | 2,407 (1,623 of documentation, 784 of code) |
+| Parents | 718 | 828 |
+| `docs/nextstep.md` (ghost file, no longer exists) | 19 chunks | Out |
+| `deploy/space/README.md` (old Space card) | In | Out (`exclude_paths`) |
+
+### The "about" ground truth was out of date
+
+Comparing `97` with `95`, the "about" recall in the `route-bench` collapsed (EN R@5 0.44 → 0.28). It was not the retrieval: the "about" ground truth stores **character offsets** into each file, and editing the README had moved **16 of the 18 reference passages** in each language.
+- Already in commit `644c455`, **3 were out of place** (about-14, 16 and 17), because the documentation had been edited without regenerating it. It affects the recall and "cites correctly" of "about" in the earlier runs; not "contains the answer", which looks at the text.
+- **Fix:** `python -m src build_about_bench`, which looks for each piece of evidence in its file again and fails unless it finds it exactly once. Two questions had to be touched:
+  - **about-11** (where it is deployed): the reference answer was "Hugging Face", which has been false since DEC-19. It is now "Oracle", with the evidence from the README's deployment section.
+  - **about-17** (the Stop button): the signature of `stopping_criteria` changed with the loop detector (`02ff464`); the evidence points to the current signature.
+- `98` repeats the "about" measurement with the regenerated ground truth. That is the one that counts, not `97`.
+
+### Results of the re-index (`98` vs `95`)
+
+`gen-bench` for vLLM, XQuAD and CV: **identical** answer by answer. 42 (`97-final`): **identical**, docs 0.76 / 0.91 / 0.92 / 0.94 and code 0.51 / 0.72 / 0.80 / 0.88.
+
+| | `95` (DEC-25 index) | `98` (re-indexed) |
+|---|---|---|
+| Route-bench about/EN, routed · R@1/@3/@5/@10 | 0.778 · 0.22 / 0.39 / 0.44 / 0.56 | **0.833** · 0.11 / 0.33 / 0.33 / **0.61** |
+| Route-bench about/ES, routed · R@1/@3/@5/@10 | 0.889 · 0.33 / 0.39 / 0.50 / 0.56 | **0.944** · **0.39 / 0.50 / 0.67 / 0.67** |
+| Route-bench CV EN / ES, routed | 0.967 / 0.967 | 0.933 / 0.900 (1 and 2 more questions go to "about") |
+| Route-bench 42 and XQuAD | — | Same routing and recall; in XQuAD, one question per language moves from "about" to vLLM |
+| 0.6B about/EN · ES, contains | 0.56 · 0.56 | 0.44 · **0.61** |
+| 1.7B about/EN · ES, contains | 0.61 · 0.67 | 0.56 · **0.78** |
+| 4B about/EN · ES, contains | 0.72 · 0.67 | 0.67 · **0.78** |
+| False "not found" on about/ES (all three models) | 0.22 | **0.06** |
+| 0.6B about/ES: language · echo · cut | 1.00 · 0 · 0 | 0.88 · 0.06 · 0.06 |
+| Answers that switch language halfway (`lang_mix.py`, whole matrix + open bank) | 10 of 1,105 | **20 of 1,117**: +5 on about/ES (0.6B and 1.7B) and +5 in the open bank; the rest, the same ones |
+
+(The `95` column uses the old ground truth, with 3 passages out of place; the "contains" rows do not depend on that.)
+
+**Reading:** Spanish clearly improves (R@5 0.50 → 0.67, "contains" +0.05 to +0.11, and false "not found" almost disappears). English drops in R@5 and in "contains" (one question with each model), although it rises in R@10. The CV loses routing: with more documentation, "about" wins some personal question (the `route-bench` does not store which questions; I did not look further). And the 0.6B, in Spanish, once copies the sources as they are (1,011 tokens: a README table, code from `language.py` and a piece of this changelog; it is not a loop, so the detector does not act) and once answers in English. **Language is what gets worse most:** Spanish questions receive sources in both languages (the filter only acts on English questions, DEC-34), and the English translation grew a lot tonight (DEC-19 to DEC-38, §7a.6 to §7b.8). That this is the cause is my deduction; I have not measured it.
+
+### The new problem: the documentation quotes itself
+
+In the open bank (`97` vs `95`), 12 of 34 answers change with the 0.6B and 12 with the 1.7B. Some improve (A-05 and A-07 now really describe the project) and others get worse in a new way (answers verbatim in `docs/es/RESPUESTAS_ARCHIVADAS.md`):
+
+| Question | Model | Answer with the new index |
+|---|---|---|
+| A-15 | 0.6B | Copies the changelog line that quotes that same question |
+| A-09 | 0.6B | Copies the changelog note about another test question |
+| A-04 | 0.6B and 1.7B | Explains `strip_echo` (before, they described the project) |
+| A-06 | 1.7B | Explains how that same question is routed to "about" |
+
+**The cause:** the changelogs and `decisions.md` quote the test questions and their bad answers **word for word** (to document the failures). When that same question is asked, the best-matching chunk is the one that quotes it. The more a failure is documented, the more it repeats. It is the risk DEC-25 already pointed out, and this session makes it worse: §7b.8 and this file quote those questions again.
+
+### Experiment: "about" without the history (`99`, reverted)
+
+I measured the option the author kept for themself (taking the history out of "about"), **without leaving it on**. `exclude_paths` with `docs/changelog`, `docs/es/changelog`, `docs/decisions.md`, `docs/es/decisions.md` and `docs/es/DETECTOR_BUCLES.md`. The README, the ROADMAP, `BENCHMARK_REPORT.md` and the code stay.
+
+The index goes down to 1,286 chunks (502 of documentation and 784 of code): **the history is 1,121 of the 1,623 documentation chunks**.
+
+| | `98` (with history) | `99` (without history) |
+|---|---|---|
+| Route-bench about/EN, R@1/@3/@5/@10 | 0.11 / 0.33 / 0.33 / 0.61 | **0.22 / 0.39 / 0.50** / 0.56 |
+| Route-bench about/ES, R@1/@3/@5/@10 | 0.39 / 0.50 / 0.67 / 0.67 | **0.56 / 0.78 / 0.78 / 0.83** |
+| Route-bench es/docs (42 complementary set), routed · R@1/@3/@5/@10 | 0.900 · 0.50 / 0.70 / 0.70 / 0.80 | **1.000 · 0.60 / 0.80 / 0.80 / 0.90** |
+| Route-bench XQuAD/ES, routed · R@1 | 0.975 · 0.91 | 0.973 · 0.90 (2 more questions to "about") |
+| Route-bench 42, XQuAD/EN, CV | — | Same |
+| Contains EN: 0.6B · 1.7B · 4B | 0.44 · 0.56 · 0.67 | **0.61 · 0.67 · 0.72** |
+| Contains ES: 0.6B · 1.7B · 4B | 0.61 · 0.78 · 0.78 | 0.50 · 0.61 · 0.67 |
+| False "not found" EN · ES (1.7B) | 0.11 · 0.06 | 0.22 · 0.17 |
+| Cites correctly ES: 0.6B · 1.7B · 4B | 0.38 · 0.38 · 0.47 | 0.33 · **0.53 · 0.67** |
+| 0.6B: echo · cut (EN / ES) | 0 · 0 / 0.06 · 0.06 | 0.06 · 0.07 / 0 · 0.06 |
+| Open bank 0.6B: echo · wrong language | 3 · 2 | **0 · 0** |
+| Open bank 1.7B: wrong language | 1 | 3 |
+| Language switch halfway (about + open bank) | 10 | 6 |
+
+In the open bank (`99` vs `97`), the 0.6B improves in about 7 of its 12 changed answers: A-04, A-05 (now in Spanish), the agent, the language model, the recall and the hybrid search (A-07, A-13, A-14, A-15) are answered on topic again, and A-09 says "not found" instead of making things up. Worse: A-02 (answers with a single citation), A-06 (back to XQuAD's construction contract) and A-16 (copies code). The 1.7B improves in English and gets worse in Spanish: it answers 3 Spanish questions in English (the agent, the recall and why Qwen3-0.6B).
+
+**Reading:** without the history, the "about" recall rises a lot and the documentation almost stops quoting itself. Not entirely: the ROADMAP also named A-01, and the 1.7B quotes it. But Spanish loses: a good part of the Spanish material was the history (the changelogs and `decisions.md` are written in Spanish first), so Spanish questions receive less text in their language, and "contains" and the language drop. **There is no clear winner**: it depends on whether English (the recruiters) or Spanish weighs more.
+
+### Options
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Re-indexed index with everything** ✅ (applied) | No contradictions; Spanish improves a lot | The documentation quotes itself; English drops a little; the CV loses 1–2 routing questions |
+| B. A + history out of "about" (`99`) | Much higher "about" recall; English improves with all three models; self-quoting almost gone; the 0.6B with no echo or wrong language in the open bank | Spanish drops ("contains" −0.11 to −0.17, more false "not found", the 1.7B answers in English); "about" cannot tell the project's history (why each thing was decided) |
+| C. Back to the DEC-25 index | The numbers of `95` | The contradictions (Hugging Face, the ghost file, the Space card) come back |
+| D. Rewrite the history so it does not quote the questions | Fixes the cause | A lot of work, and the history would lose precision (the quotes are the evidence of each failure) |
+
+**Why A, and not B:** the author kept taking the history out as their own call. A is what was asked for (documentation up to date and indexed); B is measured for the author to decide. To apply it: add those five paths to `exclude_paths` in `[sources.about]` of `rag.toml` and run `make index SOURCE=about` (~1 min).
+
+**Final order:** after writing all this documentation, "about" is re-indexed one last time (`100`), so that the index matches the files. Those numbers are in "Where everything stands", at the end.
+
+**What `100` says, and my recommendation:** with this documentation inside, self-quoting gets worse: 7 of the 12 open questions about the project are answered with notes from the history, including this session's. The Spanish `gen-bench`, on the other hand, rises with the 1.7B and the 4B. For the web, where recruiters ask open questions, **I recommend B**. In exchange, Spanish loses something, and "about" can no longer explain why each thing was decided. I did not apply it because it is the author's call. An intermediate variant, not measured: take out only `decisions.md` and the Phase 7 changelogs, which are the ones that quote the test questions. *(In the end another route was chosen: DEC-39.)*
+
+**Reversible:** A and B, yes (one line and a re-index). C, by restoring "about" from the bundle of the 24th (`deploy/bundle/`), as in DEC-25. Careful: `make bundle` overwrites that bundle, and option C with it.
+
+## DEC-38 — What was left untouched
+
+Not a decision, but the list of what I saw and left as it was, for the author to review:
+
+| Topic | State | Why I did not touch it |
+|---|---|---|
+| The "about" gate rejects specific questions | Threshold −1.0 unchanged. For example, about-02 in English scores −2.07 and stays at "not found" if only "about" is searched | Lowering the threshold lets in questions from other domains. It would need recalibrating with `gate_scores` and passing the `route-bench` again |
+| Less focused questions (A-01, A-06) | Worse than with the tricks (DEC-33) | The author accepted it when removing them. The root cause is the retrieval, not the generator |
+| The history inside "about" (changelogs, `decisions.md`) | Still indexed | The author kept it as their own call. DEC-37 has the measurement with and without it. *(Resolved in DEC-39: it stays, without the quotes.)* |
+| Phi's tool format in `toolcalls.py` (`system_tools`) | Stays | It is generic (any template that declares the tools in the system message) and it has tests |
+| Qwen3-4B in the open bank | It does not load in that process: `llm_sdk` sends part of the model to the CPU ("You can't move a model that has some modules offloaded") | Same since `92`. Its `gen-bench` is measured. Not investigated |
+| The language hint, option C | Open | DEC-36 |
+| `deploy/stage/` (ignored by git) and `deploy/bundle/` | `stage` still names Phi, and the bundle carries the previous "about" index | They are regenerated with `make bundle`. **Before deploying**, rebuild it to carry the new index (it overwrites the old bundle, and option C of DEC-37 with it) |
+| The API | Stopped (I stopped it to free the GPU) | Started with `make api` |
+| The "about" ground truth depends on the documents' offsets | Any edit of the README or the ROADMAP puts it out of place (DEC-37) | I regenerated it with `python -m src build_about_bench`. It should be done every time the documents are edited, or automated; I did not automate it without asking |
+| Commits | None | `PLANING.md` rule |
+
+## Where everything stands (session 2026-10-26/27, `100-*`)
+
+| Check | Result |
+|---|---|
+| `gen-bench` for vLLM, XQuAD and CV, 0.6B, 1.7B and 4B | **Identical** to `94` (and to `92`), answer by answer |
+| "About" `gen-bench` (`100`), contains EN / ES | 0.6B 0.44 / 0.50 · 1.7B 0.56 / 0.72 · 4B 0.72 / 0.83; false "not found" on ES: 0 with all three |
+| Route-bench (`100-route`) | 42 and CV as in `98`; XQuAD/EN 0.980 (one more question to "about"); about routed EN 0.889 · ES 0.944, R@1/@3/@5/@10 EN 0.11 / 0.28 / 0.33 / 0.67 · ES 0.39 / 0.50 / 0.61 / 0.67 |
+| Open bank (`100`) | 12 of 34 answers change vs `97` with each model. **7 of the 12 questions about the project are answered by quoting notes from the changelogs and `decisions.md`**, including this very session's (A-09 is answered with the text of DEC-37). Language switch halfway: 4 (10 in `97`) |
+| 42 `make bench` (`97-final`) | **Identical:** docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88 |
+| Tests | 123 (129 minus the 6 of the retry and of `route_names`); flake8 and mypy clean |
+| "About" index | Re-indexed one last time after writing these numbers, so that it matches the files (only the text of the documents changes). Not measured again |
+| Commits | None |
+
+---
+
+# The morning of 2026-10-27
+
+## DEC-39 — Quotes of test questions and wrong answers removed
+
+**What the author saw:** in the web, with the `100` state, the 1.7B answered A-04 with the rationale of `strip_echo` taken from `decisions.md`, and the 0.6B gave "not found" to A-13. I confirmed it was the self-quoting of DEC-37 and that it already showed in the open bank of `100`. My report gave it as "7 of 12 questions quote the history", without saying clearly that this is what the web would show.
+
+**The author's decision** (their words, translated): *"Remove those quotes of wrong answers. All of them. If you want to keep them, for history, put them in some file outside the indexing."* It is option D of DEC-37 (rewriting the history so that it does not quote the questions), with the quotes kept apart.
+
+**What I had to decide:**
+
+| Question | Option chosen | Why | Alternative |
+|---|---|---|---|
+| Only the answers, or the questions too? | **Both**: every copied wrong answer and the text of every test question about the project, even well-answered ones | The question is what attracts the search: a note that copies the question and describes the failure without the answer still wins, and the model answers "not found" or with the note | Remove only the answers: closer to the author's words, but it does not fix the cause |
+| How are the questions named? | **Ids** (`A-NN` for the open bank, `about-NN` for the benchmark, `L-N` for the loops), listed in the archive | An id matches no real question. A paraphrase ("the question on the language model") would still look like it | Paraphrase: reads better, but resembles the question |
+| Where does the verbatim text go? | **`docs/es/RESPUESTAS_ARCHIVADAS.md`**, one file, in Spanish and not translated (like `DETECTOR_BUCLES.md`), ordered by the section each quote comes from | A single place is easy to exclude (`exclude_paths`) and to look up. The quotes are mostly in English, so translating adds nothing | One `.md` per changelog, or inside `data/` (not versioned: the history would be lost) |
+| What stays? | vLLM, XQuAD and CV questions without a bad answer, correct answers, prompt and interface texts, "capital of France" → "Paris" (B15: it is in vLLM's documentation, not wrong), the CV transcripts (already out with `about:skip`) and the code comments | They are neither wrong answers nor questions about the project, so "about" does not compete for them | Remove everything: much more work, and the history would lose readability with no measured gain |
+
+**Checked:** a script goes through what "about" indexes (with the same exclusions) and none of the 36 "about" benchmark questions, the 16 open-bank questions about the project or the loop questions remain.
+
+**Measured (`101` vs `100`, full table in `FASE_7.md` §7b.9):**
+- **Open bank:** no answer quotes the history any more (before, 7 of 12 with the 0.6B). With the 0.6B and the 1.7B, echo 0 and wrong language 0 (before, 2 and 1 with the 0.6B, and 1 and 2 with the 1.7B). Language switch halfway: from 4 of 165 answers to 1 of 150.
+- **"About" `gen-bench`:** the 0.6B the same (0.44 / 0.50). The 1.7B drops in ES (0.72 → 0.61) and the 4B in both languages (0.72 / 0.83 → 0.67 / 0.72). False "not found" goes from 0 to 0.11 in ES.
+- **`route-bench`:** about/EN loses two questions to vLLM (0.889 → 0.778; R@5 0.33 → 0.28). about/ES rises (R@5 0.61 → 0.67). CV/EN gets one back (0.933 → 0.967). 42, es/docs, es/code and XQuAD, the same.
+
+**With the final index** (`102`, 0.6B and `route-bench`): the same as `101`, no self-quoting; about/ES R@5 0.61.
+
+**Honest reading:** the drop in the `gen-bench` and the `route-bench` comes from the same three questions (about-02, about-04 and about-11). They reached "about", and passed its gate, thanks to the history note that quoted them, and part of the "hits" were that quote. Without it, their best source scores below the threshold (−1.0), which DEC-38 already pointed out. The `100` figures were inflated by the self-quoting; the `101` ones are the real ones. What the web shows (the open bank) clearly improves.
+
+**Options for what remains:**
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Leave it like this** ✅ (applied) | No self-quoting; a clean open bank | about-02, 04 and 11 at "not found" if "about" wins or is the only domain |
+| B. Recalibrate the "about" threshold with `gate_scores` | Would win those questions back if the reranker scores them above unrelated ones | Not measured. It changes the routing of every domain: the `route-bench` must be repeated, checking that nothing unrelated gets in |
+| C. Go back to `100` | The `100` figures | The self-quoting comes back, which is what the author saw in the web |
+
+**Why A and not B:** B changes the general behaviour (the gate decides which questions are answered in every domain), and that needs the author's permission (`PLANING.md`). Proposed for Phase 8.
+
+**Rule from now on** (written at the top of the archive): indexed documents do not copy the text of a test question about the project or a wrong answer; they use the id and a description, and the verbatim text goes to the archive.
+
+**Reversible:** yes. The verbatim text is in the archive, and the previous version of the documents is in git up to commit `644c455` (what was written in the session of the 26th to the 27th was never committed with the quotes).

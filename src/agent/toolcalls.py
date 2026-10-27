@@ -6,8 +6,9 @@ and calls tools its own way:
                   section in the system turn, calls as <tool_call>{json}
                   </tool_call>).
     system_tools  the tools go as a JSON string in a `tools` field of the
-                  system message (Phi-4-mini: <|tool|>[...]<|/tool|>,
-                  calls as <|tool_call|>[...]<|/tool_call|>).
+                  system message (Phi-4-mini, an option until Phase 7:
+                  <|tool|>[...]<|/tool|>, calls as
+                  <|tool_call|>[...]<|/tool_call|>).
     prompt        the template knows nothing about tools: they are
                   described in the system prompt and the call format is
                   asked for in plain text (any other model).

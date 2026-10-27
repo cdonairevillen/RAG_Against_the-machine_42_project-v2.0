@@ -1,16 +1,16 @@
 # CHANGELOG — Fase 7: Opcionales y mejoras
 
-Fase abierta el 2026-10-24, tras el commit `3378494` (Fase 6). El plan está en `ROADMAP.md` (Fase 7). Aquí se irá apuntando qué se cambia, por qué y en qué afecta, según las normas de `PLANING.md`.
+Fase abierta el 2026-10-24, tras el commit `3378494` (Fase 6). **Cerrada el 2026-10-27** (lo pendiente pasa a la Fase 8, ver `ROADMAP.md`). El plan está en `ROADMAP.md` (Fase 7). Aquí se irá apuntando qué se cambia, por qué y en qué afecta, según las normas de `PLANING.md`.
 
 ## Estado
 
 | Bloque | Estado |
 |---|---|
 | 7a — Dominio "about" (README, `docs/`, código) | ✅ Hecho: README, fuente, benchmark bilingüe, separación del CV (§7a.6), umbral y regla léxica (§7a.7), y web y bundle (§7a.8). Quedan 6 preguntas que se van a vLLM, sin palabras que las distingan |
-| 7b — Calidad de las respuestas (Markdown, plan B del agente, formato, juez del CV) | Agente desactivado por defecto en la web, límite de tokens por modelo (§7b.1), detector de bucles (§7b.2), limpieza del eco (§7b.3), filtro de idioma desactivado (§7b.4) y preguntas que nombran el proyecto (§7b.5), forma de las respuestas: bucles largos y eco de Phi (§7b.7); el resto, planificado (P11 resuelto: Groq) |
+| 7b — Calidad de las respuestas (Markdown, plan B del agente, formato, juez del CV) | Agente desactivado por defecto en la web, límite de tokens por modelo (§7b.1), detector de bucles (§7b.2), limpieza del eco (§7b.3), filtro de idioma (§7b.4, activado en §7b.8), forma de las respuestas (§7b.7) **solo Qwen, sin trampas** (§7b.8: Phi-4-mini, su reintento y `route_names` retirados, "about" reindexado) y fuera las citas de preguntas de prueba y respuestas incorrectas (§7b.9); el resto, planificado (P11 resuelto: Groq) |
 | Despliegue | Plataforma cambiada a Oracle Cloud Always Free (DEC-19); guía en `deploy/README.md` |
 | 7c — Visual (tarjetas que giran, scroll) | Planificado |
-| 7d — Opcionales (Gulliver, MLQA) | Aparcados; `repetition_penalty` descartado (§7b.1) |
+| 7d — Opcionales (Gulliver, MLQA) | Aparcados; `repetition_penalty` descartado (§7b.1). Un modelo opcional de otra familia que sustituya a Phi, sin probar (DEC-32) |
 
 ## 7a.1 — README reescrito (borrador para tu revisión)
 
@@ -59,7 +59,7 @@ Todas las cifras salen de `BENCHMARK_REPORT.md`, `CHECKPOINT_42.md` y los change
 
 ## 7a.3 — "about" fuera de la web hasta calibrarlo
 
-Con la API reiniciada después de indexar "about", ese dominio entró en el router **sin calibrar**. Ejemplo tuyo con el 1.7B: <!-- about:skip -->a "Chrystian Donaire Villén Que me estas contando" respondió con tu fecha de nacimiento y<!-- /about:skip --> añadió *"la respuesta se presenta con el agente por defecto (D7)"*. Los changelogs contienen transcripciones de las pruebas (por ejemplo, `FASE_6.md` §5 cita respuestas del CV) y jerga interna, y el router los eligió.
+Con la API reiniciada después de indexar "about", ese dominio entró en el router **sin calibrar**. Ejemplo tuyo con el 1.7B: <!-- about:skip -->a "Chrystian Donaire Villén Que me estas contando" respondió con tu fecha de nacimiento y<!-- /about:skip --> añadió una frase de jerga interna sobre el agente por defecto (literal en `RESPUESTAS_ARCHIVADAS.md`). Los changelogs contienen transcripciones de las pruebas (por ejemplo, `FASE_6.md` §5 cita respuestas del CV) y jerga interna, y el router los eligió.
 - **`RAG_API_DOMAINS`:** lista de los dominios que sirve la web (vacía: todos los indexados). `make api` usa `API_DOMAINS ?= vllm,xquad,cv` hasta terminar los pasos 4–5 de la 7a. `RagTools.load` acepta la lista de dominios (opcional; sin ella, como antes).
 - **Pendiente para el paso 4:** decidir si las transcripciones de pruebas de los changelogs se quedan en el índice de "about" o se excluyen, porque meten respuestas del CV dentro de "about".
 
@@ -145,14 +145,14 @@ Los documentos existen en los dos idiomas, para que "about" responda bien en amb
 - **Aviso:** son solo 18 preguntas por idioma, así que cada pregunta vale 0.06.
 - **Las preguntas de 42 no importan aquí:** puntúan alto contra "about" porque la documentación habla de vLLM, pero el router las manda a vLLM (99 %), y el umbral de "about" solo actúa cuando gana "about".
 
-**Por qué se iban a otro dominio** (pregunta a pregunta, con el índice de §7a.6):
+**Por qué se iban a otro dominio** (pregunta a pregunta, con el índice de §7a.6; los identificadores son los de `bench/datasets/about/questions.json`):
 
 | Pregunta | Gana | Puntuación de "about" | ¿Tiene pista? |
 |---|---|---|---|
-| What is / ¿Qué es RAG against the Machine? | **cv** (8.3 / 8.0): tu CV menciona el proyecto | 6.7 / 6.4 | el nombre |
-| Which language model does the project use by default? | vllm (−2.06) | −2.25 | "the project" |
-| Where is the project deployed? | vllm (−0.24) | −2.91 | "the project" |
-| Modelo de embeddings y cómo se divide el código Python (EN y ES) | vllm | más baja | ninguna: vLLM también responde a eso |
+| about-01 (EN / ES) | **cv** (8.3 / 8.0): tu CV menciona el proyecto | 6.7 / 6.4 | el nombre |
+| about-02 (EN) | vllm (−2.06) | −2.25 | "the project" |
+| about-11 (EN) | vllm (−0.24) | −2.91 | "the project" |
+| about-03 y about-09 (EN y ES) | vllm | más baja | ninguna: vLLM también responde a eso |
 
 **La regla (`route_hints`, nuevo en `SourceConfig`):** expresiones regulares que nombran un dominio.
 - **Cuándo actúa:** si la pregunta coincide **y** ese dominio pasa su propio umbral, va primero. Si no pasa el umbral, el enrutado sigue como antes.
@@ -168,8 +168,8 @@ Los documentos existen en los dos idiomas, para que "about" responda bien en amb
 | About EN | 0.722 → **0.778** (se van a vLLM: 4) | 0.17 / 0.33 / 0.33 / 0.56 → 0.22 / 0.39 / 0.39 / 0.61 |
 | About ES | 0.833 → **0.889** (se van a vLLM: 2) | 0.28 / 0.33 / 0.44 / 0.50 → 0.33 / 0.39 / 0.50 / 0.56 |
 
-- **Lo que arregla:** "¿Qué es RAG against the Machine?" en los dos idiomas.
-- **Lo que no arregla:** "Which language model does the project use by default?" y "Where is the project deployed?" sí tienen la pista, pero "about" no pasa su umbral (−2.25 y −2.91 frente a −1.0). La regla no las fuerza, y es lo que se buscaba.
+- **Lo que arregla:** about-01 en los dos idiomas.
+- **Lo que no arregla:** about-02 y about-11 (EN) sí tienen la pista, pero "about" no pasa su umbral (−2.25 y −2.91 frente a −1.0). La regla no las fuerza, y es lo que se buscaba.
 - **El resto** (embeddings, código Python) son preguntas que la documentación de vLLM también responde, sin ninguna palabra que las distinga.
 
 **Pruebas:** `test_a_hinted_domain_wins_when_it_passes_its_threshold` y `test_a_hint_alone_does_not_route` en `tests/test_router.py`. 109 tests; flake8 y mypy limpios.
@@ -182,15 +182,15 @@ Los documentos existen en los dos idiomas, para que "about" responda bien en amb
 - **`make api`:** `API_DOMAINS` pasa a estar vacío, así que la web sirve todos los dominios indexados. El servidor de despliegue ya servía todo lo del bundle.
 - **Textos de la web:** la presentación y el campo de pregunta mencionan el proyecto ("…and the project explaining itself").
 
-**Preguntas de ejemplo** (`web/src/examples.ts`). Todas se han comprobado con el índice real, buscando en todos los dominios:
+**Preguntas de ejemplo** (`web/src/examples.ts`). Todas se han comprobado con el índice real, buscando en todos los dominios. Las preguntas sobre el proyecto se nombran por su identificador del banco abierto (`A-NN`, lista en `RESPUESTAS_ARCHIVADAS.md`):
 
 | Ejemplo | Llega a | ¿Pasa el filtro? |
 |---|---|---|
-| vLLM, XQuAD (2), CV (2), "What is RAG against the Machine?", "How does the router choose a domain?", "¿Cómo se mide el recall?" | su dominio | sí |
+| vLLM, XQuAD (2), CV (2) y tres sobre el proyecto (A-04, A-12, A-14) | su dominio | sí |
 | ~~"Which instrument does he play?"~~ | vllm (−3.77) | no. **Ya fallaba sin "about"**: suelta, la pregunta no dice quién es "he" |
 | → "Which instrument does Chrystian play?" | cv (3.52) | sí |
-| ~~"¿Qué modelos usa el proyecto?"~~ | vllm (−0.83) | no |
-| → "¿Qué modelo de lenguaje usa el proyecto?" | about (1.09) | sí |
+| ~~Un ejemplo sobre los modelos del proyecto~~ (literal en `RESPUESTAS_ARCHIVADAS.md`) | vllm (−0.83) | no |
+| → A-13 | about (1.09) | sí |
 
 **Tarjetas de recall: "about" no sale.** Su recall con el evaluador de 42 es bajo (R@5 0.39 / 0.50), aunque la respuesta está entre las 5 primeras fuentes en el 89 % de las preguntas (§7a.5). La tarjeta daría una idea equivocada.
 
@@ -220,20 +220,20 @@ El bucle es la degeneración de la generación *greedy* en respuestas largas: el
 
 **Reproducción** (Phi-4-mini, 10 fuentes, límite de 1.500 tokens, 6 preguntas de "paso a paso" y listas): 3 de las 6 agotan el límite. Las otras tres terminan solas en 133–493 tokens.
 
-| Pregunta | Cómo degenera |
+| Pregunta (texto y salida literales en `RESPUESTAS_ARCHIVADAS.md`) | Cómo degenera |
 |---|---|
-| "Give me a step-by-step guide to serve a model with vLLM" | Desde el paso 26, la misma línea una y otra vez ("For more information… [1]") |
-| "List all the command-line options of vllm serve" | Dos líneas alternas (`--help=serve=ApiServerCount` / `--help=serve=Headless`) desde la opción 29 |
-| "Paso a paso de vLLM" | En prosa, sin saltos de línea: "En la séptima etapa…", "En la décima etapa…", "En la decimotercera…". **Cambia palabras en cada vuelta**, como habías visto: por eso penalizar la repetición no sirve |
-| Las tres | Terminan con "step step step…" hasta el límite |
+| L-1, guía para servir un modelo con vLLM (EN) | Desde el paso 26, la misma línea una y otra vez |
+| L-2, opciones de línea de comandos (EN) | Dos líneas que se alternan desde la opción 29 |
+| L-3, guía de vLLM en tres palabras (ES) | En prosa, sin saltos de línea, la misma frase con el ordinal cambiado. **Cambia palabras en cada vuelta**, como habías visto: por eso penalizar la repetición no sirve |
+| Las tres | Terminan con la misma palabra repetida hasta el límite |
 
 **Microsoft** recomienda en la ficha del modelo lo mismo que ya hacemos: *greedy* (`do_sample=False`) y un máximo de 500 tokens. La propia ficha avisa de que Phi-4 "puede generar respuestas repetitivas".
 
 **Idea: detector de bucles por similitud de frases.** En lugar de comparar n-gramas exactos (descartado en `FASE_6.md` §6g: saltaba en 32 de 3.933 respuestas buenas), compara **frases y líneas enteras** con una similitud aproximada:
 - **Unidad:** cada línea y cada frase, normalizadas (sin numeración de lista ni citas `[n]`).
-- **Ventana:** en las últimas 8 unidades, si 5 o más son casi copias (similitud ≥ 0.95, `difflib`) de una anterior de la ventana, es un bucle.
+- **Ventana:** en las últimas 8 unidades, si 5 o más son casi copias (similitud ≥ 0.95, `difflib`) de una anterior de la ventana, es un bucle. *(Ventana 12 desde DEC-28, §7b.7.)*
 - **Fuera de la comparación:** tablas, HTML, logs, código y bloques sangrados, que repiten su forma por naturaleza.
-- **Además:** la misma palabra 12 veces seguidas ("step step step…").
+- **Además:** la misma palabra 12 veces seguidas.
 - **Al detectarlo:** se para la generación y se recorta la respuesta donde empieza la repetición, conservando lo bueno.
 
 **Medido** (prototipo en `data/output/loop_detector/`, fuera de git):
@@ -258,12 +258,12 @@ El bucle es la degeneración de la generación *greedy* en respuestas largas: el
 
 | Pregunta | Antes | Con el detector |
 |---|---|---|
-| Paso a paso de vLLM | 1.500 tokens, 67 s | **419 tokens, 34 s** |
-| Step-by-step guide to serve a model | 1.500 tokens, 69 s | **661 tokens, 47 s** |
-| Command-line options of vllm serve | 1.500 tokens, 73 s | **499 tokens, 35 s** |
+| L-3 | 1.500 tokens, 67 s | **419 tokens, 34 s** |
+| L-1 | 1.500 tokens, 69 s | **661 tokens, 47 s** |
+| L-2 | 1.500 tokens, 73 s | **499 tokens, 35 s** |
 | Las otras 3 | 133 / 248 / 493 tokens | **idénticas, carácter a carácter** |
 
-Las respuestas recortadas terminan en una línea completa. La de prosa conserva algunas frases ya repetitivas ("séptima… décima etapa"), que son las que el detector usa de referencia antes de confirmar el bucle.
+Las respuestas recortadas terminan en una línea completa. La de prosa conserva algunas frases ya repetitivas, que son las que el detector usa de referencia antes de confirmar el bucle.
 
 **Benchmarks:** no cambian. Con 150 tokens no hay bucles (0 de 11.550 respuestas marcadas).
 
@@ -271,7 +271,7 @@ Las respuestas recortadas terminan en una línea completa. La de prosa conserva 
 
 **Pruebas:** `tests/test_loops.py` (6 tests: línea repetida, dos líneas alternas, frases con una palabra cambiada, palabra repetida, y tablas, código y respuestas buenas sin falso positivo).
 
-**Caso visto de paso:** "Paso a paso de vLLM" (corta y ambigua) va a "about" (3.13 frente a 2.09 de vLLM), porque la documentación habla del "paso a paso" del RAG. Con una formulación completa ("Explícame paso a paso cómo usar vLLM") va a vLLM (3.0 frente a 1.2). No se toca el router por un caso límite.
+**Caso visto de paso:** L-3 (corta y ambigua) va a "about" (3.13 frente a 2.09 de vLLM), porque la documentación habla del "paso a paso" del RAG. Con una formulación completa ("Explícame paso a paso cómo usar vLLM") va a vLLM (3.0 frente a 1.2). No se toca el router por un caso límite.
 
 ## 7b.3 — Respuestas que copian el prompt (eco)
 
@@ -280,9 +280,9 @@ Las respuestas recortadas terminan en una línea completa. La de prosa conserva 
 - **1.7B, Phi-4-mini y 4B:** vllm (25 por set), cv y about.
 
 **Lo que viste:**
-- Con Phi y "What is RAG against the Machine?", la "respuesta" eran las 5 fuentes copiadas con sus cabeceras (`[1] --- file: README.md ---…`), y la respuesta de verdad (`ANSWER: …`) llegaba al final, cortada por el límite de tokens.
+- Con Phi y A-04, la "respuesta" eran las 5 fuentes copiadas con sus cabeceras, y la respuesta de verdad (tras `ANSWER:`) llegaba al final, cortada por el límite de tokens (literal en `RESPUESTAS_ARCHIVADAS.md`).
 - La etiqueta mal puesta de la fuente [4] era una copia equivocada de Phi; el índice estaba bien (comprobado).
-- El 0.6B hace lo mismo a pequeña escala: acaba con *"The answer is in English, citing the sources by number."*, que es nuestra última instrucción repetida.
+- El 0.6B hace lo mismo a pequeña escala: acaba repitiendo nuestra última instrucción del prompt.
 
 **Medirlo (DEC-20):** suite `about` en `gen-bench` y dos métricas nuevas, `echo` y `bad_citation` (`src/evaluation/gen_bench.py`). Eco en la línea base:
 
@@ -334,7 +334,7 @@ Para una pregunta en inglés, "about" devolvía copias en español del mismo doc
 | Ambos idiomas | 0.28 / 0.50 / 0.56 / 0.72 | 0.33 / 0.44 / 0.61 / 0.72 | 0.67 / 0.78 / 0.83 | 0.72 / **0.83 / 0.83** | 3 / 0 |
 | **Solo inglés** | 0.28 / 0.50 / 0.56 / 0.72 | idéntico | 0.67 / 0.78 / 0.83 | idéntico | 3 / 5 |
 
-- **Por qué "ambos idiomas" pierde en español:** la sección inglesa recuperada a veces contiene la respuesta y la sección española recuperada es otra. Por ejemplo, para "¿Qué es RAG against the Machine?" se quitaba el fragmento del `README.md` inglés que contiene "Retrieval-Augmented Generation".
+- **Por qué "ambos idiomas" pierde en español:** la sección inglesa recuperada a veces contiene la respuesta y la sección española recuperada es otra. Por ejemplo, para about-01 en español se quitaba el fragmento del `README.md` inglés que contiene "Retrieval-Augmented Generation".
 
 **Generación** (filtro "solo inglés" `83-*` frente a sin filtro `84-*`, mismo índice):
 
@@ -345,33 +345,35 @@ Para una pregunta en inglés, "about" devolvía copias en español del mismo doc
 | Phi-4-mini | citas correctas 0.33 → 0.17, "no encontrado" 0.17 → 0.28; idioma 0.80 → 0.92 | = |
 | Qwen3-4B | contiene 0.61 → 0.67; "no encontrado" 0.22 → 0.28 | = |
 
-**Decisión (DEC-23):** queda **desactivado** en `rag.toml` (comentado), porque empeora métricas de los modelos opcionales. Es muy bueno para el 0.6B, el que se despliega: activarlo es descomentar dos líneas, sin reindexar.
+**Decisión (DEC-23):** queda **desactivado** en `rag.toml` (comentado), porque empeora métricas de los modelos opcionales. Es muy bueno para el 0.6B, el que se despliega: activarlo es descomentar dos líneas, sin reindexar. *(Activado en §7b.8, DEC-34.)*
 
 **Pruebas:** `test_translated_copies_are_recognised` (`tests/test_retriever.py`).
 
 ## 7b.5 — Preguntas que nombran el proyecto o al autor
 
-**"Háblame sobre este rag"** iba a vLLM (1.04 frente a −1.85 de "about"), y aunque hubiera ido a "about", su filtro (−1.0) la habría rechazado.
+*(Retirado en §7b.8, DEC-33.)*
+
+**A-02** (pedir que hable del RAG, sin nombrarlo) iba a vLLM (1.04 frente a −1.85 de "about"), y aunque hubiera ido a "about", su filtro (−1.0) la habría rechazado.
 
 **`route_names`** (nuevo en `SourceConfig`; `DomainRouter.named` en `src/rag/router.py`): expresiones que nombran el dominio sin ambigüedad. Si coinciden, ese dominio gana **y su filtro no se aplica**, en el enrutado y también cuando es el único dominio del filtro.
 - **En "about":** "rag against the machine", "este/esta/tu/vuestro + rag/proyecto/sistema/chatbot/asistente/web/aplicación" y "this/your + rag/project/system/chatbot/assistant/website/app".
 - **"The project" y "el proyecto"** siguen como pista débil (`route_hints`): deben pasar el umbral, por la pregunta de XQuAD que dice "the project".
 - **Comprobado:** ningún patrón coincide con preguntas de los demás benchmarks (vLLM, XQuAD, CV, fuera de dominio, conversaciones).
 
-**8 preguntas que nombran el proyecto** (`named.py`), antes (commit) y ahora:
+**8 preguntas que nombran el proyecto** (`named.py`; identificadores del banco abierto), antes (commit) y ahora:
 
 | Pregunta | Antes | Ahora |
 |---|---|---|
-| Háblame sobre este rag | vLLM, no encontrado | about |
-| Tell me about this RAG | vLLM (3.91) | about |
-| What does this project do? | XQuAD | about |
-| ¿Qué hace el agente de este proyecto? | CV | about |
-| ¿Qué modelos usa este sistema? | about, no encontrado | about |
-| How was this website built? | about, no encontrado | about |
-| ¿Quién ha hecho esta aplicación? | XQuAD | about |
-| Which reranker does your system use? | about, no encontrado | about |
+| A-02 | vLLM, no encontrado | about |
+| A-03 | vLLM (3.91) | about |
+| A-06 | XQuAD | about |
+| A-07 | CV | about |
+| A-08 | about, no encontrado | about |
+| A-09 | about, no encontrado | about |
+| A-10 | XQuAD | about |
+| A-11 | about, no encontrado | about |
 
-**El autor, para el CV** (pista débil `\b(chrystian|donaire)\b` en `[sources.cv]`): con un índice de "about" más grande, "What is Chrystian's contact e-mail?" acababa en "about" (0.17), que la respondía con código. Con la pista, si la pregunta nombra al autor y el CV pasa su umbral (−3.0), gana el CV. Solo coinciden preguntas del CV.
+**El autor, para el CV** (pista débil `\b(chrystian|donaire)\b` en `[sources.cv]`): con un índice de "about" más grande, una pregunta del CV por el correo de contacto acababa en "about" (0.17), que la respondía con código. Con la pista, si la pregunta nombra al autor y el CV pasa su umbral (−3.0), gana el CV. Solo coinciden preguntas del CV.
 
 **Route-bench** (`85-night-final` frente a `76-about-hints`, el estado del commit): mismo enrutado en todos los conjuntos. Con el índice nuevo de "about" (antes de restaurarlo, `79-cv-name-hint`), la pista del CV devolvió el CV a 0.967 / 0.967 desde 0.933 / 0.933.
 
@@ -380,7 +382,7 @@ Para una pregunta en inglés, "about" devolvía copias en español del mismo doc
 ## 7b.6 — Índice de "about" y verificación final
 
 **El índice de "about" crece y empeora.** Reindexado esta noche (753 padres, +35, por la documentación del día 24), la generación de "about" baja frente a la línea base **sin cambiar el código** (`84-*` frente a `80-*`; por ejemplo, el 1.7B en ES contiene 0.67 → 0.56), y una pregunta de "about" en ES pasa a vLLM.
-- **Decisión (DEC-25):** se **restaura el índice de la línea base** desde `deploy/bundle` (718 padres, SHA256 comprobado). La documentación nueva no entra en "about" hasta reindexar, y habrá que decidir qué partes ve (`about:skip`) antes del despliegue.
+- **Decisión (DEC-25):** se **restaura el índice de la línea base** desde `deploy/bundle` (718 padres, SHA256 comprobado). La documentación nueva no entra en "about" hasta reindexar, y habrá que decidir qué partes ve (`about:skip`) antes del despliegue. *(Reindexado en §7b.8, DEC-37.)*
 - **Preparado sin efecto hasta reindexar:** `deploy/space/README.md` (la ficha antigua del Space) sale de "about".
 
 **Verificación final** (estado en que lo dejo: prompt `v3`, `strip_echo`, `route_names`, pista del CV, filtro de idioma desactivado e índice de la línea base):
@@ -398,14 +400,14 @@ Para una pregunta en inglés, "about" devolvía copias en español del mismo doc
 ## 7b.7 — Forma de las respuestas: preguntas abiertas, eco de Phi y bucles (sesión del 25 al 26)
 
 **Lo que viste en la web tras la noche anterior:**
-- **Phi-4-mini:** sigue copiando fuentes con "Hablame sobre este rag" y con "What is RAG against the Machine?", y la segunda respuesta sale cortada.
-- **0.6B:** "Hablame sobre este rag" no da ninguna respuesta.
+- **Phi-4-mini:** sigue copiando fuentes con A-01 y con A-04, y la segunda respuesta sale cortada.
+- **0.6B:** A-01 no da ninguna respuesta.
 - **1.7B:** responde bien.
 
 Regla de la sesión: ningún caso puede empeorar. Decisiones DEC-27 a DEC-31 en `decisions.md`.
 
 **Por qué no funcionaba:**
-- **0.6B, respuesta vacía:** la limpieza de la instrucción repetida (`INSTRUCTION_ECHO`, §7b.3) iba de "citing the sources by number" hasta el último punto, atravesando los dos puntos, así que en *"The answer in Spanish, citing the sources by number, is: [1] …"* se comía toda la respuesta.
+- **0.6B, respuesta vacía:** la limpieza de la instrucción repetida (`INSTRUCTION_ECHO`, §7b.3) iba de "citing the sources by number" hasta el último punto, atravesando los dos puntos, así que cuando el 0.6B repetía la instrucción seguida de dos puntos y la respuesta, se comía toda la respuesta.
   - **Arreglo:** el patrón no cruza los dos puntos, y si la limpieza deja la respuesta vacía, se devuelve la original.
   - **Comprobado:** 0 cambios en las 4.662 respuestas guardadas de `80`/`81`/`82`.
 - **Phi:** en la web hay dos fallos que `strip_echo` no puede arreglar.
@@ -422,17 +424,17 @@ Regla de la sesión: ningún caso puede empeorar. Decisiones DEC-27 a DEC-31 en 
 - **Línea base `90-*`:** la matriz de `gen-bench` a 1.024 tokens más el banco abierto, con el código de la noche anterior más el arreglo del 0.6B.
 
 **Cambios:**
-1. **Detector de bucles, ventana 8 → 12** (DEC-28). Un bucle de Phi de 4 frases ("The Spanish BENCHMARK_REPORT.md file…") no se detectaba, porque en una ventana de 8 nunca hay 5 copias. Con 12 se detectan ciclos de hasta 7 frases.
+1. **Detector de bucles, ventana 8 → 12** (DEC-28). Un bucle de Phi de 4 frases no se detectaba, porque en una ventana de 8 nunca hay 5 copias. Con 12 se detectan ciclos de hasta 7 frases.
    - 4 de 7 bucles reproducidos, frente a 3 de 7 con ventana 8.
    - 0 falsos positivos en 14.261 respuestas y 299 documentos.
-2. **Reintento cuando Phi copia las fuentes** (DEC-29, `EchoStart` en `src/rag/generator.py`).
+2. **Reintento cuando Phi copia las fuentes** (DEC-29, `EchoStart` en `src/rag/generator.py`). *(Retirado en §7b.8, DEC-32.)*
    - **Cuándo:** la respuesta empieza con una cabecera de fuente o una etiqueta (`[n] ---`, `SOURCES:`, `QUESTION:`) y llega a copiar una segunda.
    - **Qué hace:** se para y se genera otra vez, sin dejar empezar por `[` y sin dejar escribir cabeceras ni etiquetas.
    - **En la web:** el principio de la respuesta se retiene hasta saber que no es un eco, así que la copia nunca llega a la pantalla.
    - **Coste:** tarda el doble, pero solo en estos casos.
-   - **Por qué hace falta una segunda copia:** la versión que reintentaba con la primera cabecera (`91-*`) mejoraba la forma de ~11 respuestas del 0.6B, pero perdía una (Toyota/ES: "2017" → "febrero de 2014").
+   - **Por qué hace falta una segunda copia:** la versión que reintentaba con la primera cabecera (`91-*`) mejoraba la forma de ~11 respuestas del 0.6B, pero perdía una (una pregunta de XQuAD/ES que pasaba a dar una fecha equivocada; literal en `RESPUESTAS_ARCHIVADAS.md`).
 3. **Bloques repetidos** (DEC-30, `repeated_block` en `src/rag/loops.py`): 6 o más frases seguidas que repiten las de un poco antes, con un ciclo de hasta 40 frases.
-   - Detecta los ciclos largos de Phi (14 frases sobre la búsqueda híbrida, hasta 1.016 tokens) y la respuesta escrita dos veces ("…dispositivo). La respuesta en español, citando las fuentes, es: <la misma respuesta>").
+   - Detecta los ciclos largos de Phi (14 frases sobre la búsqueda híbrida, hasta 1.016 tokens) y la respuesta escrita dos veces, con la instrucción repetida en medio.
    - Con bloques de 4 daba falsos positivos en 4 documentos de vLLM; con 5 o más, ninguno. Se usa 6 por margen.
    - En 15.793 respuestas y 299 documentos solo cambian las de Phi que repetían.
 
@@ -447,20 +449,20 @@ Regla de la sesión: ningún caso puede empeorar. Decisiones DEC-27 a DEC-31 en 
 
 **Cambios de Phi:**
 - **Commit de Triton (vLLM):** pasa de copiar 1.461 caracteres de la documentación a *"…is `e5be006` [1]"*.
-- **"What is RAG against the Machine?":** pasa de 49 tokens cortados a media frase a una respuesta completa.
-- **"¿Qué es RAG against the Machine?":** deja de escribir la respuesta dos veces (773 → 375 tokens).
+- **A-04:** pasa de 49 tokens cortados a media frase a una respuesta completa.
+- **A-05:** deja de escribir la respuesta dos veces (773 → 375 tokens).
   - Por eso bajan dos métricas de about/ES de Phi: "cites" 0.93 → 0.86 y "citation ok" 0.38 → 0.33.
   - Las citas de esa respuesta (`[1][2][3][4][5]`) solo estaban al final de la copia.
-- **"How does the hybrid search work?":** 1.016 → 307 tokens, sin el ciclo.
-- **"How was this website built?":** de un trozo de changelog copiado a una respuesta redactada.
-- **"Hablame sobre este rag":** de copiar 873 tokens de fuentes a *"No se encuentra en las fuentes proporcionadas."*
+- **A-15:** 1.016 → 307 tokens, sin el ciclo.
+- **A-09:** de un trozo de changelog copiado a una respuesta redactada.
+- **A-01:** de copiar 873 tokens de fuentes a "no encontrado".
 
 **Lo que queda:**
-- **"Hablame sobre este rag":** el 0.6B responde *"The answer in Spanish, citing the sources by number, is: [1] "Hablame sobre este rag" and [4] …"*, ya no vacía pero mala, y Phi dice que no lo encuentra.
+- **A-01:** el 0.6B da una respuesta ya no vacía pero mala (repite la instrucción y cita la propia pregunta; literal en `RESPUESTAS_ARCHIVADAS.md`), y Phi dice que no lo encuentra.
   - Con esa pregunta, las fuentes que llegan son pobres: secciones sueltas del ROADMAP y los changelogs.
-  - Si se busca con el nombre del proyecto en lugar de "este rag", las fuentes mejoran para las preguntas generales, pero empeoran para las concretas (reranker, agente, web). No aplicado.
+  - Si se busca con el nombre del proyecto en lugar de la forma en que lo nombra A-01, las fuentes mejoran para las preguntas generales, pero empeoran para las concretas (reranker, agente, web). No aplicado.
 - **Phi en "about" sigue siendo prolijo:** resume cada fuente una tras otra.
-  - Repite datos falsos de `deploy/space/README.md` (la ficha antigua del Space: "Hugging Face Space", "Agent (default)"), que sigue en el índice restaurado (DEC-25).
+  - Repite datos falsos de `deploy/space/README.md` (la ficha antigua del Space: el despliegue y el agente por defecto), que sigue en el índice restaurado (DEC-25).
   - Se arregla al reindexar "about" (ya está excluida en `rag.toml`); es tu decisión pendiente.
 - **Banco abierto del 4B en `92`:** el 4B no carga en el proceso del banco abierto (llm_sdk descarga parte a la CPU con 12 GB; en `90` sí cargó).
   - Sus respuestas no pueden cambiar: en `90` no tiene eco ni bloques repetidos, y en `gen-bench` es idéntico.
@@ -468,6 +470,129 @@ Regla de la sesión: ningún caso puede empeorar. Decisiones DEC-27 a DEC-31 en 
 - **Incidencia:** una prueba de Phi que debía ir en CPU usó la GPU y bloqueó la línea base de 00:45 a 14:05. No afecta a ningún resultado (generación determinista), solo a los tiempos de `90-q06-xquad`.
 
 **Pruebas:** 129 tests (nuevos: el reintento y los bloques repetidos); flake8 y mypy limpios. `make bench` de 42 (`93-session-final`) **idéntico**: docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88.
+
+## 7b.8 — Solo Qwen, sin trampas (sesión del 26 al 27)
+
+**Punto de partida:** el commit `644c455` (checkpoint de §7b.7) y tus decisiones de esa tarde:
+- **Phi-4-mini fuera** ("el problema de Phi ya es insalvable"): se queda la familia Qwen3.
+- **Limpieza encima del commit actual**, no volver a una versión anterior: se conserva lo que funciona (métricas, banco abierto y detector de bucles).
+- **Quitar las trampas**, aunque empeoren las preguntas poco concretas.
+- **El filtro de idioma se queda**, y si se le puede dar al LLM una pista del idioma, mejor.
+- **Toda la documentación al día**, sin contradicciones.
+
+Decisiones DEC-32 a DEC-38 en `decisions.md`.
+
+### Qué ha cambiado
+
+| Fichero | Cambio | Por qué |
+|---|---|---|
+| `src/rag/generator.py` | Vuelve a la versión de `02ff464` (sin el reintento por eco de Phi: `EchoStart`, constantes `ECHO_*`, streaming retenido) más `strip_echo` con el arreglo del 0.6B | DEC-32, DEC-35 |
+| `src/rag/router.py`, `src/config.py`, `src/rag/retriever.py` | Fuera `route_names` (`DomainRouter.named`, el campo de `SourceConfig` y su compilación) | DEC-33 |
+| `rag.toml` | Fuera el perfil `llm-phi4-mini`, `route_names` y la pista del CV; las pistas de "about" vuelven a las de `8ff05d0`; `translations` y `translation_languages = ["en"]` activados | DEC-32, DEC-33, DEC-34 |
+| `Makefile` | `API_MODELS ?= default,llm-qwen3-1.7b` | DEC-32 |
+| `web/src/App.tsx` | Fuera la nota de Phi del selector (web recompilada) | DEC-32 |
+| `tests/test_generator.py`, `tests/test_router.py` | Fuera los tests del reintento y de `route_names` | — |
+| `src/agent/toolcalls.py`, `src/api/app.py`, `src/rag/loops.py` | Solo comentarios y docstrings (Phi como opción hasta la Fase 7; referencias de sección) | Que el código no contradiga a los documentos |
+| `bench/datasets/about/` | Ground truth regenerado con `build_about_bench`; about-11 responde ahora "Oracle" (decía "Hugging Face") y about-17 apunta a la firma actual de `stopping_criteria` | DEC-37 |
+| `README.md`, `docs/es/README.md` | Cuatro dominios (con "about"), solo modelos Qwen, sección "Modelos" con la retirada de Phi, despliegue en Oracle (ya no Hugging Face), agente desactivado en la web, chip "about" siempre activo | Contradicciones encontradas en el diagnóstico (abajo) |
+| `deploy/README.md`, `deploy/space/README.md` | Dominios y modelos al día; la ficha del Space avisa de que el despliegue real está en Oracle | Ídem |
+| `docs/es/DETECTOR_BUCLES.md` | Ventana 12, bloques repetidos y §8 con la actualización | Seguía describiendo la ventana 8 |
+| `docs/es/ROADMAP.md`, `docs/ROADMAP.md`, `BENCHMARK_REPORT.md`, `decisions.md`, este changelog (ES y EN) | Estado de la sesión; el inglés, sincronizado con todo lo que faltaba desde `8ff05d0` (§7a.6–7b.8, DEC-19 a DEC-38) | Tu encargo |
+
+### Diagnóstico previo: ¿las preguntas vagas o los datos duplicados rompen "about"?
+
+Me preguntaste las dos cosas antes de decidir. Medido solo con la recuperación (API, índice restaurado de DEC-25):
+- **Las preguntas concretas fallan por sí solas**, no por culpa de las vagas: con el filtro de la web, 6 de 36 se van a vLLM o XQuAD; solo con "about", su umbral (−1.0) rechaza 7 de 36 (por ejemplo, about-02 en inglés, −2.07).
+- **Las copias EN/ES sí ocupan sitio:** en 5 de 18 preguntas en inglés, la copia en español de un documento ocupa huecos del top 5 (1 de 18 en español). Es lo que arregla el filtro de idioma (DEC-34).
+- **Había contradicciones de verdad en el índice:**
+  - El README decía "Hugging Face Space" y "agente por defecto" (cierto en la CLI, no en la web).
+  - "Oracle" solo aparecía en `docs/es`.
+  - Un fichero fantasma, `docs/nextstep.md` (19 trozos), estaba en el índice aunque ya no existe en disco ni estuvo nunca en git.
+  - La ficha antigua del Space (`deploy/space/README.md`) seguía dentro del índice restaurado.
+- **El historial pesa mucho:** el README son 44 de los 1.613 puntos de Markdown del índice (contando padres e hijos; 2.726 puntos en total). En el índice nuevo, el historial (changelogs, `decisions.md`, `DETECTOR_BUCLES.md`) son 1.121 de los 1.623 trozos de documentación.
+
+### Mediciones
+
+Misma matriz que §7b.7 (`gen-bench` a 1.024 tokens; banco abierto de 34 preguntas; `route-bench`), un cambio cada vez. Hasta `96`, con el mismo índice:
+
+| Ejecución | Cambio | `gen-bench` frente a la anterior | Banco abierto | Route-bench |
+|---|---|---|---|---|
+| `94` | Limpieza (sin Phi, sin reintento, sin `route_names` ni pista del CV), filtro apagado | **Idéntico a `92`** en las 10 ejecuciones de los Qwen | 9 respuestas cambian por modelo (0.6B y 1.7B), todas preguntas que nombraban el proyecto (DEC-33) | **Idéntico** a `76` y `85` |
+| `95` | + filtro de idioma | Solo cambia about/EN (DEC-34) | 2 cambios por modelo, a mejor o igual | about/EN R@5 0.39 → 0.44, R@10 0.61 → 0.56 |
+| `96` | + pista de idioma (opción A de DEC-36) | 22 métricas bajan; 158 respuestas cambian en XQuAD/ES del 0.6B; idioma de about/ES del 0.6B 1.00 → 0.86 | — | — |
+| `97` | `95` (sin la pista) + "about" reindexado | vLLM, XQuAD y CV idénticos a `95`; cambia "about" (ver `98`) | 12 de 34 cambian por modelo (DEC-37) | Igual salvo CV y "about" (ver `98`) |
+| `98` | `97` con el ground truth de "about" regenerado | about/ES mejora (contiene 0.61–0.78), about/EN baja una pregunta por modelo | — | about R@5 EN 0.33, ES 0.67; CV enrutado 0.933 / 0.900 |
+| `99` | Experimento: "about" sin historial (revertido) | Contiene EN sube con los tres modelos (0.44–0.67 → 0.61–0.72); ES baja (0.61–0.78 → 0.50–0.67) | 0.6B: unas 7 de 12 a mejor, sin eco ni idioma mal; 1.7B: responde en inglés a 3 preguntas en español | about R@5 EN 0.50, ES 0.78; es/docs de 42 enrutado 0.9 → 1.0; XQuAD/ES −2 preguntas |
+| `100` | Estado final, tras escribir la documentación | Contiene EN / ES: 0.6B 0.44 / 0.50, 1.7B 0.56 / 0.72, 4B 0.72 / 0.83; "no encontrado" falso en ES a 0 | 12 de 34 cambian frente a `97` por modelo; **7 de las 12 preguntas sobre el proyecto se responden citando notas de los changelogs y de `decisions.md`**, también las de esta sesión | about enrutado EN 0.889 · ES 0.944, R@5 EN 0.33 · ES 0.61; XQuAD/EN, una pregunta más a "about"; el resto, como `98` |
+
+**`96`, la pista de idioma:** no se adopta (DEC-36). Empeora justo lo que quería mejorar: el idioma del 0.6B en about/ES (a about-01 responde solo con una cita, sin texto) y, de rebote, XQuAD/ES y el mensaje del CV en preguntas privadas (sin fugas). Queda abierta otra forma de dar la pista (opción C).
+
+**`97`–`98`, el reindexado:** detalle en DEC-37. Tres cosas a saber:
+- **El ground truth de "about" guarda offsets de caracteres.** Al editar el README se movieron 16 de los 18 pasajes; `97` daba un recall falso (EN R@5 0.28). Regenerado con `python -m src build_about_bench` (`98`). Hay que repetirlo cada vez que se edite la documentación.
+- **El español mejora y el inglés baja un poco.** Pero se duplican las respuestas que cambian de idioma a mitad (10 → 20 en toda la matriz, todas las nuevas en about/ES y en el banco abierto), y el CV pierde 1–2 preguntas de enrutado frente a "about".
+- **La documentación se cita a sí misma:** los changelogs copiaban las preguntas de prueba, y la búsqueda devolvía la cita en lugar de la respuesta (ejemplos literales en `RESPUESTAS_ARCHIVADAS.md`). Medido sin el historial en `99`; arreglado en §7b.9.
+
+**`99`, "about" sin el historial:** los changelogs, `decisions.md` y `DETECTOR_BUCLES.md` son 1.121 de los 1.623 trozos de documentación. Sin ellos, el recall de "about" sube mucho y la autocita casi desaparece, pero el español pierde material en su idioma ("contiene" y el idioma bajan). Sin un ganador claro: se revierte y queda como decisión tuya (tabla completa y opciones en DEC-37).
+
+**`100`, el estado final:** "about" reindexado con toda esta documentación (2.616 trozos, 892 padres). El `gen-bench` en español sube con el 1.7B y el 4B (0.72 y 0.83), pero el banco abierto empeora: documentar la autocita la agrava, porque §7b.8 y DEC-37 citan otra vez las preguntas. A A-09 los dos modelos responden con el texto de DEC-37. Es el argumento más fuerte para la opción B (DEC-37). *(Al final se eligió otra vía: §7b.9.)*
+
+**El 4B en el banco abierto:** como en `92`, no carga en ese proceso (llm_sdk manda parte del modelo a la CPU). Su `gen-bench` sí se mide.
+
+**Pruebas:** 123 tests (fuera los 6 del reintento y de `route_names`), flake8 y mypy limpios. 42 (`97-final`) idéntico: docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88.
+
+**Pendiente de ti:** ~~el historial dentro de "about" (DEC-37)~~ → resuelto en §7b.9 sin sacarlo del índice; otro modelo de otra familia (DEC-32), la opción C de la pista de idioma (DEC-36) y rehacer el bundle antes de desplegar (DEC-38).
+
+## 7b.9 — Fuera las citas de preguntas de prueba y respuestas incorrectas (2026-10-27, decisión tuya)
+
+**Lo que viste en la web con el estado de §7b.8:** a A-04 el 1.7B respondió explicando `clean_output` y `strip_echo` con el texto de `decisions.md`, y a A-13 el 0.6B dijo "no encontrado". Es la autocita de DEC-37, la misma que había medido en el banco abierto de `100` y que no traduje en "esto se nota en la web".
+
+**Tu decisión:** quitar todas las citas de respuestas incorrectas y guardarlas, si se quieren conservar, en un fichero fuera de la indexación. Detalle y opciones en DEC-39.
+
+### Qué ha cambiado
+
+| Fichero | Cambio |
+|---|---|
+| `docs/es/RESPUESTAS_ARCHIVADAS.md` | **Nuevo, fuera del índice.** Las preguntas de prueba y las respuestas incorrectas al pie de la letra, con la sección de origen de cada una, y las listas de identificadores: `A-01`…`A-16` (banco abierto), `about-01`…`about-18` (benchmark de "about") y `L-1`…`L-3` (bucles de Phi) |
+| `rag.toml` | `docs/es/RESPUESTAS_ARCHIVADAS.md` en `exclude_paths` de `[sources.about]` |
+| `docs/es/changelog/FASE_7.md`, `docs/es/decisions.md` y sus traducciones | Las preguntas sobre el proyecto se nombran por su identificador y las respuestas malas se describen sin copiarlas (unas 35 sustituciones por fichero) |
+| `docs/es/DETECTOR_BUCLES.md` | Los bucles de ejemplo se describen; las salidas literales pasan al archivo |
+| `docs/es/ROADMAP.md`, `docs/ROADMAP.md`, `FASE_6.md` (ES y EN) | Las menciones sueltas (la pregunta abierta pendiente, las frases de `route_names`, el bucle de la revisión de la web) |
+| `bench/datasets/about/` | Ground truth regenerado (`build_about_bench`), porque cambian los offsets del ROADMAP |
+
+**Qué se ha quitado y qué no:** todas las respuestas incorrectas copiadas, y el texto de todas las preguntas de prueba sobre el proyecto (también las bien respondidas), porque lo que atrae a la búsqueda es la pregunta. Se quedan: las preguntas de vLLM, XQuAD y CV citadas sin respuesta mala, las respuestas correctas, los textos de la interfaz y del prompt, y "capital of France" → "Paris", que no es incorrecta (B15). Las transcripciones del CV ya estaban fuera con `about:skip`. El código no se toca. Lista completa en el §8 del archivo.
+
+**Comprobado:** un script recorre todo lo que indexa "about" y no encuentra ninguna de las 36 preguntas del benchmark ni de las 16 del banco abierto (ni sus formas cortas). "about" reindexado: 894 padres y 2.630 hijos (1.846 de documentación y 784 de código).
+
+### Mediciones (`101` frente a `100`)
+
+| | `100` | `101` |
+|---|---|---|
+| Banco abierto 0.6B: respuestas que citan el historial | 7 de las 12 preguntas del proyecto | **0** |
+| Banco abierto 0.6B: respondidas · eco · idioma mal | 30 · 2 · 1 | 29 · **0 · 0** |
+| Banco abierto 1.7B: respondidas · eco · idioma mal · frases repetidas | 31 · 1 · 2 · 1 | 29 · **0 · 0 · 0** |
+| Cambio de idioma a mitad (about + banco abierto) | 4 de 165 | **1 de 150** |
+| `gen-bench` about, contiene EN / ES: 0.6B | 0.44 / 0.50 | 0.44 / 0.50 |
+| 1.7B | 0.56 / 0.72 | 0.56 / **0.61** |
+| 4B | 0.72 / 0.83 | **0.67 / 0.72** |
+| "No encontrado" falso EN / ES (0.6B · 1.7B · 4B) | 0.11 / 0 · 0.06 / 0 · 0.06 / 0 | 0.17 / 0.11 · 0.17 / 0.11 · 0.22 / 0.11 |
+| Route-bench about/EN, enrutado · R@1/@3/@5/@10 | 0.889 · 0.11 / 0.28 / 0.33 / 0.67 | **0.778** · 0.17 / 0.28 / 0.28 / 0.56 |
+| Route-bench about/ES | 0.944 · 0.39 / 0.50 / 0.61 / 0.67 | 0.944 · **0.44** / 0.50 / **0.67** / 0.67 |
+| Route-bench CV EN / ES, enrutado | 0.933 / 0.900 | **0.967** / 0.900 |
+| Route-bench 42, es/docs, es/code, XQuAD | — | Igual (XQuAD/EN, una pregunta menos a "about") |
+
+**`102`, con el índice final** (reindexado tras escribir esta sección y DEC-39, 913 padres y 2.700 hijos; solo el 0.6B y el `route-bench`): `gen-bench` about EN / ES 0.50 / 0.50; banco abierto, 3 respuestas cambian frente a `101` (el agente, el modelo y el recall), las tres al tema y ninguna cita el historial; `route-bench` igual que `101` salvo about/ES R@5 0.67 → 0.61. Después de anotar esta línea se reindexa "about" una vez más, sin volver a medir.
+
+**En el banco abierto, las respuestas de la web:**
+- **0.6B:** A-04 y A-13 vuelven a responder bien (el proyecto y Qwen3-0.6B). A-07, A-14 y A-15 explican el proyecto en lugar de copiar notas del historial o de `FASE_0.md`. A-09 y A-02 pasan a "no encontrado", que es mejor que contestar con DEC-37.
+- **1.7B:** igual: A-05, A-07, A-13 y A-15 responden al tema, sin repetir la pregunta ni copiar notas; A-09 y A-02 pasan a "no encontrado".
+- **Lo que sigue mal, sin autocita:** A-01 habla de la técnica RAG en general (fuentes de vLLM) y A-06 responde con el contrato de obra de XQuAD. Es la recuperación de las preguntas que no nombran el proyecto (DEC-33).
+- **El 4B** no carga en el proceso del banco abierto, como desde `92`.
+
+**Por qué baja el `gen-bench` de "about":** las preguntas que pierden son about-02 (modelo de lenguaje), about-04 (reranker) y about-11 (despliegue). Ahora dan "no encontrado": su mejor fuente ya no pasa el filtro de "about" (−1.0). Antes lo pasaban gracias a la nota del historial que copiaba la pregunta, y varias respuestas "acertadas" eran esa misma cita (por ejemplo, la de about-02 en español empezaba repitiendo la pregunta). Es el problema del umbral apuntado en DEC-38, que la autocita tapaba. Por la misma razón, about-02 y about-04 en inglés se van a vLLM en el `route-bench`.
+
+**Pruebas:** 123 tests, flake8 limpio. Solo cambian documentos y `rag.toml` (una ruta excluida).
+
+**Pendiente:** recalibrar el umbral de "about" con `gate_scores` ahora que la documentación no cita las preguntas (DEC-39). No lo he hecho: cambia el enrutado de todos los dominios y hay que volver a pasar el `route-bench`.
 
 ## Decisiones (tuyas, 2026-10-24)
 

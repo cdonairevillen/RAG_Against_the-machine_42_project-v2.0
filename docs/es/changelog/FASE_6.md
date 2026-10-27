@@ -260,7 +260,7 @@ navegador ──► FastAPI (src/api) ──► RagTools (src/server/tools.py) �
 
 **Medido antes de decidir:**
 - Con 6 preguntas complejas y sin límite práctico, la respuesta válida más larga fue de **464 tokens** (Phi-4-mini con 10 fuentes). El 1.7B no pasó de 321.
-- Phi-4-mini entró una vez en **bucle** con el "paso a paso de vLLM": a partir del paso ~20 repite una plantilla y se inventa opciones (`--response-func`…) hasta agotar el límite.
+- Phi-4-mini entró una vez en **bucle** con L-3, una guía de vLLM (`RESPUESTAS_ARCHIVADAS.md`): a partir del paso ~20 repite una plantilla y se inventa opciones hasta agotar el límite.
 - **Un detector de bucles automático no es fiable:** una regla de "parar si se repite la misma secuencia de N palabras" salta en 32 de 3.933 respuestas buenas guardadas (código, listas…), y el bucle de Phi solo repite su secuencia 5 veces.
 - **Penalizar la repetición** cambiaría todas las respuestas y obligaría a repetir `gen-bench`. Descartado por ahora.
 

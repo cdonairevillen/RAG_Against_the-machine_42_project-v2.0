@@ -18,8 +18,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 887,
-          "last_character_index": 963
+          "first_character_index": 1025,
+          "last_character_index": 1101
         }
       ],
       "answer": "Qwen3-0.6B"
@@ -30,8 +30,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 5318,
-          "last_character_index": 5481
+          "first_character_index": 5547,
+          "last_character_index": 5710
         }
       ],
       "answer": "bge-m3"
@@ -42,8 +42,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 5514,
-          "last_character_index": 5619
+          "first_character_index": 5743,
+          "last_character_index": 5848
         }
       ],
       "answer": "mmarco-mMiniLMv2-L12-H384-v1"
@@ -54,8 +54,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 4883,
-          "last_character_index": 4980
+          "first_character_index": 5112,
+          "last_character_index": 5209
         }
       ],
       "answer": "Qdrant"
@@ -66,8 +66,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 5904,
-          "last_character_index": 6035
+          "first_character_index": 6133,
+          "last_character_index": 6264
         }
       ],
       "answer": "cross-encoder"
@@ -78,8 +78,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 2286,
-          "last_character_index": 2335
+          "first_character_index": 2417,
+          "last_character_index": 2466
         }
       ],
       "answer": "0.17"
@@ -90,8 +90,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 7370,
-          "last_character_index": 7449
+          "first_character_index": 8251,
+          "last_character_index": 8330
         }
       ],
       "answer": "sesión"
@@ -102,8 +102,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 4536,
-          "last_character_index": 4597
+          "first_character_index": 4765,
+          "last_character_index": 4826
         }
       ],
       "answer": "ast"
@@ -114,8 +114,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 8155,
-          "last_character_index": 8224
+          "first_character_index": 8995,
+          "last_character_index": 9064
         }
       ],
       "answer": "list_domains"
@@ -126,11 +126,11 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 11548,
-          "last_character_index": 11640
+          "first_character_index": 12454,
+          "last_character_index": 12529
         }
       ],
-      "answer": "Hugging Face"
+      "answer": "Oracle"
     },
     {
       "question_id": "about-12",
@@ -138,8 +138,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 14826,
-          "last_character_index": 14925
+          "first_character_index": 15929,
+          "last_character_index": 16028
         }
       ],
       "answer": "MIT"
@@ -150,8 +150,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 1862,
-          "last_character_index": 1969
+          "first_character_index": 1993,
+          "last_character_index": 2100
         }
       ],
       "answer": "5%"
@@ -162,8 +162,8 @@
       "sources": [
         {
           "file_path": "docs/es/ROADMAP.md",
-          "first_character_index": 39605,
-          "last_character_index": 39693
+          "first_character_index": 42652,
+          "last_character_index": 42740
         }
       ],
       "answer": "pgvector"
@@ -174,8 +174,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 5686,
-          "last_character_index": 5804
+          "first_character_index": 5915,
+          "last_character_index": 6033
         }
       ],
       "answer": "empeor"
@@ -186,8 +186,8 @@
       "sources": [
         {
           "file_path": "src/rag/ingestion/pipeline.py",
-          "first_character_index": 600,
-          "last_character_index": 655
+          "first_character_index": 1494,
+          "last_character_index": 1549
         }
       ],
       "answer": "walk_source"
@@ -198,8 +198,8 @@
       "sources": [
         {
           "file_path": "src/rag/generator.py",
-          "first_character_index": 14228,
-          "last_character_index": 14263
+          "first_character_index": 15989,
+          "last_character_index": 16044
         }
       ],
       "answer": "cancel"
@@ -210,8 +210,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 7764,
-          "last_character_index": 7827
+          "first_character_index": 8604,
+          "last_character_index": 8667
         }
       ],
       "answer": "pregunta original"

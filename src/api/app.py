@@ -106,7 +106,7 @@ def model_label(name: str) -> str:
 
 def parse_max_tokens(value: str, models: list[str]) -> dict[str, int]:
     """Per-model token caps from "512" (every model) or
-    "default=512,llm-phi4-mini=640" (unknown ids are ignored)."""
+    "default=512,llm-qwen3-1.7b=768" (unknown ids are ignored)."""
     value = value.strip()
     if not value:
         return {}
@@ -132,7 +132,7 @@ class ModelPool:
         RAG_API_MODELS: comma-separated ids to offer (default: all).
         RAG_API_MAX_LOADED: models kept loaded at once (default 1).
         RAG_API_MAX_TOKENS: answer length cap, one number for every model
-            or per model ("default=512,llm-phi4-mini=640"); models not
+            or per model ("default=512,llm-qwen3-1.7b=768"); models not
             listed keep their configuration's max_new_tokens.
     """
 

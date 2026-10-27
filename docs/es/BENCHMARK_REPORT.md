@@ -203,7 +203,7 @@ El clasificador léxico decide la rama (docs o code) comparando las puntuaciones
 
 **Decisión (tuya):**
 - **Familia Qwen3 completa:** 0.6B (base, obligatoria), y 1.7B y 4B como perfiles.
-- **Phi-4-mini** como alternativa de otra familia.
+- **Phi-4-mini** como alternativa de otra familia. **Retirado el 2026-10-27** (DEC-32 en `decisions.md`, `FASE_7.md` §7b.8): con respuestas largas, como en la web, copiaba las fuentes y entraba en bucles. Sus filas de este informe quedan como histórico.
 - **SmolLM3-3B descartado:** el F1 más bajo y el doble de falsos rechazos en code que la base.
 - **Qué modelo se recomienda en la web:** se decide en la Fase 6.
 - **Velocidad en CPU de los opcionales: no medida.** Por tamaño, los de 3–4B serán bastante más lentos sin GPU.
@@ -352,3 +352,64 @@ Imagen del Space en local con los límites del plan gratuito simulados (`docker 
 
 - **Con los hilos de torch sin ajustar** (12 hilos sobre 2 vCPU), todo era ~3.5× más lento: 48–88 s directo y 84–123 s con el agente. Se ajustan en `entrypoint.sh` (DEC-17).
 - **En CPU, el agente cuesta ~8 s más por respuesta.** En la 3080 Ti eran ~2 s.
+
+---
+
+## 9. Dominio "about" y forma de las respuestas (Fase 7)
+
+### 9.1 El benchmark de "about"
+
+18 preguntas sobre el proyecto, en inglés y en español (`bench/datasets/about/`, `make bench SUITE=about`). Cada una tiene su evidencia en el README, el ROADMAP o el código, en el idioma de la pregunta. El ground truth se genera con `python -m src build_about_bench`, que busca cada evidencia en su fichero: **hay que regenerarlo cada vez que se editan esos documentos**, porque guarda offsets de caracteres (DEC-37).
+
+- **Umbral del filtro fuera de dominio:** −1.0, calibrado con `gate_scores`.
+- **Recall bajo con el evaluador de 42, aunque la respuesta llega:** el evaluador solo acepta el pasaje exacto de referencia, y la documentación repite cada dato en varios sitios (README, ROADMAP, changelogs). Con la métrica "la respuesta está en las 5 primeras fuentes", llegaba al 89 % (EN y ES) en la Fase 7a.
+
+### 9.2 Estado final (`100`, "about" reindexado, Qwen)
+
+Router sin filtro (`route-bench`):
+
+| Conjunto | Enrutado a su dominio | R@1 / R@3 / R@5 / R@10 |
+|---|---|---|
+| 42 docs / code | 1.000 / 0.990 | 0.76 / 0.91 / 0.92 / 0.94 · 0.51 / 0.72 / 0.80 / 0.88 |
+| XQuAD EN / ES | 0.980 / 0.975 | 0.94 / 0.97 / 0.97 / 0.98 · 0.91 / 0.97 / 0.97 / 0.97 |
+| CV EN / ES | 0.933 / 0.900 | 0.47 / 0.77 / 0.87 / 0.90 · 0.67 / 0.80 / 0.87 / 0.90 |
+| about EN | 0.889 | 0.11 / 0.28 / 0.33 / 0.67 |
+| about ES | 0.944 | 0.39 / 0.50 / 0.61 / 0.67 |
+
+Generación sobre "about" (`gen-bench`, k = 5, hasta 1.024 tokens):
+
+| Modelo | Contiene EN / ES | "No encontrado" falso EN / ES | Cita la correcta EN / ES | Idioma EN / ES |
+|---|---|---|---|---|
+| Qwen3-0.6B | 0.44 / 0.50 | 0.11 / 0.00 | 0.17 / 0.27 | 1.00 / 1.00 |
+| Qwen3-1.7B | 0.56 / 0.72 | 0.06 / 0.00 | 0.35 / 0.39 | 1.00 / 0.94 |
+| Qwen3-4B | 0.72 / 0.83 | 0.06 / 0.00 | 0.29 / 0.44 | 1.00 / 1.00 |
+
+- **"Cita la correcta" infravalora:** compara con el fichero de la respuesta de referencia, y el mismo dato está en varios ficheros.
+- **El historial ocupa la mayor parte de "about"** (1.121 de los 1.623 trozos de documentación al medirlo en `99`) y los changelogs citan las preguntas de prueba al pie de la letra, así que la búsqueda devuelve la cita en lugar de la respuesta: en el banco abierto de `100`, 7 de las 12 preguntas sobre el proyecto (DEC-37, con la medida sin el historial). Arreglado en §9.4.
+
+### 9.3 Forma de las respuestas
+
+| Medida | Resultado |
+|---|---|
+| Detector de bucles (`src/rag/loops.py`), falsos positivos | 0 en 11.550 respuestas guardadas (§7b.2); ventana 12 y bloques repetidos desde §7b.7 |
+| Limpieza del eco (`strip_echo`) | Eco a 0 en las 4.662 respuestas medidas, sin perder ninguna (§7b.3); con los Qwen limpia 17 respuestas de una matriz completa (DEC-35) |
+| Respuestas que cambian de idioma a mitad (`lang_mix`) | 10 de 1.105 con el índice de DEC-25 (`95`); **20 de 1.117** con "about" reindexado (`97`): las 10 nuevas son de about/ES y del banco abierto. En el estado final (`100`, solo "about" y el banco abierto): 4 de 165 |
+| Pista de idioma en el prompt | No adoptada: el idioma del 0.6B en about/ES baja de 1.00 a 0.86 (DEC-36) |
+
+### 9.4 Sin citas de preguntas de prueba en la documentación (`101`)
+
+La documentación indexada ya no copia las preguntas de prueba sobre el proyecto ni las respuestas incorrectas (DEC-39, `FASE_7.md` §7b.9). Esta tabla sustituye a la §9.2 como estado vigente de "about":
+
+| | `100` | `101` |
+|---|---|---|
+| `gen-bench` about, contiene EN / ES: 0.6B · 1.7B · 4B | 0.44 / 0.50 · 0.56 / 0.72 · 0.72 / 0.83 | 0.44 / 0.50 · 0.56 / 0.61 · 0.67 / 0.72 |
+| Route-bench about, enrutado EN · ES | 0.889 · 0.944 | 0.778 · 0.944 |
+| Route-bench about, R@1/@3/@5/@10 EN · ES | 0.11 / 0.28 / 0.33 / 0.67 · 0.39 / 0.50 / 0.61 / 0.67 | 0.17 / 0.28 / 0.28 / 0.56 · 0.44 / 0.50 / 0.67 / 0.67 |
+| Route-bench CV EN / ES, enrutado | 0.933 / 0.900 | 0.967 / 0.900 |
+| Banco abierto: respuestas que citan el historial (0.6B) | 7 de 12 | 0 |
+| Banco abierto: eco · idioma mal (0.6B · 1.7B) | 2 · 1 · 1 · 2 | 0 · 0 · 0 · 0 |
+| Cambio de idioma a mitad (about + banco abierto) | 4 de 165 | 1 de 150 |
+
+Las cifras de `100` estaban infladas por la autocita: tres preguntas (about-02, about-04 y about-11) solo pasaban el filtro de "about" gracias a la nota que las citaba. 42, XQuAD y CV no cambian.
+
+Phi-4-mini se retiró el 2026-10-27 (DEC-32): necesitaba parches (reintento por eco, detector de bucles) para dar respuestas limpias con el límite de la web. Sus filas de §5 y §8 quedan como histórico.

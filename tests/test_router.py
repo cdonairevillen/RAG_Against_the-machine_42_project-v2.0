@@ -20,7 +20,6 @@ class FakeRetriever:
         self.chunks: list[Any] = []
         self.answer_k = None
         self.route_hints: list[re.Pattern[str]] = []
-        self.route_names: list[re.Pattern[str]] = []
 
     def source(self) -> MinimalSource:
         return MinimalSource(file_path=f"{self.domain}.md",
@@ -108,28 +107,3 @@ def test_a_hint_alone_does_not_route() -> None:
     })
     r.retrievers["about"].route_hints = [re.compile("the project", re.I)]
     assert r.search_smart("Who led the project?")[0].file_path == "xquad.md"
-
-
-def test_a_named_domain_wins_and_skips_its_gate() -> None:
-    r = DomainRouter({  # type: ignore[dict-item]
-        "vllm": FakeRetriever("vllm", 1.0),
-        "about": FakeRetriever("about", -1.85, threshold=-1.0),
-    })
-    r.retrievers["about"].route_names = [re.compile("este rag", re.I)]
-    # Below its own threshold, but named: it wins and answers.
-    sources = r.search_for_generation("Háblame sobre este rag")
-    assert sources[0].file_path == "about.md"
-    assert r.last_named == "about"
-    # Not named: vLLM wins as before.
-    sources = r.search_for_generation("Háblame sobre RAG")
-    assert sources[0].file_path == "vllm.md"
-    assert r.last_named is None
-
-
-def test_a_named_single_domain_skips_its_gate() -> None:
-    r = DomainRouter({  # type: ignore[dict-item]
-        "about": FakeRetriever("about", -1.85, threshold=-1.0),
-    })
-    assert r.search_for_generation("q") == []
-    r.retrievers["about"].route_names = [re.compile("este rag", re.I)]
-    assert r.search_for_generation("Háblame sobre este rag")

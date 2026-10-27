@@ -152,10 +152,6 @@ class SourceConfig(BaseModel):
     # when it also passes its own relevance_threshold; otherwise routing
     # is unchanged (see DomainRouter.route).
     route_hints: list[str] = Field(default_factory=list)
-    # Expressions that name this domain beyond doubt ("RAG against the
-    # Machine", "este rag"): a matching domain wins and its gate does
-    # not apply, since the question is explicitly about it.
-    route_names: list[str] = Field(default_factory=list)
     # Files that exist in two languages, as [English, Spanish] path
     # prefixes (a file or a folder, relative to root). For a question in
     # one language, the other language's copy of a translated file is

@@ -114,11 +114,11 @@
       "id": "about-11",
       "en": "Where is the project deployed?",
       "es": "¿Dónde se despliega el proyecto?",
-      "answer": "Hugging Face",
+      "answer": "Oracle",
       "file": "README.md",
-      "evidence": "**Backend:** a Hugging Face Space (Docker, free CPU), with Qdrant inside the container.",
+      "evidence": "an **Oracle Cloud Always Free** ARM machine (2 OCPU, 12 GB) with Docker.",
       "file_es": "docs/es/README.md",
-      "evidence_es": "**Backend:** un Hugging Face Space (Docker, CPU gratuita), con Qdrant dentro del contenedor."
+      "evidence_es": "una máquina ARM de **Oracle Cloud Always Free** (2 OCPU, 12 GB) con Docker."
     },
     {
       "id": "about-12",
@@ -177,7 +177,7 @@
       "es": "¿Cómo detiene la generación el botón Stop de la web?",
       "answer": "cancel",
       "file": "src/rag/generator.py",
-      "evidence": "def stopping_criteria(self) -> Any:"
+      "evidence": "def stopping_criteria(self, prompt_length: int) -> Any:"
     },
     {
       "id": "about-18",

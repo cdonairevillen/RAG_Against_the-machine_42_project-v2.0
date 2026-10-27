@@ -18,8 +18,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 723,
-          "last_character_index": 802
+          "first_character_index": 867,
+          "last_character_index": 946
         }
       ],
       "answer": "Qwen3-0.6B"
@@ -30,8 +30,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 4809,
-          "last_character_index": 4953
+          "first_character_index": 5029,
+          "last_character_index": 5173
         }
       ],
       "answer": "bge-m3"
@@ -42,8 +42,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 4971,
-          "last_character_index": 5075
+          "first_character_index": 5191,
+          "last_character_index": 5295
         }
       ],
       "answer": "mmarco-mMiniLMv2-L12-H384-v1"
@@ -54,8 +54,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 4413,
-          "last_character_index": 4496
+          "first_character_index": 4633,
+          "last_character_index": 4716
         }
       ],
       "answer": "Qdrant"
@@ -66,8 +66,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 5327,
-          "last_character_index": 5445
+          "first_character_index": 5547,
+          "last_character_index": 5665
         }
       ],
       "answer": "cross-encoder"
@@ -78,8 +78,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 2008,
-          "last_character_index": 2058
+          "first_character_index": 2140,
+          "last_character_index": 2190
         }
       ],
       "answer": "0.17"
@@ -90,8 +90,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 6619,
-          "last_character_index": 6694
+          "first_character_index": 7463,
+          "last_character_index": 7538
         }
       ],
       "answer": "session"
@@ -102,8 +102,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 4106,
-          "last_character_index": 4182
+          "first_character_index": 4326,
+          "last_character_index": 4402
         }
       ],
       "answer": "ast"
@@ -114,8 +114,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 7294,
-          "last_character_index": 7356
+          "first_character_index": 8103,
+          "last_character_index": 8165
         }
       ],
       "answer": "list_domains"
@@ -126,11 +126,11 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 10420,
-          "last_character_index": 10507
+          "first_character_index": 11292,
+          "last_character_index": 11364
         }
       ],
-      "answer": "Hugging Face"
+      "answer": "Oracle"
     },
     {
       "question_id": "about-12",
@@ -138,8 +138,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 13636,
-          "last_character_index": 13723
+          "first_character_index": 14704,
+          "last_character_index": 14791
         }
       ],
       "answer": "MIT"
@@ -150,8 +150,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 1608,
-          "last_character_index": 1697
+          "first_character_index": 1740,
+          "last_character_index": 1829
         }
       ],
       "answer": "5%"
@@ -162,8 +162,8 @@
       "sources": [
         {
           "file_path": "docs/ROADMAP.md",
-          "first_character_index": 38081,
-          "last_character_index": 38173
+          "first_character_index": 41554,
+          "last_character_index": 41646
         }
       ],
       "answer": "pgvector"
@@ -174,8 +174,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 5136,
-          "last_character_index": 5231
+          "first_character_index": 5356,
+          "last_character_index": 5451
         }
       ],
       "answer": "hurt"
@@ -186,8 +186,8 @@
       "sources": [
         {
           "file_path": "src/rag/ingestion/pipeline.py",
-          "first_character_index": 600,
-          "last_character_index": 655
+          "first_character_index": 1494,
+          "last_character_index": 1549
         }
       ],
       "answer": "walk_source"
@@ -198,8 +198,8 @@
       "sources": [
         {
           "file_path": "src/rag/generator.py",
-          "first_character_index": 14228,
-          "last_character_index": 14263
+          "first_character_index": 15989,
+          "last_character_index": 16044
         }
       ],
       "answer": "cancel"
@@ -210,8 +210,8 @@
       "sources": [
         {
           "file_path": "README.md",
-          "first_character_index": 6951,
-          "last_character_index": 7014
+          "first_character_index": 7760,
+          "last_character_index": 7823
         }
       ],
       "answer": "original question"

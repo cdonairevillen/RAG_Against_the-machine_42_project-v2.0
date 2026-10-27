@@ -205,7 +205,7 @@ The lexical classifier picks the branch (docs or code) by comparing the BM25 sco
 
 **Decision (the author's):**
 - **The whole Qwen3 family:** 0.6B (the base, mandatory), and 1.7B and 4B as profiles.
-- **Phi-4-mini** as an alternative from another family.
+- **Phi-4-mini** as an alternative from another family. **Dropped on 2026-10-27** (DEC-32 in `decisions.md`, `FASE_7.md` §7b.8): with long answers, as in the web, it copied the sources and fell into loops. Its rows in this report stay as history.
 - **SmolLM3-3B discarded:** the lowest F1 and twice as many false rejections on code as the base.
 - **Which model the web recommends:** decided in Phase 6.
 - **CPU speed of the optional models: not measured.** Given their size, the 3–4B ones will be much slower without a GPU.
@@ -353,3 +353,64 @@ The Space image run locally with the free tier's limits simulated (`docker run -
 
 - **With torch's threads left unadjusted** (12 threads on 2 vCPUs), everything was ~3.5× slower: 48–88 s direct and 84–123 s with the agent. They are adjusted in `entrypoint.sh` (DEC-17).
 - **On a CPU, the agent costs ~8 s more per answer.** On the 3080 Ti it was ~2 s.
+
+---
+
+## 9. The "about" domain and the form of the answers (Phase 7)
+
+### 9.1 The "about" benchmark
+
+18 questions about the project, in English and Spanish (`bench/datasets/about/`, `make bench SUITE=about`). Each one has its evidence in the README, the ROADMAP or the code, in the question's language. The ground truth is generated with `python -m src build_about_bench`, which looks for each piece of evidence in its file: **it has to be regenerated every time those documents are edited**, because it stores character offsets (DEC-37).
+
+- **Out-of-domain gate threshold:** −1.0, calibrated with `gate_scores`.
+- **Low recall with the 42 evaluator, although the answer arrives:** the evaluator only accepts the exact reference passage, and the documentation repeats each fact in several places (README, ROADMAP, changelogs). With the metric "the answer is in the top 5 sources", it reached 89% (EN and ES) in Phase 7a.
+
+### 9.2 Final state (`100`, "about" re-indexed, Qwen)
+
+Router without a filter (`route-bench`):
+
+| Set | Sent to its domain | R@1 / R@3 / R@5 / R@10 |
+|---|---|---|
+| 42 docs / code | 1.000 / 0.990 | 0.76 / 0.91 / 0.92 / 0.94 · 0.51 / 0.72 / 0.80 / 0.88 |
+| XQuAD EN / ES | 0.980 / 0.975 | 0.94 / 0.97 / 0.97 / 0.98 · 0.91 / 0.97 / 0.97 / 0.97 |
+| CV EN / ES | 0.933 / 0.900 | 0.47 / 0.77 / 0.87 / 0.90 · 0.67 / 0.80 / 0.87 / 0.90 |
+| about EN | 0.889 | 0.11 / 0.28 / 0.33 / 0.67 |
+| about ES | 0.944 | 0.39 / 0.50 / 0.61 / 0.67 |
+
+Generation over "about" (`gen-bench`, k = 5, up to 1,024 tokens):
+
+| Model | Contains EN / ES | False "not found" EN / ES | Cites the right source EN / ES | Language EN / ES |
+|---|---|---|---|---|
+| Qwen3-0.6B | 0.44 / 0.50 | 0.11 / 0.00 | 0.17 / 0.27 | 1.00 / 1.00 |
+| Qwen3-1.7B | 0.56 / 0.72 | 0.06 / 0.00 | 0.35 / 0.39 | 1.00 / 0.94 |
+| Qwen3-4B | 0.72 / 0.83 | 0.06 / 0.00 | 0.29 / 0.44 | 1.00 / 1.00 |
+
+- **"Cites the right source" underestimates:** it compares with the file of the reference answer, and the same fact is in several files.
+- **The history takes up most of "about"** (1,121 of the 1,623 documentation chunks when measured in `99`), and the changelogs quote the test questions word for word, so the search returns the quote instead of the answer: in the open bank of `100`, for 7 of the 12 questions about the project (DEC-37, with the measurement without the history). Fixed in §9.4.
+
+### 9.3 Form of the answers
+
+| Measure | Result |
+|---|---|
+| Loop detector (`src/rag/loops.py`), false positives | 0 in 11,550 saved answers (§7b.2); window 12 and repeated blocks since §7b.7 |
+| Echo cleaning (`strip_echo`) | Echo at 0 in the 4,662 measured answers, without losing any (§7b.3); with the Qwen models it cleans 17 answers of a full matrix (DEC-35) |
+| Answers that switch language halfway (`lang_mix`) | 10 of 1,105 with the DEC-25 index (`95`); **20 of 1,117** with "about" re-indexed (`97`): the 10 new ones are from about/ES and the open bank. In the final state (`100`, only "about" and the open bank): 4 of 165 |
+| Language hint in the prompt | Not adopted: the 0.6B's language on about/ES drops from 1.00 to 0.86 (DEC-36) |
+
+### 9.4 No test-question quotes in the documentation (`101`)
+
+The indexed documentation no longer copies the test questions about the project or the wrong answers (DEC-39, `FASE_7.md` §7b.9). This table replaces §9.2 as the current state of "about":
+
+| | `100` | `101` |
+|---|---|---|
+| `gen-bench` about, contains EN / ES: 0.6B · 1.7B · 4B | 0.44 / 0.50 · 0.56 / 0.72 · 0.72 / 0.83 | 0.44 / 0.50 · 0.56 / 0.61 · 0.67 / 0.72 |
+| Route-bench about, routed EN · ES | 0.889 · 0.944 | 0.778 · 0.944 |
+| Route-bench about, R@1/@3/@5/@10 EN · ES | 0.11 / 0.28 / 0.33 / 0.67 · 0.39 / 0.50 / 0.61 / 0.67 | 0.17 / 0.28 / 0.28 / 0.56 · 0.44 / 0.50 / 0.67 / 0.67 |
+| Route-bench CV EN / ES, routed | 0.933 / 0.900 | 0.967 / 0.900 |
+| Open bank: answers quoting the history (0.6B) | 7 of 12 | 0 |
+| Open bank: echo · wrong language (0.6B · 1.7B) | 2 · 1 · 1 · 2 | 0 · 0 · 0 · 0 |
+| Language switch halfway (about + open bank) | 4 of 165 | 1 of 150 |
+
+The `100` figures were inflated by the self-quoting: three questions (about-02, about-04 and about-11) only passed the "about" gate thanks to the note that quoted them. 42, XQuAD and CV do not change.
+
+Phi-4-mini was dropped on 2026-10-27 (DEC-32): it needed patches (echo retry, loop detector) to give clean answers with the web's cap. Its rows in §5 and §8 stay as history.

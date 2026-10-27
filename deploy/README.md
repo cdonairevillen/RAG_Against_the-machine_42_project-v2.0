@@ -28,7 +28,7 @@ GitHub Pages (opcional) ── la misma web, apuntando a https://<nombre>.duckdn
 
 1. **Índice al día:** `make index` y después `make bundle` (en `deploy/bundle/`, con SHA256).
    - ⚠️ El bundle contiene el material del CV **sin enmascarar** (el enmascarado se aplica al responder). No lo subas a ningún sitio público: solo a tu máquina con `scp`.
-   - Mira en `deploy/bundle/bundle.json` que salen los dominios que quieres servir (`vllm`, `xquad`, `cv` y, cuando esté calibrado, `about`).
+   - Mira en `deploy/bundle/bundle.json` que salen los dominios que quieres servir (`vllm`, `xquad`, `cv` y `about`).
 2. **Código preparado:** `make space-stage`. Compila la web y deja en `deploy/stage/` solo lo que necesita la imagen, más `deploy/oracle/`.
 3. **Clave SSH** (PowerShell), si no tienes una:
    ```powershell

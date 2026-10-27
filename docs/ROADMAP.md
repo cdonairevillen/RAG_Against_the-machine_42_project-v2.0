@@ -12,6 +12,7 @@ The roadmap of the project's improvement. Everything discussed and agreed from h
 - `BENCHMARK_REPORT.md`: comparison of models and configurations (created in Phase 2).
 - `decisions.md`: decisions taken out of necessity, with their options.
 - `es/README.md`: Spanish translation of the project's README.
+- `es/RESPUESTAS_ARCHIVADAS.md` (Spanish only): the test questions and the wrong answers verbatim, outside the "about" index (DEC-39). The other documents name them by their id (`A-NN`, `about-NN`, `L-N`).
 
 **Languages:** the work is done in Spanish (`docs/es/`), and these English versions are updated **at the end of each phase**. `PLANING.md`, `RESPUESTA.md` and `Elements_frontend.md` are not translated (the initial plan and working notes).
 
@@ -185,7 +186,7 @@ clean-up   ingestion  hybrid     generation  checkpoint    modes      agent +   
 > - **New prompt:** official chat template, `[n]` citations, the question's language (ES: 90–100%) and a token budget (B9).
 > - **B15 solved:** a gate with the reranker; it rejects 100% of what is clearly unrelated.
 > - **A single pipeline** (`src/rag.py`) for the CLI, the web and the benchmark, with streaming.
-> - **LLM:** Qwen3-0.6B as the base; Qwen3-1.7B, Qwen3-4B and Phi-4-mini as profiles (SmolLM3 discarded).
+> - **LLM:** Qwen3-0.6B as the base; Qwen3-1.7B, Qwen3-4B and Phi-4-mini as profiles (SmolLM3 discarded). Phi-4-mini was dropped in Phase 7 (DEC-32).
 > - Evaluators grouped in `src/evaluation/`.
 
 ## 42 tests — Checkpoint
@@ -231,7 +232,7 @@ The results obtained during the evaluation must not get worse.
 
 ### 4b — CV mode
 
-> ✅ **Completed (2026-10-23).** The `cv` domain: the author presented by his own documents, with private contact data protected. Details in `changelog/FASE_4.md` (4b) and `BENCHMARK_REPORT.md` §7.
+> ✅ **Completed (2026-10-23).** The `cv` domain: the author presented through their own documents, with private contact data protected. Details in `changelog/FASE_4.md` (4b) and `BENCHMARK_REPORT.md` §7.
 
 ### 4c — Multimedia: *Gulliver's Travels* (1939) vs Swift's novel (1726)
 
@@ -321,7 +322,7 @@ The results obtained during the evaluation must not get worse.
   - **"With agent / Without agent" switch** (the author's request, 2026-10-23): a switch in the chat interface that toggles between the agent (session memory, rewriting and tools) and the direct conversation with the RAG (the current pipeline, question by question). The API takes it as a request parameter (`agent: true|false`); Phase 5 leaves both paths ready behind that same parameter.
   - **Groundwork already done (Phase 2):** the `rag.toml` profiles (`available_profiles`) are the options an ingestion, reranker or embeddings picker could offer. The stable base is still the benchmark one. *To be raised in this phase.*
 - **Zero-cost deployment**:
-  - Backend in a Hugging Face Space (Docker, free CPU).
+  - ~~Backend in a Hugging Face Space (Docker, free CPU).~~ → **Oracle Cloud Always Free** (DEC-19, 2026-10-24): since July 2026, Docker Spaces are paid.
   - Static frontend on GitHub Pages.
   - **Google Cloud is not touched.**
   - The free deployment can probably hold only one loaded model; the rest, locally.
@@ -346,6 +347,8 @@ The results obtained during the evaluation must not get worse.
 
 **Goal:** polish what came up while using the web, and pick up the parked optional items. Phase opened on 2026-10-24, after commit `3378494`. Changelog in `changelog/FASE_7.md`.
 
+> ✅ **Closed (2026-10-27, the author's decision).** Done: all of 7a and 7b up to §7b.9 (loop detector, echo cleanup, "about" language filter, Qwen only and no tricks, and documentation without test-question quotes). 42 identical (docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88; `97-final` and `route-bench` `102`). **Moves to Phase 8:** Granite as a model from another family (DEC-32), the Oracle deployment (rebuild the bundle first, DEC-38), the "about" threshold (DEC-39), language hint option C (DEC-36) and the extra tests. Parked: 7c (visual), the agent's fallback, the formatting rule, the CV judge and 7d.
+
 ### 7a — The "about" domain: the project talks about itself (first)
 1. **Rewrite `README.md`** (pending since Phase 0), aimed at GitHub and recruiters. It will be the domain's main source. Reviewed with the author before indexing it.
 2. **An `about` source in `rag.toml`:**
@@ -361,14 +364,24 @@ The results obtained during the evaluation must not get worse.
 - ✅ **2.** The `about` source indexed. A new field, `exclude_paths`, was needed to exclude `deploy/stage` without losing `src/deploy`.
 - 🟡 **3.** 18 EN/ES questions (`bench/datasets/about/`). First measurement: EN R@5 0.78, ES 0.22. Spanish collapses because each question only accepted one source (the README's), and the Spanish questions find the same thing in the Spanish documents.
 - **The author's decision:** documentation in two languages (`docs/` in English and `docs/es/` in Spanish), and several valid sources per question.
-- **Kept out of the web for now** (`API_DOMAINS`) until steps 4–5 are done: uncalibrated, it was picked by the router and mixed test transcripts from the changelogs into CV answers.
+- ✅ **3 (cont.).** Ground truth in the question's language; with the "contains the answer" metric, the answer is in the top 5 sources in 89% of cases (EN and ES).
+- ✅ **4.** The CV's personal content out of "about" (`about:skip` markers, the author's decision: redirect, don't repeat). Threshold −1.0 and a lexical rule for the project (`route_hints`). Route-bench `76`: CV 0.97 / 0.97, about 0.78 / 0.89, and 42 and XQuAD unchanged.
+- ✅ **5.** The "about" chip pinned (`pinned`), the examples checked one by one, and the bundle with the four domains. Details in `FASE_7.md` §7a.6–7a.8.
 
 ### 7b — Answer quality
 - **Markdown in the web** (lists, bold, code). No risk: no answer changes.
 - **The agent's fallback:** it searches with the previous query + the new one, but it must **answer the original question**. With the 0.6B, answering the mix gives wrong answers on follow-ups (measured, `FASE_6.md`). Measured with `agent-bench` before adopting it.
 - **A formatting rule** (lists and bold) only in the web, tested per model: with the 0.6B, every extra rule in the prompt can cost correct answers.
 - **A judge for the answers, especially the CV ones:** to find where they fail, not to show it in the web. **Decided (P11): Groq**, until the free tokens run out; if needed, it is repeated with Qwen3-4B as a local judge.
+- 🟡 **Freedom of length** (the author's request, 2026-10-24): let the LLM write what it needs without getting stuck in a loop. ✅ **Loop detector integrated** (`src/rag/loops.py`, `FASE_7.md` §7b.2): it stops generation when the model starts repeating near-identical lines or sentences. 0 false positives in 11,550 answers, and Phi's loops go from 1,500 tokens to 419–661. The web cap raised to 1,024 tokens for every model (the author's decision), now only a safety net.
 - **Agent off by default in the web** (the author's decision, 2026-10-24), marked as a work in progress until the fallback is improved.
+- ✅ **Answers that copy the prompt** (night of the 24th to the 25th, `FASE_7.md` §7b.3, DEC-21/22). The new prompts worsened citations and language, so the prompt does not change. The answers are cleaned instead: echo at 0 in the 4,662 measured answers, without losing any.
+- ✅ **"About" sources in one language** (§7b.4, DEC-23): implemented and off on the night of the 24th to the 25th; **turned on** on 2026-10-27 (§7b.8, DEC-34, the author's decision).
+- ~~**Questions that name the project**~~ (§7b.5, DEC-24): fixed phrases that name the project went to "about" without passing its gate, and the author's name sent questions to the CV. **Removed** on 2026-10-27 (§7b.8, DEC-33, the author's decision: they were tricks), even though less focused questions get worse.
+- ✅ **Which documentation "about" sees** (§7b.6, DEC-25): as the documentation grew, "about" generation dropped, and the previous index was restored. On 2026-10-27 it is **re-indexed** with the synced documentation and without the old Space card (§7b.8, DEC-37). Marking the history with `about:skip` remains the author's option.
+- ✅ **Answer form** (§7b.7, DEC-27 to DEC-31, session of the 25th to the 26th): a bank of open questions as in the web, the loop detector with a window of 12 and repeated blocks, and a retry when Phi copies the sources. The 0.6B, 1.7B and 4B stay identical; Phi goes from 2 cut answers and 1 with echo to none. Open question A-01, which asks about the RAG without naming it, remains (the sources that arrive are poor), and so does the "about" index (DEC-25). Pros and cons of going back to an earlier version, at the end of `decisions.md`. The retry was removed along with Phi (DEC-32).
+- ✅ **Qwen only, no tricks** (§7b.8, DEC-32 to DEC-38, session of the 26th to the 27th, the author's decisions): Phi-4-mini and its retry removed, `route_names` and the author's-name hint removed, the "about" language filter on, `strip_echo` kept (it also acts with the Qwen models) and the language hint in the prompt **not** adopted (it worsened the 0.6B's language). Documentation synced in both languages and "about" re-indexed. 42 identical. The history inside "about" is resolved in §7b.9.
+- ✅ **Quotes of test questions and wrong answers removed** (§7b.9, DEC-39, 2026-10-27, the author's decision): indexed documents name the questions by their id (`A-NN`, `about-NN`, `L-N`), and the verbatim text moves to `es/RESPUESTAS_ARCHIVADAS.md`, outside the index. The open bank stops quoting the history (before, 7 of 12 project questions). The "about" `gen-bench` and `route-bench` drop on three questions that only passed the gate thanks to their own quote. **Proposed for Phase 8:** recalibrating the "about" threshold.
 
 ### 7c — Visual
 - Floating recall cards that flip when moving from one to the next.
@@ -377,10 +390,10 @@ The results obtained during the evaluation must not get worse.
 ### 7d — Parked optional items
 - **4c, Gulliver** (multimedia). The plan is in Phase 4.
 - **MLQA.**
-- **A module of the author's own texts:** his stories, as part of the CV mode or as a separate domain.
-- **`repetition_penalty`** against generation loops (seen with Phi-4-mini). It changes every answer, so it requires rerunning `gen-bench`.
+- **A module of the author's own texts:** the author's stories, as part of the CV mode or as a separate domain.
+- ~~**`repetition_penalty`**~~ → **dropped** (2026-10-24, the author's decision): in its loops, Phi-4-mini changes words on every turn, so penalising repetition does not stop them. The official template and the stop tokens were checked and are correct (`FASE_7.md` §7b.1).
 
-**Note on deployment:** Phi-4-mini does not fit in the free Space (on a CPU, in float32, it would take ~15 GB, plus the retrieval). Even loaded at half precision, it would take minutes per answer on 2 CPUs (estimated, not measured). In the Space, the realistic options are the 0.6B and maybe the 1.7B. Phi remains an option locally.
+**Note on deployment:** on the server (Oracle, 2 CPUs and 12 GB), the realistic options are the 0.6B and maybe the 1.7B (P12). Phi-4-mini is no longer an option: it was dropped on 2026-10-27 (DEC-32). It did not fit on a CPU anyway (~15 GB in float32).
 
 ---
 
@@ -396,9 +409,9 @@ The results obtained during the evaluation must not get worse.
 | P3 | ~~New domains~~ → resolved: XQuAD (general knowledge, en/es) and then MLQA | Done |
 | P4 | ~~Modularisation: which options the web exposes~~ → resolved in the Phase 6 review: domain filters, agent yes/no, model and depth | Done |
 | P11 | ~~Judge for the CV answers (Phase 7b)~~ → resolved (2026-10-24, the author's decision): **Groq**, also with the CV questions, until the free tokens run out. If needed, it is repeated with Qwen3-4B as a local judge | Done |
-| P12 | The Space's LLM: the 0.6B (the base) or the 1.7B (a better agent; its CPU latency is not measured) | Before deployment |
+| P12 | The server's LLM: the 0.6B (the base) or the 1.7B (a better agent; its CPU latency is not measured). On Oracle, the 1.7B would fit in memory (estimated ~9.5 GB of 12) | Before deployment |
 | P5 | ~~The GPU of the 42 machines~~ → resolved: they do not accept CUDA (vLLM takes ~10 h to index). Indexing at 42 is ruled out and the project is served online | Done |
-| P10 | Hugging Face Datasets: use them as an ingestion source and host ours there (the 42 ones, the multimedia derivatives and maybe the index). Whether the 42 datasets' license allows publishing them is still to be checked. **Progress (2026-10-24):** the prebuilt index goes in a **private** HF dataset (DEC-09). Publishing the 42 datasets has not been done: the license has not been checked | To develop; before Phase 6 (deployment) or 4c if it is resumed |
+| P10 | Hugging Face Datasets: use them as an ingestion source and host ours there (the 42 ones, the multimedia derivatives and maybe the index). Whether the 42 datasets' license allows publishing them is still to be checked. **Progress (2026-10-24):** with Oracle, the prebuilt index goes to the machine by `scp` (DEC-19); the **private** HF dataset (DEC-09) stays as an alternative. Publishing the 42 datasets has not been done: the license has not been checked | To develop; before Phase 6 (deployment) or 4c if it is resumed |
 | P6 | Provider of the free key for the LLM judge | Before Phase 3 |
 
 ---
@@ -446,3 +459,10 @@ The results obtained during the evaluation must not get worse.
 - **2026-10-24**: **agent off by default in the web** (the author's decision): with small models, its memory mixes topics or gives answers that are too basic. When turned on, a "work in progress" note. The CLI keeps D7. Reviewed after the fallback improvement (7b). The "about" domain stays out of the web (`API_DOMAINS`) until it is calibrated. See `changelog/FASE_7.md`.
 - **2026-10-24**: **documentation in two languages** (the author's decision). The Spanish originals move to `docs/es/` (with `git mv`; Git only records it as a rename for `PLANING.md`, `RESPUESTA.md` and `Elements_frontend.md`. For the others, the translation reuses the old path, so their Spanish history is found with `git log docs/<file>`, not with `--follow` on `docs/es/`) and remain the working version. `docs/` holds the English translation, updated at the end of each phase. The README has its Spanish copy in `docs/es/README.md`. `CLAUDE.md` loads the rules from `docs/es/`. Both languages are indexed in the "about" domain.
 - **2026-10-24**: **Phase 7 (optional work and polish)** opened. It starts with the "about" domain (the project talking about itself, with the rewritten README, `docs/` and the code). The judge for the CV answers is decided: Groq (P11).
+- **2026-10-24**: "about" domain finished and in the web (pinned chip). The CV's personal information is no longer repeated in the documentation: it redirects to `FASE_4.md` §4b and is left out of the "about" index.
+- **2026-10-24**: **deployment on Oracle Cloud Always Free** instead of Hugging Face, which has charged for Docker Spaces since July 2026. Kept apart from Google Cloud (the author's decision). Measured: 5.0 GB peak RAM with 2 CPUs and 12 GB (DEC-19, `deploy/README.md`).
+- **2026-10-25**: autonomous overnight session (decisions DEC-20 to DEC-26). Echo cleanup, questions that name the project and a language filter (off). Everything measured against a baseline of the four models; 42 identical. No commits. See `changelog/FASE_7.md` §7b.3–7b.6.
+- **2026-10-26**: second autonomous session (DEC-27 to DEC-31): answer form (cut answers, Phi's echo, long loops). Measured against the `90` baseline: the Qwen models identical and Phi better in all its cases; 42 identical. Checkpoint at the author's request, with the pros and cons of going back in `decisions.md` for discussion. See `changelog/FASE_7.md` §7b.7.
+- **2026-10-27**: third autonomous session (DEC-32 to DEC-38), on top of commit `644c455`: a cleanup instead of going back (the author's decision). Phi-4-mini dropped, routing tricks removed, the "about" language filter on, and all the documentation synced (including the English translation, which had stopped at `8ff05d0`). The Qwen models identical on vLLM, XQuAD and CV; 42 identical (`97-final`). No commits. See `changelog/FASE_7.md` §7b.8.
+- **2026-10-27**: **Phase 7 closed** (the author's decision). What is pending moves to Phase 8: Granite, deployment and extra tests.
+- **2026-10-27**: quotes of test questions and wrong answers removed from the indexed documentation (the author's decision, DEC-39): the search returned those notes instead of the answer. The verbatim text is kept in `es/RESPUESTAS_ARCHIVADAS.md`, excluded from "about". See `changelog/FASE_7.md` §7b.9.

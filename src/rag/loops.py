@@ -28,7 +28,7 @@ MIN_WORDS = 3
 WORD_RUN = 12
 # A repeated block: this many units in a row, each a near-copy of the
 # unit the same distance back. Catches cycles longer than WINDOW allows
-# and an answer written twice (FASE_7.md 7b.8).
+# and an answer written twice (FASE_7.md 7b.7).
 BLOCK = 6
 # Longest cycle looked for, in units (an answer of 1024 tokens has ~40
 # sentences).

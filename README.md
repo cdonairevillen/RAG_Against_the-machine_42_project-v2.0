@@ -2,19 +2,20 @@
 
 # RAG against the Machine v2.0
 
-A multi-domain **Retrieval-Augmented Generation** system with an agent, an MCP server and a web interface. It answers questions with citations from three knowledge bases:
+A multi-domain **Retrieval-Augmented Generation** system with an agent, an MCP server and a web interface. It answers questions with citations from four knowledge bases:
 
 | Domain | What it holds | Size |
 |---|---|---|
 | `vllm` | The vLLM 0.10.1 documentation and source code (the 42 benchmark corpus) | 37,381 chunks |
 | `xquad` | General knowledge: 48 Wikipedia articles from XQuAD, in English and Spanish | 1,217 chunks |
 | `cv` | The author's CV, LinkedIn profile and biography (English and Spanish) | 162 chunks |
+| `about` | This project itself: this README, the documentation in `docs/` (English and Spanish) and the source code in `src/` | ~2,600 chunks |
 
-The base language model is **Qwen3-0.6B**, the model of the original 42 project, so the results stay comparable with other 42 RAGs. Larger models (Qwen3-1.7B, Qwen3-4B, Phi-4-mini) are optional profiles.
+The base language model is **Qwen3-0.6B**, the model of the original 42 project, so the results stay comparable with other 42 RAGs. Larger models of the same family (Qwen3-1.7B, Qwen3-4B) are optional profiles.
 
 The project was rebuilt phase by phase, and every change was measured before it was kept. The full history, with the numbers, is in [`docs/`](docs/).
 
-**Live demo:** *coming soon* (Hugging Face Space). <!-- TODO: link to the Space once deployed -->
+**Live demo:** *coming soon* (Oracle Cloud). <!-- TODO: link once deployed -->
 
 ---
 
@@ -45,7 +46,7 @@ The metric priority is R@5 > R@10 > R@3 > R@1. **Docs R@5 went up by 0.07 and co
 | XQuAD (Qwen3-0.6B) | The answer contains the right fact | EN 0.65 · ES 0.57; the right source is cited in 99% of answers |
 | CV, 30 questions per language | Retrieval R@1 / R@3 / R@5 / R@10 | EN 0.47 / 0.80 / 0.93 / 0.97 · ES 0.70 / 0.83 / 0.97 / 1.00 |
 | CV (Qwen3-0.6B) | The answer contains the right fact | EN 0.73 · ES 0.80, with **0 leaks of private contact data** |
-| Router, no filter | Questions sent to their own domain | 42: 100% · CV: 100% · XQuAD: ~98% |
+| Router, no filter | Questions sent to their own domain | 42: 99–100% · XQuAD: ~98% · CV: 90–93% · about: 89% (EN) · 94% (ES) |
 
 ### Agent vs direct RAG
 
@@ -56,9 +57,8 @@ Twelve conversations of 2–3 turns, where the follow-up questions only make sen
 | Qwen3-0.6B | **0.78** | 0.33 |
 | Qwen3-1.7B | 0.83 | 0.33 |
 | Qwen3-4B | **1.00** | 0.39 |
-| Phi-4-mini | 0.78 | 0.33 |
 
-On single, self-contained questions the agent stays within ±0.04 of the direct pipeline with all four models.
+On single, self-contained questions the agent stays within ±0.04 of the direct pipeline with every model. (Phi-4-mini was also measured, 0.78 / 0.33, and later dropped: see [Models](#models).)
 
 Every run is stored in [`bench/results/`](bench/results/) with its full configuration. The analysis is in [`docs/BENCHMARK_REPORT.md`](docs/BENCHMARK_REPORT.md).
 
@@ -95,12 +95,17 @@ question ──► agent (optional) ──► router ──► per-domain retrie
 - **Grounded answers:** numbered sources cited as `[n]`, a context budget in tokens, and an explicit instruction to answer in the language of the question.
 - **Domain rules** from `rag.toml`: an extra prompt for the CV domain (third person, do not mix jobs), masking of private contact data in the context, the answer and the shown sources, and a custom "not found" message that offers the public contact address.
 - **Streaming,** token by token, to the CLI and the web.
+- **Answer form:** a loop detector stops the generation when the model starts repeating lines, sentences or whole blocks, and the repeated part is cut. Answers that copy the prompt back are cleaned. The web allows up to 1,024 new tokens, only as a safety net.
+
+### Models
+
+The Qwen3 family only: **Qwen3-0.6B** (the base, the 42 model), **Qwen3-1.7B** and **Qwen3-4B**. Phi-4-mini was an option from another family until Phase 7; it was dropped because its answers copied the sources back and fell into long loops, and the fixes it needed were patches that only served it ([`docs/decisions.md`](docs/decisions.md), DEC-32).
 
 ### Agent and MCP
 
 - **The agent is the default path in the CLI**, as in production RAG systems. In the web it is opt-in for now (marked as work in progress), because with small models its conversation memory can mix in earlier topics.
   - It keeps a **session-only memory** of the conversation (nothing is stored).
-  - It rewrites follow-up questions into complete ones and searches with **native tool calls**: Qwen's `<tool_call>` format, Phi-4-mini's tools in the system message, or a prompt format for other models. Up to 3 searches per question.
+  - It rewrites follow-up questions into complete ones and searches with **native tool calls** (Qwen's `<tool_call>` format, or a prompt format for models without one). Up to 3 searches per question.
   - **Safety nets:** if the rewrite finds nothing, it searches the original question; if the model's domain choice finds nothing, it retries within the user's filter, never outside it. A deterministic fallback covers models that do not call the tool.
   - The final answer uses the same generator and domain rules as the direct path.
 - **MCP server** (`make mcp`): the RAG exposed as `list_domains`, `search` and `answer` tools, over stdio or streamable HTTP, for any MCP client.
@@ -112,7 +117,7 @@ question ──► agent (optional) ──► router ──► per-domain retrie
 FastAPI backend and React (Vite + TypeScript) frontend, in the visual style of the original Streamlit app:
 
 - **Chat** with streaming answers. Only the conversation scrolls, and a **Stop** button really stops the generation on the server.
-- **Domain filters** (`vllm`, `xquad`, `cv`), an **agent / direct** switch (direct by default; the agent is a work in progress), and pickers for the **model** and the **depth** (how many sources the LLM reads: 3, 5 or 10).
+- **Domain filters** (`vllm`, `xquad`, `cv`; `about` is always on), an **agent / direct** switch (direct by default; the agent is a work in progress), and pickers for the **model** and the **depth** (how many sources the LLM reads: 3, 5 or 10).
 - **Sources:** the domain that answered, with its sources in a carousel and the full masked text on demand; the other searched domains are folded in one line, with their router scores.
 - **Retrieval metrics** read from the latest benchmark runs.
 - Optional **example questions** for the active filters.
@@ -157,7 +162,7 @@ make run ARGS="chat"     # interactive conversation; /agent toggles the agent
 make mcp                 # MCP server (stdio)
 ```
 
-Optional models: `PROFILE=llm-qwen3-1.7b` (or `llm-qwen3-4b`, `llm-phi4-mini`) for the CLI. In the web, use the model picker.
+Optional models: `PROFILE=llm-qwen3-1.7b` (or `llm-qwen3-4b`) for the CLI. In the web, use the model picker.
 
 ### Benchmarks
 
@@ -179,14 +184,14 @@ The original 42 commands are unchanged: `make search-docs`, `make search-code`, 
 
 **Live demo:** *coming soon*. <!-- TODO: Space URL -->
 
-Built to run for free:
-- **Backend:** a Hugging Face Space (Docker, free CPU), with Qdrant inside the container.
-- **Frontend:** served by the Space, or optionally from GitHub Pages.
-- **Index:** built on a local GPU and shipped as a bundle (Qdrant snapshots and BM25 files, checked with SHA256) in a **private** Hugging Face dataset, because it holds the raw CV material.
+Built to run for free, apart from the author's other cloud projects:
+- **Server:** an **Oracle Cloud Always Free** ARM machine (2 OCPU, 12 GB) with Docker. It runs the API and the built web, behind Caddy for HTTPS. The plan was a Hugging Face Space, but since July 2026 Docker Spaces need a paid plan.
+- **Frontend:** served by the same container, or optionally from GitHub Pages.
+- **Index:** built on a local GPU and copied to the machine as a bundle (Qdrant snapshots and BM25 files, checked with SHA256). It is never published, because it holds the raw CV material.
 
-`make bundle`, `make space-build` and `make space-run` reproduce the Space locally. The step-by-step guide is in [`deploy/README.md`](deploy/README.md).
+`make bundle`, `make space-build` and `make space-run` reproduce the image locally (it is still built from `deploy/space/`). The step-by-step guide, in Spanish, is in [`deploy/README.md`](deploy/README.md).
 
-With the free tier's limits simulated (2 vCPU, 16 GB), an answer takes about 15–25 s in direct mode and 22–32 s with the agent, streamed as it is written.
+Measured with the container limited to 2 CPUs and 12 GB: 5.0 GB of RAM at peak, and 23–37 s per answer on x86, streamed as it is written. The speed on Oracle's ARM CPUs is not measured yet.
 
 ---
 
@@ -202,7 +207,7 @@ src/
   deploy/       index bundle export/restore
   cli.py        Fire CLI (python -m src <command>)
 web/            React frontend
-deploy/space/   Hugging Face Space image
+deploy/         server image (deploy/space) and Oracle setup (deploy/oracle)
 bench/          versioned datasets and every benchmark result
 docs/           roadmap, phase changelogs, benchmark report, decisions (English)
 docs/es/        the same documents in Spanish, the working version, plus this README
@@ -228,7 +233,7 @@ The documents were written in Spanish while the project was built; the originals
 
 - **vLLM** documentation and code (Apache-2.0), the 42 benchmark corpus.
 - **XQuAD** (Google, CC-BY-SA 4.0), based on Wikipedia.
-- Models: [Qwen3](https://huggingface.co/Qwen), [BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3), [cross-encoder/mmarco-mMiniLMv2-L12-H384-v1](https://huggingface.co/cross-encoder/mmarco-mMiniLMv2-L12-H384-v1), [Phi-4-mini](https://huggingface.co/microsoft/Phi-4-mini-instruct).
+- Models: [Qwen3](https://huggingface.co/Qwen), [BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3), [cross-encoder/mmarco-mMiniLMv2-L12-H384-v1](https://huggingface.co/cross-encoder/mmarco-mMiniLMv2-L12-H384-v1).
 - Tools: Qdrant, bm25s, sentence-transformers, Docling, FastAPI, React, Vite, the MCP Python SDK, uv and Python Fire.
 
 ### AI usage
