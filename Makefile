@@ -133,6 +133,23 @@ api-public: API_ORIGINS = $(PUBLIC_ORIGIN)
 api-public: API_DOCS = 0
 api-public: api
 
+# Ctrl+C in Git Bash can stop make but leave the API's Python running and
+# holding the port: these stop whatever listens on it (the tunnel stays).
+API_PORT = 8000
+api-public-stop:
+	@pid=$$(netstat -ano 2>/dev/null | grep -E "127\.0\.0\.1:$(API_PORT) .*LISTEN" | awk '{print $$NF}' | head -1); \
+	if command -v taskkill >/dev/null 2>&1; then \
+		if [ -z "$$pid" ]; then echo "No API listening on port $(API_PORT)."; \
+		else taskkill //PID $$pid //T //F >/dev/null && echo "API stopped (PID $$pid)."; fi; \
+	else \
+		fuser -k $(API_PORT)/tcp >/dev/null 2>&1 && echo "API stopped." || echo "No API listening on port $(API_PORT)."; \
+	fi
+	@sleep 2
+
+# Stop, then start again (prerequisites run in order; the api-public
+# settings reach the api recipe as usual).
+api-public-restart: api-public-stop api-public
+
 # React web in development (Vite, http://localhost:5173, talks to make api).
 web-dev:
 	cd web && npm install && npm run dev
@@ -256,4 +273,4 @@ meme:
 
 .PHONY: install data data-vllm data-xquad db-up db-down db-reset run web web-stop index search-docs search-code \
         eval-docs eval-code bench route-bench agent-bench gen-bench judge mcp test lint clean meme \
-        api api-public web-dev web-build bundle space-build space-run
+        api api-public api-public-stop api-public-restart web-dev web-build bundle space-build space-run
