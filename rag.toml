@@ -131,6 +131,16 @@ style_rule = "6. Be direct and concise: a few sentences, no preamble."
 # -3.0 accepts 83% (en) / 90% (es) and no out-of-domain question.
 # Rejections still end in the CV message below.
 relevance_threshold = -3.0
+# Questions that name the author go to the CV when it passes its gate,
+# even if "about" (whose docs and code mention him) scores higher.
+route_hints = ['\b(chrystian|donaire)\b']
+# Questions about "the author" of this project go to the CV whatever its
+# score and skip its gate (among the web's most asked questions). Not
+# "the author of <a book>" (XQuAD).
+route_names = [
+    '\b(el|the|tu|your) (autor|author|creador|creator)\b(?!\s+(de|del|of)\b)',
+    '\b(autor|author|creador|creator) (de|del|of) (este|esta|tu|this|your|the|el) (rag|proyecto|project|web|website|app|aplicaci[oó]n|sistema|system|chatbot|asistente|assistant)\b',
+]
 # The English CV comes first for English questions and lacks the
 # biography-only facts: more sources bring the biography in too.
 answer_k = 8
@@ -198,10 +208,38 @@ route_hints = [
     '\b(este|el|tu) proyecto\b',
     'rag against the machine',
 ]
+# Questions that name it beyond doubt, or ask the assistant what it is,
+# go to "about" whatever its score and skip its gate (among the web's
+# most asked questions; FASE_7.md 7b.5).
+route_names = [
+    'rag against the machine',
+    '\b(este|esta|tu|vuestro) (rag|proyecto|sistema|chatbot|asistente|web|aplicaci[oó]n)\b',
+    '\b(this|your) (rag|project|system|chatbot|assistant|website|app)\b',
+    '\b(qu[eé]|qui[eé]n) eres\b',
+    '\bpara qu[eé] (sirves|vales)\b',
+    '\bqu[eé] (puedes|sabes) hacer\b',
+    '\b(what|who) are you\b',
+    '\bwhat (can|do) you do\b',
+    '\bqui[eé]n te (ha|hizo|cre[oó]|program[oó])\b',
+    '\bwho (made|built|created|programmed) you\b',
+]
+# The small models took "you" for the reader ("you are a RAG system").
+prompt_rules = """
+7. You are this project's assistant. If the question asks about you (what you are, what you can do, who made you), it asks about this project: answer in the first person ("I am...").
+"""
 # The web always searches it (chip always on, it joins every filter).
 pinned = true
 code_extensions = [".py"]
 default_chunker = "markdown_headers_packed"
+
+# Asked of the assistant itself, those questions find nothing useful
+# with their own words: "about" is searched with these instead (the LLM
+# still gets the original question).
+[sources.about.route_queries]
+'\b(qu[eé]|qui[eé]n) eres\b|\bpara qu[eé] (sirves|vales)\b|\bqu[eé] (puedes|sabes) hacer\b' = "¿Qué es RAG against the Machine y qué puede hacer?"
+'\b(what|who) are you\b|\bwhat (can|do) you do\b' = "What is RAG against the Machine and what can it do?"
+'\bqui[eé]n te (ha|hizo|cre[oó]|program[oó])\b' = "¿Quién es el autor de RAG against the Machine?"
+'\bwho (made|built|created|programmed) you\b' = "Who is the author of RAG against the Machine?"
 
 [sources.about.chunkers]
 ".py" = "python_ast"

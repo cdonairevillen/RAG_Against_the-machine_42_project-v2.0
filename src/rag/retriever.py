@@ -164,6 +164,10 @@ class Retriever:
         # Patterns that name this domain in a question (rag.toml
         # route_hints), used by the DomainRouter.
         self.route_hints: list[re.Pattern[str]] = []
+        # Patterns that name it beyond doubt (rag.toml route_names).
+        self.route_names: list[re.Pattern[str]] = []
+        # (pattern, search query) pairs (rag.toml route_queries).
+        self.route_queries: list[tuple[re.Pattern[str], str]] = []
         # [English, Spanish] path prefixes of translated files (rag.toml
         # translations), longest first, and the question languages the
         # filter applies to (translation_languages).
@@ -343,6 +347,15 @@ class Retriever:
         retriever.route_hints = [
             re.compile(hint, re.IGNORECASE)
             for hint in (source.route_hints if source else [])
+        ]
+        retriever.route_names = [
+            re.compile(name, re.IGNORECASE)
+            for name in (source.route_names if source else [])
+        ]
+        retriever.route_queries = [
+            (re.compile(pattern, re.IGNORECASE), search)
+            for pattern, search in
+            (source.route_queries if source else {}).items()
         ]
         retriever.translations = sorted(
             ((english, spanish) for english, spanish in

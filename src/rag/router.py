@@ -64,6 +64,8 @@ class DomainRouter:
         # domain, best first: the web shows each domain's results, not
         # only the winner's. Bookkeeping only; routing is unchanged.
         self.last_ranked: list[tuple[str, float, list[MinimalSource]]] = []
+        # The domain the last question named (route_names), if any.
+        self.last_named: Optional[str] = None
         self.parent_map: dict = {}
 
     @classmethod
@@ -162,25 +164,62 @@ class DomainRouter:
             (domain, score, sources) per domain, best score first. The
             score is the best cross-encoder logit of the domain's top
             ROUTE_TOP sources; -inf without a reranker or results. A
-            domain the question names (route_hints) goes first when it
-            passes its own threshold.
+            domain the question names beyond doubt (route_names) goes
+            first; one it hints at (route_hints), when it passes its own
+            threshold.
         """
         ranked = []
         for domain in self.selected(domains):
             retriever = self.retrievers[domain]
             domain_k = (retriever.answer_k or k) if for_answer else k
-            sources = retriever.search_smart(query, domain_k)
-            score = retriever.top_relevance(query, sources[:ROUTE_TOP]) \
+            search = self.search_query(query, domain)
+            sources = retriever.search_smart(search, domain_k)
+            score = retriever.top_relevance(search, sources[:ROUTE_TOP]) \
                 if sources else float("-inf")
             ranked.append((domain, score, sources))
         # Stable sort: ties keep rag.toml order.
         ranked.sort(key=lambda item: -item[1])
-        hinted = self.hinted(query, ranked)
+        self.last_named = None
+        named = self.named(query, ranked)
+        hinted = named if named is not None else self.hinted(query, ranked)
+        if named is not None:
+            self.last_named = ranked[named][0]
         if hinted is not None:
             ranked.insert(0, ranked.pop(hinted))
         self.last_route = [(domain, score) for domain, score, _ in ranked]
         self.last_ranked = ranked
         return ranked
+
+    def search_query(self, query: str, domain: str) -> str:
+        """The query to search a domain with: its route_queries
+        replacement when the question matches one, else the question."""
+        for pattern, search in self.retrievers[domain].route_queries:
+            if pattern.search(query):
+                return search
+        return query
+
+    def names(self, query: str, domain: str) -> bool:
+        """Whether the question names a domain beyond doubt."""
+        return any(n.search(query)
+                   for n in self.retrievers[domain].route_names)
+
+    def named(self, query: str,
+              ranked: list[tuple[str, float, list[MinimalSource]]]
+              ) -> Optional[int]:
+        """Position of the domain the question names beyond doubt
+        (route_names) that has results, or None.
+
+        When several are named, the first in rag.toml order wins, not
+        the best score ("the author of this project" names the CV and
+        "about"; the CV comes first).
+        """
+        positions = {domain: pos for pos, (domain, _, sources)
+                     in enumerate(ranked)
+                     if sources and self.names(query, domain)}
+        for domain in self.retrievers:
+            if domain in positions:
+                return positions[domain]
+        return None
 
     def hinted(self, query: str,
                ranked: list[tuple[str, float, list[MinimalSource]]]
@@ -234,15 +273,21 @@ class DomainRouter:
             return []
         selected = self.selected(domains)
         if len(selected) == 1:
+            retriever = self.retrievers[selected[0]]
             self.last_route = [(selected[0], float("nan"))]
-            sources = self.retrievers[selected[0]].search_for_generation(
-                query, k
-            )
+            if self.names(query, selected[0]):
+                # A question that names the domain skips its gate.
+                sources = retriever.search_smart(
+                    self.search_query(query, selected[0]),
+                    retriever.answer_k or k)
+            else:
+                sources = retriever.search_for_generation(query, k)
             self.last_ranked = [(selected[0], float("nan"), sources)]
             return sources
         domain, score, sources = self.route(query, k, selected,
                                             for_answer=True)[0]
         threshold = self.retrievers[domain].settings.relevance_threshold
-        if self.reranker is None or threshold is None:
+        if (self.reranker is None or threshold is None
+                or domain == self.last_named):
             return sources
         return sources if score >= threshold else []

@@ -177,13 +177,16 @@ html, body {
 .link-button { background: none; border: none; color: var(--muted); font-family: var(--mono); font-size: 0.65rem; padding: 0.4rem 0 0; cursor: pointer; text-decoration: underline; }
 
 /* Composer: the input with the model and depth pickers below it */
+/* Lighter than the page and with a visible border: on some phone screens
+   the old #111 on #0a0a0a could not be told apart from the background. */
 .composer {
-  background: var(--panel);
-  border: 1px solid var(--line-strong);
+  background: #171717;
+  border: 1px solid #383838;
   border-radius: 10px;
   padding: 0.7rem 0.8rem 0.5rem;
+  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.6);
 }
-.composer:focus-within { border-color: #3a3a3a; }
+.composer:focus-within { border-color: #5a5a5a; }
 .composer textarea {
   width: 100%;
   resize: none;
@@ -197,7 +200,7 @@ html, body {
   padding: 0.2rem 0.3rem;
   max-height: 200px;
 }
-.composer textarea::placeholder { color: var(--faint); }
+.composer textarea::placeholder { color: #666; }
 .composer-bar { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; }
 .composer-spacer { flex: 1; }
 .composer-new {

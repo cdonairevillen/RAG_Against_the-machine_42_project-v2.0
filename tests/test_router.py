@@ -20,6 +20,8 @@ class FakeRetriever:
         self.chunks: list[Any] = []
         self.answer_k = None
         self.route_hints: list[re.Pattern[str]] = []
+        self.route_names: list[re.Pattern[str]] = []
+        self.route_queries: list[tuple[re.Pattern[str], str]] = []
 
     def source(self) -> MinimalSource:
         return MinimalSource(file_path=f"{self.domain}.md",
@@ -107,3 +109,57 @@ def test_a_hint_alone_does_not_route() -> None:
     })
     r.retrievers["about"].route_hints = [re.compile("the project", re.I)]
     assert r.search_smart("Who led the project?")[0].file_path == "xquad.md"
+
+
+def test_a_named_domain_wins_and_skips_its_gate() -> None:
+    r = DomainRouter({  # type: ignore[dict-item]
+        "vllm": FakeRetriever("vllm", 1.0),
+        "about": FakeRetriever("about", -1.85, threshold=-1.0),
+    })
+    r.retrievers["about"].route_names = [re.compile("este rag", re.I)]
+    # Below its own threshold, but named: it wins and answers.
+    sources = r.search_for_generation("Háblame sobre este rag")
+    assert sources[0].file_path == "about.md"
+    assert r.last_named == "about"
+    # Not named: vLLM wins as before.
+    sources = r.search_for_generation("Háblame sobre RAG")
+    assert sources[0].file_path == "vllm.md"
+    assert r.last_named is None
+
+
+def test_a_named_single_domain_skips_its_gate() -> None:
+    r = DomainRouter({  # type: ignore[dict-item]
+        "about": FakeRetriever("about", -1.85, threshold=-1.0),
+    })
+    assert r.search_for_generation("q") == []
+    r.retrievers["about"].route_names = [re.compile("este rag", re.I)]
+    assert r.search_for_generation("Háblame sobre este rag")
+
+
+def test_two_named_domains_follow_the_config_order() -> None:
+    r = DomainRouter({  # type: ignore[dict-item]
+        "cv": FakeRetriever("cv", -5.0, threshold=-3.0),
+        "about": FakeRetriever("about", 2.0, threshold=-1.0),
+    })
+    r.retrievers["cv"].route_names = [re.compile("the author", re.I)]
+    r.retrievers["about"].route_names = [re.compile("this project", re.I)]
+    # "about" scores higher, but the CV comes first in the config.
+    sources = r.search_for_generation("Who is the author of this project?")
+    assert sources[0].file_path == "cv.md"
+    assert r.last_named == "cv"
+
+
+def test_a_route_query_replaces_the_search() -> None:
+    r = DomainRouter({  # type: ignore[dict-item]
+        "about": FakeRetriever("about", -4.0, threshold=-1.0),
+    })
+    about = r.retrievers["about"]
+    about.route_names = [re.compile("what are you", re.I)]
+    about.route_queries = [(re.compile("what are you", re.I),
+                            "What is this project?")]
+    searched: list[str] = []
+    about.search_smart = (  # type: ignore[method-assign]
+        lambda query, k=10: searched.append(query) or [about.source()])
+    assert r.search_for_generation("What are you?")
+    assert searched == ["What is this project?"]
+    assert r.search_query("Which reranker?", "about") == "Which reranker?"
