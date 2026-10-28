@@ -395,3 +395,22 @@ def test_a_full_queue_refuses_the_chat(client: TestClient) -> None:
     service.queued = 0
     stream = events(client.post("/chat", json={"message": "Hi"}))
     assert stream[-1][0] == "done" and service.queued == 0
+
+
+def test_a_full_queue_refuses_the_search(client: TestClient) -> None:
+    service = client.app.state.service
+    service.max_queue = 1
+    service.queued = 1
+    response = client.post("/search", json={"query": "vllm"})
+    assert response.status_code == 503 and "busy" in response.json()["detail"]
+    service.queued = 0
+    assert client.post("/search", json={"query": "vllm"}).status_code == 200
+    assert service.queued == 0
+
+
+def test_the_api_docs_can_be_hidden(monkeypatch) -> None:
+    monkeypatch.setenv("RAG_API_DOCS", "0")
+    hidden = TestClient(create_app(CONFIG, preload=False))
+    assert hidden.get("/openapi.json").status_code == 404
+    assert hidden.get("/docs").status_code == 404
+    assert hidden.get("/health").status_code == 200

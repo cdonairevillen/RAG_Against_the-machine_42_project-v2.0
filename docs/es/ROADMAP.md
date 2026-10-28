@@ -322,6 +322,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
   - **Base ya preparada (Fase 2):** los perfiles de `rag.toml` (`available_profiles`) son las opciones que podría ofrecer un selector de ingesta, reranker o embeddings. La base estable sigue siendo la del benchmark. *A plantear en esta fase.*
 - **Despliegue sin coste**:
   - ~~Backend en un Hugging Face Space (Docker, CPU gratuito).~~ → **Oracle Cloud Always Free** (DEC-19, 2026-10-24): desde julio de 2026, los Spaces de Docker son de pago.
+  - **Actualizado (Fase 8, hoy vigente):** de momento la web se sirve desde el ordenador del autor (la 3080 Ti) con un túnel de Tailscale Funnel, como parche. Oracle queda para más adelante.
   - Frontend estático en GitHub Pages.
   - **Google Cloud no se toca.**
   - En el despliegue gratuito probablemente solo quepa un modelo cargado; el resto, en local.
@@ -338,7 +339,7 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 >   - Botón Stop y preguntas de ejemplo.
 >   - Retrievals del dominio de la respuesta con carrusel y esquinas de puntos, y tarjetas de recall por dominio.
 >   - La API sirve la web en `/`. Commit `3378494`.
-> - **Despliegue:** Space de HF (Docker, CPU) con Qdrant dentro; índice en un bundle (`make bundle`, SHA256) en un **dataset privado**; Pages con un workflow manual.
+> - **Despliegue (plan de la Fase 6, ya no vigente):** Space de HF (Docker, CPU) con Qdrant dentro; índice en un bundle (`make bundle`, SHA256) en un **dataset privado**; Pages con un workflow manual. Después pasó a Oracle (DEC-19) y, en la Fase 8, la web se sirve desde el ordenador del autor con un túnel de Tailscale Funnel.
 > - **Queda en tus manos:** crear el dataset y el Space, poner los secretos y decidir el LLM del Space, la estrategia de privacidad (DEC-09) y si se borra Streamlit (DEC-13).
 > - **P4 (modularización):** la web expone los filtros de dominio, el agente sí/no, el modelo (los perfiles `llm-*`, uno cargado a la vez) y la profundidad.
 
@@ -396,12 +397,12 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 
 ## Fase 8 — Granite, despliegue y pruebas extra
 
-**Objetivo:** un modelo opcional de otra familia (Granite), la web desplegada en Oracle y las pruebas que quedaron aparcadas. Fase abierta el 2026-10-27, tras el commit `477bff9` (cierre de la Fase 7). Changelog en `changelog/FASE_8.md`.
+**Objetivo:** un modelo opcional de otra familia (Granite), la web desplegada (de momento desde tu ordenador con un túnel; Oracle más adelante) y las pruebas que quedaron aparcadas. Fase abierta el 2026-10-27, tras el commit `477bff9` (cierre de la Fase 7). Changelog en `changelog/FASE_8.md`.
 
 **Decisiones tuyas (2026-10-27):**
 - **La base sigue siendo Qwen3-0.6B:** benchmarks, CLI y comparativas con 42.
 - **En la web, el modelo por defecto pasa a ser Qwen3-1.7B**, para lucir más el RAG.
-- **Qwen3-4B vuelve a la lista de la web, pero solo con el agente desactivado.**
+- **Qwen3-4B vuelve a la lista de la web, pero solo con el agente desactivado.** Después lo sustituyó Granite 4.0 Micro (8a.2): hoy el 4B no está en la web.
 - **Las limitaciones de Granite se ven midiendo**, sin descartarlo de antemano.
 - **Las decisiones las tomas tú:** yo propongo, mido y documento.
 - **El plan B del agente entra en la Fase 8** (8f). El 4B queda sin agente por la memoria de la GPU, así que no le afecta.
@@ -409,17 +410,18 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 - **Granite: se empieza por Granite 4.0 Micro** (`ibm-granite/granite-4.0-micro`, la densa de 3B; la híbrida es `granite-4.0-h-micro`). Se prueba con la misma matriz que los Qwen. Si funciona como debe tras tu evaluación, se sigue con él; si no, se descarta.
 - **Despliegue: desde tu ordenador, como parche** (2026-10-27). La web se sirve desde local con un túnel; Oracle y Hugging Face PRO quedan como opciones probables para el futuro (tabla de abajo).
 
-**Dato a resolver (no es una decisión, es lo medido):** el 4B tampoco cargó en el modo directo de la web, sin agente (banco abierto de `92`, `100` y `101`: *"You can't move a model that has some modules offloaded"*). Con la recuperación (`bge-m3` y el reranker) en la GPU no cabe en 12 GB (comentario de `API_MODELS` en el `Makefile`). En `gen-bench` funciona porque su perfil pone la recuperación en la CPU (`[profiles.llm-qwen3-4b.models]`). Desactivar el agente no basta: hay que decidir cómo hacerle sitio (por ejemplo, la recuperación en la CPU cuando se elige el 4B, o el 4B en la CPU). En Oracle (CPU, 12 GB) está sin medir.
+**Resuelto en 8w (opción A), y después el 4B salió de la web (8a.2):** el 4B tampoco cargaba en el modo directo de la web, sin agente (banco abierto de `92`, `100` y `101`: *"You can't move a model that has some modules offloaded"*). Con la recuperación (`bge-m3` y el reranker) en la GPU no cabe en 12 GB (comentario de `API_MODELS` en el `Makefile`). En `gen-bench` funciona porque su perfil pone la recuperación en la CPU (`[profiles.llm-qwen3-4b.models]`). Desactivar el agente no bastaba: con la opción A, al elegir el 4B la recuperación pasa a la CPU. Hoy la web ofrece Qwen3-1.7B (por defecto), Qwen3-0.6B y Granite 4.0 Micro, todos con y sin agente. En Oracle (CPU, 12 GB) el 4B está sin medir.
 
 **Plan propuesto** (orden 8a → 8e; pendiente de tus respuestas):
 
 | Bloque | Qué | Estado |
 |---|---|---|
 | 8w — Web | Modelo por defecto de la web: 1.7B. Qwen3-4B en el selector, deshabilitado con el agente encendido. Resolver la memoria del 4B (arriba) | ✅ Implementado (`FASE_8.md` §8w): con el 4B, primer token ~3.8 s y total 4.7–8.9 s, con la búsqueda en la CPU |
-| 8a — Granite | Perfil opcional `llm-granite-*` (Apache 2.0, español entre sus idiomas; variantes de 3B densa, 3B híbrida Mamba2 y 1B). Comprobar plantilla, tokens de parada, mensaje de sistema por defecto y formato de herramientas (`<tool_call>`); después la misma matriz que los Qwen (`gen-bench`, banco abierto, `agent-bench`, eco, bucles, idioma, latencia) | 🟡 Granite 4.0 Micro medido (`FASE_8.md` §8a, matriz `110`): calidad al nivel del 4B, buen agente y cabe en la GPU con el agente; peor con las preguntas privadas del CV (sin fugas). Pendiente de tu evaluación |
-| 8b — Umbral de "about" | Recalibrar con `gate_scores` sobre el índice limpio, para recuperar about-02, 04 y 11 (DEC-39), y repetir el `route-bench` | Propuesto |
+| 8a — Granite | Perfil opcional `llm-granite-*` (Apache 2.0, español entre sus idiomas; variantes de 3B densa, 3B híbrida Mamba2 y 1B). Comprobar plantilla, tokens de parada, mensaje de sistema por defecto y formato de herramientas (`<tool_call>`); después la misma matriz que los Qwen (`gen-bench`, banco abierto, `agent-bench`, eco, bucles, idioma, latencia) | ✅ Granite 4.0 Micro medido (`FASE_8.md` §8a, matriz `110`): calidad al nivel del 4B, buen agente y cabe en la GPU con el agente; peor con las preguntas privadas del CV (sin fugas). **Sustituye al 4B en la web** (decisión tuya), con una regla propia para los datos privados del CV (§8a.2) |
+| 8b — Umbral de "about" | Recalibrar con `gate_scores` sobre el índice limpio, para recuperar about-02, 04 y 11 (DEC-39), y repetir el `route-bench` | ✅ −1.25 (`FASE_8.md` §8b): recupera dos preguntas del proyecto; −1.5 dejaba pasar una pregunta de fuera de dominio. Falta el `route-bench` oficial |
 | 8c — Pista de idioma | Opción C de DEC-36 (el idioma en el mensaje de sistema). Solo si no baja nada | Propuesto, prioridad baja |
-| 8d — Despliegue en Oracle | Latencia y memoria en CPU de los modelos de la web (P12); `make bundle` con el índice limpio (DEC-38); regenerar `deploy/stage`; tú creas la máquina, subes el bundle por `scp`, pones el `.env` y activas Pages; pruebas contra la URL real | Cuándo, por decidir (pregunta 2) |
+| 8d — Despliegue | Desde tu ordenador con un túnel (decisión tuya); Oracle más adelante: latencia y memoria en CPU (P12), `make bundle` con el índice limpio (DEC-38), `deploy/stage`, máquina, `scp`, `.env` y Pages | 🟡 Local preparado (`FASE_8.md` §8d): `make api-public` (cola de 4 preguntas, origen restringible) y guía en `deploy/local/README.md`. Túnel: Tailscale Funnel; el túnel rápido de Cloudflare no admite el streaming del chat, y su URL fija exige un dominio de pago (§8d.2). Medidas de seguridad en `make api-public` y en la guía. Falta que crees la cuenta de Tailscale |
+| 8g — Respuestas más elaboradas | Regla 6 del prompt por modelo (`style_rule`) y por dominio. Petición tuya del 2026-10-27 | ✅ Medido (`FASE_8.md` §8g): ninguna regla se adopta (la mejor, S5 en el 1.7B, empeora code). S5 queda comentada en `rag.toml`; el CV mantiene siempre la regla corta |
 | 8f — Plan B del agente | Cuando el modelo no hace una llamada válida, el agente busca con la consulta anterior más la nueva (Fase 5); hoy también le pasa esa mezcla al modelo, y el 0.6B responde a las dos preguntas juntas (`FASE_6.md`). Mejora: buscar con la mezcla y responder solo a la pregunta original. Se mide con `agent-bench` (0.6B y 1.7B) antes de adoptarlo; si funciona, se valora volver a encender el agente en la web | Entra (decisión tuya) |
 | 8e — Pruebas extra | Candidatas: MRR y nDCG@10, juez de Groq sobre el CV (P11), prueba de carga del servidor, volver a medir el chunker de LangChain | Cuáles, por decidir (pregunta 3) |
 
@@ -430,12 +432,12 @@ No deben empeorar los resultados obtenidos durante la evaluación.
 4. ~~Plan B del agente~~ → entra (8f).
 5. ~~Memoria del 4B en la web~~ → opción A.
 
-**Despliegue: tres opciones a valorar** (sin decidir; lo que sigue es lo comprobado el 2026-10-27, con lo que falta por confirmar):
+**Despliegue: tres opciones** (elegida la segunda como parche; lo que sigue es lo comprobado el 2026-10-27, con lo que falta por confirmar):
 
 | Opción | A favor | En contra / a confirmar |
 |---|---|---|
 | Oracle Cloud Always Free (DEC-19) | Gratis; 2 CPU ARM y 12 GB; ya preparado (`deploy/`) | Solo CPU (0.6B y quizá 1.7B; el 4B y Granite 3B, sin medir y difíciles en 12 GB). Crear la máquina puede fallar por falta de capacidad (*"Out of capacity"*, `deploy/README.md`) |
-| Servir desde tu ordenador (la 3080 Ti) con un túnel (por ejemplo, Cloudflare Tunnel) | Gratis; GPU, así que todos los modelos de la web (1.7B por defecto, 4B, Granite); sin abrir puertos del router | La web solo funciona con tu ordenador encendido; tu conexión limita el tráfico; los túneles rápidos cambian de URL en cada arranque (para una URL fija hace falta un dominio en Cloudflare); exponer tu máquina pide revisar la seguridad de la API |
+| Servir desde tu ordenador (la 3080 Ti) con un túnel (Tailscale Funnel o Cloudflare Tunnel, §8d) | Gratis; GPU, así que todos los modelos de la web (1.7B por defecto, 0.6B, Granite); sin abrir puertos del router | La web solo funciona con tu ordenador encendido; tu conexión limita el tráfico; los túneles rápidos de Cloudflare cambian de URL en cada arranque (para una URL fija hace falta un dominio de pago) y no admiten el streaming del chat; exponer tu máquina pide revisar la seguridad de la API |
 | Hugging Face PRO | Plataforma conocida por los recruiters | **De pago** (unos 9 $/mes según varias fuentes de 2026, sin confirmar en la página oficial), y choca con "no quiero gastar dinero" de `PLANING.md`. Lo que da PRO es sobre todo cuota de ZeroGPU; **falta confirmar** si ZeroGPU sirve para un Space de Docker como el nuestro y qué cuesta el hardware de un Space de Docker desde julio de 2026 (DEC-19) |
 
 Regla de siempre: cada paso se mide por separado, 42 no puede empeorar y las preguntas de prueba se citan por identificador (DEC-39).
@@ -454,7 +456,7 @@ Regla de siempre: cada paso se mide por separado, 42 no puede empeorar y las pre
 | P3 | ~~Dominios nuevos~~ → resuelto: XQuAD (cultura general, en/es) y después MLQA | Hecho |
 | P4 | ~~Modularización: qué opciones se exponen en la web~~ → resuelto en la revisión de la Fase 6: filtros de dominio, agente sí/no, modelo y profundidad | Hecho |
 | P11 | ~~Juez de las respuestas del CV (Fase 7b)~~ → resuelto (2026-10-24, decisión tuya): **Groq**, también con las preguntas del CV, hasta agotar los tokens gratuitos. Si hace falta, se repite con Qwen3-4B como juez local | Hecho |
-| P12 | LLM del servidor: el 0.6B (la base) o el 1.7B (mejor agente; su latencia en CPU está sin medir). En Oracle, el 1.7B cabría en memoria (estimado ~9.5 GB de 12). **Avance (2026-10-27, decisión tuya):** en la web, el 1.7B por defecto y el 4B solo sin agente (Fase 8); falta medir la latencia y la memoria en la CPU de Oracle | Fase 8 (8d) |
+| P12 | LLM del servidor: el 0.6B (la base) o el 1.7B (mejor agente; su latencia en CPU está sin medir). En Oracle, el 1.7B cabría en memoria (estimado ~9.5 GB de 12). **Avance (2026-10-27, decisiones tuyas):** en la web, el 1.7B por defecto; el 4B volvió solo sin agente y después lo sustituyó Granite 4.0 Micro (Fase 8). De momento se sirve desde tu ordenador con un túnel; falta medir la latencia y la memoria en la CPU de Oracle | Fase 8 (8d) |
 | P5 | ~~GPU de los ordenadores de 42~~ → resuelto: no aceptan CUDA (vLLM tarda ~10 h en indexarse). Se descarta indexar en 42 y el proyecto se sirve en línea | Hecho |
 | P10 | Hugging Face Datasets: usarlos como fuente de la ingesta y alojar allí los nuestros (los de 42, los derivados multimedia y quizá el índice). Falta revisar si la licencia de los datasets de 42 permite publicarlos. **Avance (2026-10-24):** con Oracle, el índice preconstruido va por `scp` a la máquina (DEC-19); el dataset **privado** de HF (DEC-09) queda como alternativa. Publicar los datasets de 42 sigue sin hacerse: la licencia no está revisada | A desarrollar; antes de la Fase 6 (despliegue) o de la 4c si se retoma |
 | P6 | Proveedor de la key gratuita para el juez LLM | Antes de la Fase 3 |
@@ -512,3 +514,5 @@ Regla de siempre: cada paso se mide por separado, 42 no puede empeorar y las pre
 - **2026-10-27**: **Fase 7 cerrada** (decisión tuya). Lo pendiente pasa a la Fase 8: Granite, despliegue y pruebas extra.
 - **2026-10-27**: **Fase 8 abierta** tras el commit `477bff9`. Decisiones tuyas: la base sigue siendo el 0.6B; en la web, el 1.7B por defecto y el 4B de vuelta, solo con el agente desactivado; las limitaciones de Granite se ven midiendo. El 4B no cabe en la GPU con la recuperación ni siquiera sin agente (medido): queda por resolver cómo hacerle sitio. Plan y preguntas abiertas en la Fase 8.
 - **2026-10-27**: fuera de la documentación indexada las citas de preguntas de prueba y de respuestas incorrectas (decisión tuya, DEC-39): la búsqueda devolvía esas notas en lugar de la respuesta. Lo literal se guarda en `RESPUESTAS_ARCHIVADAS.md`, excluido de "about". Ver `changelog/FASE_7.md` §7b.9.
+- **2026-10-27**: **Granite 4.0 Micro sustituye al 4B en la web** (decisión tuya), con y sin agente, y con una regla propia para no presentar el Gmail como otro correo (`FASE_8.md` §8a.2). Despliegue local preparado (`make api-public`, `deploy/local/README.md`, §8d).
+- **2026-10-28**: sesión de noche sobre la longitud de las respuestas (`FASE_8.md` §8g). Mecanismo `style_rule` por modelo y por dominio; 6 reglas medidas en el 1.7B y una en Granite y el 0.6B. Ninguna se adopta, porque todas empeoran algo; S5 queda lista para activarla en el perfil del 1.7B. Sin commits.

@@ -123,6 +123,9 @@ The SOURCES describe one person, Chrystian Donaire Villén: his CV, his LinkedIn
 10. His literary world is a secret project: if asked about it, say only that it is secret and that more will be known soon.
 11. His only public contact is the e-mail cdonairevillen@gmail.com. Never present it as another address. If asked for a phone number or any other contact detail, say that it is private and give that e-mail.
 """
+# The CV keeps the short rule 6 with every model: longer answers made up
+# facts ("he has no pets") instead of the CV message (FASE_8.md, 8g).
+style_rule = "6. Be direct and concise: a few sentences, no preamble."
 # Calibrated with `gate_scores` for the 800-char chunks below (FASE_4.md,
 # 4b): the global 0.0 rejected over 40% of valid English questions;
 # -3.0 accepts 83% (en) / 90% (es) and no out-of-domain question.
@@ -182,9 +185,12 @@ translation_languages = ["en"]
 # Test transcripts quoting CV answers, marked inside the changelogs, are
 # left out (they made the router pick "about" for CV questions).
 skip_marked = true
-# Own gate (`gate_scores`, FASE_7.md 7a.7): -1.0 accepts 83% (en) /
+# Own gate (`gate_scores`, FASE_7.md 7a.7): -1.0 accepted 83% (en) /
 # 78% (es) of the questions about the project; the global 0.0 only 67%.
-relevance_threshold = -1.0
+# Recalibrated in Phase 8b (FASE_8.md 8b) on the clean index: -1.25
+# recovers two project questions with every model; -1.5 let an
+# out-of-domain question through.
+relevance_threshold = -1.25
 # Questions that name the project go to "about" when it passes its gate
 # (a hint alone never decides: XQuAD also has "the project").
 route_hints = [
@@ -224,6 +230,10 @@ model = "intfloat/multilingual-e5-small"
 # looped, DEC-32).
 [profiles."llm-qwen3-1.7b".generation]
 model = "Qwen/Qwen3-1.7B"
+# Longer answers (FASE_8.md, 8g, rule S5): measured, not adopted (more
+# false "not found" on code with the agent). Uncomment to use it; the CV
+# keeps the short rule either way ([sources.cv] style_rule).
+# style_rule = "6. Be direct, no preamble: give the answer, then explain it briefly in two or three more sentences."
 
 [profiles.llm-qwen3-4b.generation]
 model = "Qwen/Qwen3-4B"

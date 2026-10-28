@@ -9,13 +9,13 @@ A multi-domain **Retrieval-Augmented Generation** system with an agent, an MCP s
 | `vllm` | The vLLM 0.10.1 documentation and source code (the 42 benchmark corpus) | 37,381 chunks |
 | `xquad` | General knowledge: 48 Wikipedia articles from XQuAD, in English and Spanish | 1,217 chunks |
 | `cv` | The author's CV, LinkedIn profile and biography (English and Spanish) | 162 chunks |
-| `about` | This project itself: this README, the documentation in `docs/` (English and Spanish) and the source code in `src/` | ~2,600 chunks |
+| `about` | This project itself: this README, the documentation in `docs/` (English and Spanish) and the source code in `src/` | ~3,000 chunks |
 
-The base language model is **Qwen3-0.6B**, the model of the original 42 project, so the results stay comparable with other 42 RAGs. Larger models of the same family (Qwen3-1.7B, Qwen3-4B) are optional profiles.
+The base language model is **Qwen3-0.6B**, the model of the original 42 project, so the results stay comparable with other 42 RAGs. Larger models are optional profiles: Qwen3-1.7B and Qwen3-4B from the same family, and IBM Granite 4.0 Micro from another one.
 
 The project was rebuilt phase by phase, and every change was measured before it was kept. The full history, with the numbers, is in [`docs/`](docs/).
 
-**Live demo:** *coming soon* (Oracle Cloud). <!-- TODO: link once deployed -->
+**Live demo:** *coming soon*. <!-- TODO: link once deployed -->
 
 ---
 
@@ -99,7 +99,12 @@ question ──► agent (optional) ──► router ──► per-domain retrie
 
 ### Models
 
-The Qwen3 family only: **Qwen3-0.6B** (the base, the 42 model), **Qwen3-1.7B** and **Qwen3-4B**. Phi-4-mini was an option from another family until Phase 7; it was dropped because its answers copied the sources back and fell into long loops, and the fixes it needed were patches that only served it ([`docs/decisions.md`](docs/decisions.md), DEC-32).
+- **Qwen3-0.6B:** the base, the 42 model. Benchmarks, the CLI and the comparisons with other 42 RAGs use it.
+- **Qwen3-1.7B:** the default model of the web.
+- **Qwen3-4B:** CLI and benchmarks. It was in the web for a while (with the retrieval moved to the CPU to fit in a 12 GB GPU, and without the agent); IBM Granite replaced it there in Phase 8.
+- **IBM Granite 4.0 Micro** (`ibm-granite/granite-4.0-micro`, 3B, Apache 2.0): added in Phase 8 as a model from another family. Answer quality at the level of Qwen3-4B, a good agent, and it fits in the GPU with the agent on; it is the slowest model of the web. It has one extra CV rule of its own, so that it never presents the public Gmail address as another address ([`docs/changelog/FASE_8.md`](docs/changelog/FASE_8.md)).
+
+Phi-4-mini was an option from another family until Phase 7; it was dropped because its answers copied the sources back and fell into long loops, and the fixes it needed were patches that only served it ([`docs/decisions.md`](docs/decisions.md), DEC-32).
 
 ### Agent and MCP
 
@@ -117,7 +122,7 @@ The Qwen3 family only: **Qwen3-0.6B** (the base, the 42 model), **Qwen3-1.7B** a
 FastAPI backend and React (Vite + TypeScript) frontend, in the visual style of the original Streamlit app:
 
 - **Chat** with streaming answers. Only the conversation scrolls, and a **Stop** button really stops the generation on the server.
-- **Domain filters** (`vllm`, `xquad`, `cv`; `about` is always on), an **agent / direct** switch (direct by default; the agent is a work in progress), and pickers for the **model** and the **depth** (how many sources the LLM reads: 3, 5 or 10).
+- **Domain filters** (`vllm`, `xquad`, `cv`; `about` is always on), an **agent / direct** switch (direct by default; the agent is a work in progress), and pickers for the **model** (Qwen3-1.7B by default, Qwen3-0.6B and IBM Granite 4.0 Micro) and the **depth** (how many sources the LLM reads: 3, 5 or 10).
 - **Sources:** the domain that answered, with its sources in a carousel and the full masked text on demand; the other searched domains are folded in one line, with their router scores.
 - **Retrieval metrics** read from the latest benchmark runs.
 - Optional **example questions** for the active filters.
@@ -184,7 +189,9 @@ The original 42 commands are unchanged: `make search-docs`, `make search-code`, 
 
 **Live demo:** *coming soon*. <!-- TODO: Space URL -->
 
-Built to run for free, apart from the author's other cloud projects:
+**For now, the web is served from the author's own computer** (an RTX 3080 Ti) through a tunnel, as a stopgap: `make api-public` limits the server to 4 questions at a time, and the API only listens on `127.0.0.1`, so it is reachable only through the tunnel. The tunnel is Tailscale Funnel: Cloudflare's free quick tunnels do not support the streaming the chat needs, and a fixed Cloudflare URL needs a paid domain. Guide, in Spanish: [`deploy/local/README.md`](deploy/local/README.md).
+
+The planned free server, apart from the author's other cloud projects:
 - **Server:** an **Oracle Cloud Always Free** ARM machine (2 OCPU, 12 GB) with Docker. It runs the API and the built web, behind Caddy for HTTPS. The plan was a Hugging Face Space, but since July 2026 Docker Spaces need a paid plan.
 - **Frontend:** served by the same container, or optionally from GitHub Pages.
 - **Index:** built on a local GPU and copied to the machine as a bundle (Qdrant snapshots and BM25 files, checked with SHA256). It is never published, because it holds the raw CV material.
@@ -207,7 +214,7 @@ src/
   deploy/       index bundle export/restore
   cli.py        Fire CLI (python -m src <command>)
 web/            React frontend
-deploy/         server image (deploy/space) and Oracle setup (deploy/oracle)
+deploy/         server image (deploy/space), Oracle setup (deploy/oracle) and local serving with a tunnel (deploy/local)
 bench/          versioned datasets and every benchmark result
 docs/           roadmap, phase changelogs, benchmark report, decisions (English)
 docs/es/        the same documents in Spanish, the working version, plus this README

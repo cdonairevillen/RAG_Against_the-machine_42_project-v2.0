@@ -11,13 +11,13 @@ Un sistema de **generación aumentada por recuperación** (RAG) multidominio, co
 | `vllm` | La documentación y el código fuente de vLLM 0.10.1 (el corpus del benchmark de 42) | 37 381 chunks |
 | `xquad` | Cultura general: 48 artículos de Wikipedia de XQuAD, en inglés y en español | 1 217 chunks |
 | `cv` | El CV del autor, su perfil de LinkedIn y su biografía (en inglés y en español) | 162 chunks |
-| `about` | El propio proyecto: el README, la documentación de `docs/` (en inglés y en español) y el código de `src/` | ~2 600 chunks |
+| `about` | El propio proyecto: el README, la documentación de `docs/` (en inglés y en español) y el código de `src/` | ~3 000 chunks |
 
-El modelo de lenguaje base es **Qwen3-0.6B**, el del proyecto original de 42, para que los resultados sigan siendo comparables con otros RAG de 42. Los modelos más grandes de la misma familia (Qwen3-1.7B, Qwen3-4B) son perfiles opcionales.
+El modelo de lenguaje base es **Qwen3-0.6B**, el del proyecto original de 42, para que los resultados sigan siendo comparables con otros RAG de 42. Los modelos más grandes son perfiles opcionales: Qwen3-1.7B y Qwen3-4B, de la misma familia, e IBM Granite 4.0 Micro, de otra.
 
 El proyecto se rehízo fase a fase, y cada cambio se midió antes de quedarse. La historia completa, con las cifras, está en [`docs/es/`](./).
 
-**Demo en línea:** *próximamente* (Oracle Cloud). <!-- TODO: enlace cuando esté desplegado -->
+**Demo en línea:** *próximamente*. <!-- TODO: enlace cuando esté desplegado -->
 
 ---
 
@@ -102,7 +102,12 @@ pregunta ──► agente (opcional) ──► router ──► recuperación po
 
 ### Modelos
 
-Solo la familia Qwen3: **Qwen3-0.6B** (la base, el modelo de 42), **Qwen3-1.7B** y **Qwen3-4B**. Phi-4-mini fue una opción de otra familia hasta la Fase 7; se retiró porque sus respuestas copiaban las fuentes y entraban en bucles largos, y los arreglos que necesitaba eran parches que solo le servían a él ([`decisions.md`](decisions.md), DEC-32).
+- **Qwen3-0.6B:** la base, el modelo de 42. Lo usan los benchmarks, la CLI y las comparativas con otros RAG de 42.
+- **Qwen3-1.7B:** el modelo por defecto de la web.
+- **Qwen3-4B:** CLI y benchmarks. Estuvo un tiempo en la web (con la recuperación en la CPU para caber en una GPU de 12 GB, y sin agente); en la Fase 8 lo sustituyó IBM Granite.
+- **IBM Granite 4.0 Micro** (`ibm-granite/granite-4.0-micro`, 3B, Apache 2.0): añadido en la Fase 8 como modelo de otra familia. Calidad de respuesta al nivel de Qwen3-4B, buen agente y cabe en la GPU con el agente encendido; es el modelo más lento de la web. Tiene una regla propia del CV para no presentar nunca el Gmail público como otro correo ([`changelog/FASE_8.md`](changelog/FASE_8.md)).
+
+Phi-4-mini fue una opción de otra familia hasta la Fase 7; se retiró porque sus respuestas copiaban las fuentes y entraban en bucles largos, y los arreglos que necesitaba eran parches que solo le servían a él ([`decisions.md`](decisions.md), DEC-32).
 
 ### Agente y MCP
 
@@ -120,7 +125,7 @@ Solo la familia Qwen3: **Qwen3-0.6B** (la base, el modelo de 42), **Qwen3-1.7B**
 Backend en FastAPI y frontend en React (Vite + TypeScript), con el estilo visual de la aplicación original en Streamlit:
 
 - **Chat** con respuestas en streaming. Solo se desplaza la conversación, y un botón **Stop** detiene de verdad la generación en el servidor.
-- **Filtros de dominio** (`vllm`, `xquad`, `cv`; `about` siempre activo), un interruptor **agente / directo** (directo por defecto; el agente es trabajo en curso) y selectores de **modelo** y de **profundidad** (cuántas fuentes lee el LLM: 3, 5 o 10).
+- **Filtros de dominio** (`vllm`, `xquad`, `cv`; `about` siempre activo), un interruptor **agente / directo** (directo por defecto; el agente es trabajo en curso) y selectores de **modelo** (Qwen3-1.7B por defecto, Qwen3-0.6B e IBM Granite 4.0 Micro) y de **profundidad** (cuántas fuentes lee el LLM: 3, 5 o 10).
 - **Fuentes:** el dominio que respondió, con sus fuentes en un carrusel y el texto completo (enmascarado) a demanda; los demás dominios buscados quedan plegados en una línea, con sus puntuaciones del router.
 - **Métricas de recuperación** leídas de las últimas ejecuciones de los benchmarks.
 - **Preguntas de ejemplo** opcionales para los filtros activos.
@@ -187,7 +192,9 @@ Los comandos originales de 42 no cambian: `make search-docs`, `make search-code`
 
 **Demo en línea:** *próximamente*. <!-- TODO: URL -->
 
-Pensado para funcionar sin coste y separado de los otros proyectos del autor en la nube:
+**De momento, la web se sirve desde el ordenador del autor** (una RTX 3080 Ti) a través de un túnel, como parche: `make api-public` limita el servidor a 4 preguntas a la vez, y la API solo escucha en `127.0.0.1`, así que solo se llega a ella por el túnel. El túnel es Tailscale Funnel: los túneles rápidos gratuitos de Cloudflare no admiten el streaming que necesita el chat, y una URL fija de Cloudflare exige un dominio de pago. Guía: [`deploy/local/README.md`](../../deploy/local/README.md).
+
+El servidor gratuito previsto, separado de los otros proyectos del autor en la nube:
 - **Servidor:** una máquina ARM de **Oracle Cloud Always Free** (2 OCPU, 12 GB) con Docker. Corre la API y la web compilada, detrás de Caddy para el HTTPS. El plan era un Space de Hugging Face, pero desde julio de 2026 los Spaces de Docker son de pago.
 - **Frontend:** lo sirve el mismo contenedor, u opcionalmente GitHub Pages.
 - **Índice:** se construye en una GPU local y se copia a la máquina como un bundle (snapshots de Qdrant y ficheros BM25, comprobados con SHA256). No se publica nunca, porque contiene el material del CV sin enmascarar.
@@ -210,7 +217,7 @@ src/
   deploy/       exportación y restauración del bundle del índice
   cli.py        CLI con Fire (python -m src <comando>)
 web/            frontend en React
-deploy/         imagen del servidor (deploy/space) y configuración de Oracle (deploy/oracle)
+deploy/         imagen del servidor (deploy/space), configuración de Oracle (deploy/oracle) y servicio local con túnel (deploy/local)
 bench/          datasets versionados y todos los resultados de los benchmarks
 docs/           roadmap, changelogs por fase, informe de benchmarks, decisiones (en inglés)
 docs/es/        los mismos documentos en español, la versión de trabajo, y este README

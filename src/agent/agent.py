@@ -269,17 +269,19 @@ class Agent:
         )
         extra = rules.prompt_rules(
             domain, getattr(self.generator, "model_name", ""))
+        style = rules.style_rule(domain)
+        own = {"style_rule": style} if style is not None else {}
         start = time.perf_counter()
         if on_piece:
             pieces = []
             for piece in self.generator.stream_answer(
-                    query, blocks, extra, language):
+                    query, blocks, extra, language, **own):
                 pieces.append(piece)
                 on_piece(piece)
             text = clean_output("".join(pieces))
         else:
             text = self.generator.answer_with_text(query, blocks, extra,
-                                                   language)
+                                                   language, **own)
         not_found = is_not_found(text)
         text = (rules.not_found_message(domain, question)
                 or not_found_for(question)) if not_found \

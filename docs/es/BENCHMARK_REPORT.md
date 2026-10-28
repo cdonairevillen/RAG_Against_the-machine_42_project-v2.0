@@ -340,6 +340,7 @@ Tiempos en la 3080 Ti; en la CPU del Space serán varias veces mayores.
   - **Qwen3-1.7B** es el candidato claro si la CPU lo aguanta: misma latencia en GPU y mejor en CV (0.90 / 0.87 frente a 0.70 / 0.80) y XQuAD EN (0.76 frente a 0.58). Su latencia en la CPU del Space **no está medida**.
   - **Qwen3-4B** es el mejor agente (1.00 en seguimientos), pero tarda ~2× en GPU. En CPU previsiblemente sería demasiado lento para una web (sin medir).
   - **Phi-4-mini** no compensa: llamadas a la herramienta menos fiables (44 % en XQuAD ES) y peor F1 en vLLM docs.
+  - **Lo que se decidió después (Fase 8, hoy vigente):** la web ofrece Qwen3-1.7B (por defecto), Qwen3-0.6B e IBM Granite 4.0 Micro, todos con y sin agente. Qwen3-4B y Phi-4-mini no están en la web (§10).
 
 ### 8.4 Latencia en la CPU del despliegue (Fase 6)
 
@@ -413,3 +414,23 @@ La documentación indexada ya no copia las preguntas de prueba sobre el proyecto
 Las cifras de `100` estaban infladas por la autocita: tres preguntas (about-02, about-04 y about-11) solo pasaban el filtro de "about" gracias a la nota que las citaba. 42, XQuAD y CV no cambian.
 
 Phi-4-mini se retiró el 2026-10-27 (DEC-32): necesitaba parches (reintento por eco, detector de bucles) para dar respuestas limpias con el límite de la web. Sus filas de §5 y §8 quedan como histórico.
+
+## 10. Granite 4.0 Micro y la longitud de las respuestas (Fase 8)
+
+Detalle en `changelog/FASE_8.md` (§8a y §8g). `gen-bench` a 1.024 tokens, como en la web; juez de Groq (`gpt-oss-120b`) sobre vLLM, 25 preguntas por conjunto (70 en total).
+
+**Modelos** (contiene la respuesta, EN / ES; juez: correctas de 70):
+
+| | Qwen3-0.6B | Qwen3-1.7B | Qwen3-4B | IBM Granite 4.0 Micro |
+|---|---|---|---|---|
+| CV | 0.73 / 0.80 | 0.90 / 0.90 | 0.90 / 0.93 | 0.87 / 0.93 |
+| about | 0.50 / 0.50 | 0.56 / 0.61 | 0.67 / 0.72 | 0.67 / 0.83 |
+| XQuAD | 0.64 / 0.59 | 0.79 / 0.68 | — | 0.81 / 0.74 |
+| Juez vLLM, correctas de 70 | 33 | 47 | — | 52 |
+| Agente, seguimientos (0.6B y 4B: Fase 5; 1.7B y Granite: `110`) | 0.78 | 0.78 | 1.00 | 0.89 |
+| Tokens por respuesta, banco abierto (media) | 78 | 130 | — | 179 |
+| En la web | Sí | Sí, por defecto | No (CLI y benchmarks) | Sí |
+
+Granite es el mejor modelo de la web en calidad y como agente, y el más lento (con el agente, 11–14 s hasta el primer token). Tiene una regla propia del CV para no presentar el Gmail público como otro correo (§8a.2). 0 fugas de datos privados con todos los modelos.
+
+**Longitud de las respuestas (§8g):** seis versiones de la regla 6 del prompt ("Be direct and concise") probadas en el 1.7B, y una en Granite y el 0.6B. La mejor, S5 en el 1.7B, alarga las respuestas (176 frente a 130 tokens) y sube las correctas del juez (50 frente a 47), pero empeora code (con el agente, el doble de "no encontrados" falsos). Las reglas largas hacen que el CV invente negaciones, así que el CV mantiene siempre la regla corta. **No se adopta ninguna**; S5 queda comentada en `rag.toml`.

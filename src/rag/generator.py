@@ -54,6 +54,8 @@ SYSTEM_PROMPT = (
     "shown in that source's header.\n"
     "6. Be direct and concise: a few sentences, no preamble."
 )
+# Rule 6 above: a model's style_rule (rag.toml) takes its place.
+STYLE_RULE = "6. Be direct and concise: a few sentences, no preamble."
 
 THINK_BLOCK = re.compile(r"<think>.*?</think>", flags=re.DOTALL)
 # A repeated prompt in an answer (see strip_echo). Small models
@@ -89,7 +91,8 @@ def is_not_found(text: str) -> bool:
 
 def build_messages(question: str, sources: list[str],
                    language: str,
-                   extra_rules: str = "") -> list[dict[str, str]]:
+                   extra_rules: str = "",
+                   style_rule: str = "") -> list[dict[str, str]]:
     """Chat messages for a grounded answer.
 
     Args:
@@ -98,6 +101,8 @@ def build_messages(question: str, sources: list[str],
         language: 'es' or 'en'; the answer is requested in it.
         extra_rules: The domain's own rules (rag.toml prompt_rules),
             appended to the system prompt; empty for none.
+        style_rule: The model's rule 6 (answer length and form); empty
+            keeps STYLE_RULE.
 
     Returns:
         System and user messages for the chat template.
@@ -112,6 +117,8 @@ def build_messages(question: str, sources: list[str],
         f"Answer in {name}, citing the sources by number."
     )
     system = SYSTEM_PROMPT
+    if style_rule.strip():
+        system = system.replace(STYLE_RULE, style_rule.strip())
     if extra_rules.strip():
         system += "\n" + extra_rules.strip()
     return [
@@ -211,6 +218,7 @@ class Generator:
         )
         self.max_new_tokens = config.max_new_tokens
         self.max_input_tokens = config.max_input_tokens
+        self.style_rule = config.style_rule
         self.eos_token_ids = self.stop_token_ids()
         # Set to stop the generation in progress (the web's Stop button
         # or a closed tab); the API gives each request its own Event.
@@ -248,7 +256,8 @@ class Generator:
     def answer_with_text(self, question: str,
                          context_blocks: list[str],
                          extra_rules: str = "",
-                         language: Optional[str] = None) -> str:
+                         language: Optional[str] = None,
+                         style_rule: Optional[str] = None) -> str:
         """Generate a grounded answer from pre-built context blocks.
 
         Args:
@@ -258,6 +267,8 @@ class Generator:
             extra_rules: Domain rules added to the system prompt.
             language: Answer language ('es', 'en'); detected from the
                 question when None.
+            style_rule: Rule 6 for this answer (a domain's own); None
+                uses the model's.
 
         Returns:
             A concise answer citing its sources as [n], or
@@ -269,14 +280,15 @@ class Generator:
             return "No relevant sources found."
         return clean_output(
             self.greedy_decode(self.build_prompt(
-                question, context_blocks, extra_rules, language
+                question, context_blocks, extra_rules, language, style_rule
             ))
         )
 
     def stream_answer(self, question: str,
                       context_blocks: list[str],
                       extra_rules: str = "",
-                      language: Optional[str] = None) -> Iterator[str]:
+                      language: Optional[str] = None,
+                      style_rule: Optional[str] = None) -> Iterator[str]:
         """Like answer_with_text(), but yields the text as it is
         generated (same prompt and decoding).
 
@@ -288,13 +300,14 @@ class Generator:
             context_blocks: Context strings, one per source.
             extra_rules: Domain rules added to the system prompt.
             language: Answer language; detected when None.
+            style_rule: Rule 6 for this answer; None uses the model's.
 
         Yields:
             Successive pieces of the answer.
         """
         if not question or not question.strip() or not context_blocks:
             yield self.answer_with_text(question, context_blocks,
-                                        extra_rules, language)
+                                        extra_rules, language, style_rule)
             return
 
         from transformers import TextIteratorStreamer
@@ -304,7 +317,7 @@ class Generator:
         )
         kwargs = self.generate_kwargs(
             self.build_prompt(question, context_blocks, extra_rules,
-                              language)
+                              language, style_rule)
         )
         worker = Thread(target=self.generate, kwargs={
             **kwargs, "streamer": streamer,
@@ -317,15 +330,19 @@ class Generator:
 
     def build_prompt(self, question: str, context_blocks: list[str],
                      extra_rules: str = "",
-                     language: Optional[str] = None) -> str:
+                     language: Optional[str] = None,
+                     style_rule: Optional[str] = None) -> str:
         """Chat-formatted prompt: numbered sources trimmed to the token
         budget, answer language taken from the question, plus the
-        domain's own rules when given."""
+        domain's own rules when given. style_rule (a domain's rule 6)
+        replaces the model's when not None."""
         language = language or detect_language(question)
+        style = self.style_rule if style_rule is None else style_rule
         sources = self.fit_sources(question, context_blocks, language,
-                                   extra_rules)
+                                   extra_rules, style)
         return str(self.tokenizer.apply_chat_template(
-            build_messages(question, sources, language, extra_rules),
+            build_messages(question, sources, language, extra_rules,
+                           style),
             tokenize=False, add_generation_prompt=True,
             enable_thinking=False,
         ))
@@ -335,7 +352,8 @@ class Generator:
         return len(self.tokenizer.encode(text, add_special_tokens=False))
 
     def fit_sources(self, question: str, blocks: list[str],
-                    language: str, extra_rules: str = "") -> list[str]:
+                    language: str, extra_rules: str = "",
+                    style_rule: Optional[str] = None) -> list[str]:
         """Trim sources so the full prompt fits max_input_tokens.
 
         Sources keep their order (and numbering); the last one that does
@@ -347,7 +365,9 @@ class Generator:
         """
         fixed = self.count_tokens(
             self.tokenizer.apply_chat_template(
-                build_messages(question, [], language, extra_rules),
+                build_messages(question, [], language, extra_rules,
+                               self.style_rule if style_rule is None
+                               else style_rule),
                 tokenize=False,
                 add_generation_prompt=True, enable_thinking=False,
             )

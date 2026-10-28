@@ -1,0 +1,29 @@
+{
+  "label": "125-q17-S5-vllm",
+  "judge_model": "openai/gpt-oss-120b",
+  "limit": 25,
+  "api_calls": 60,
+  "timestamp": "2026-10-28T05:06:33",
+  "sets": {
+    "public/docs": {
+      "judged": 25,
+      "mean_score": 1.64,
+      "correct": 0.76
+    },
+    "public/code": {
+      "judged": 25,
+      "mean_score": 1.28,
+      "correct": 0.6
+    },
+    "es/docs": {
+      "judged": 10,
+      "mean_score": 1.7,
+      "correct": 0.8
+    },
+    "es/code": {
+      "judged": 10,
+      "mean_score": 1.6,
+      "correct": 0.8
+    }
+  }
+}

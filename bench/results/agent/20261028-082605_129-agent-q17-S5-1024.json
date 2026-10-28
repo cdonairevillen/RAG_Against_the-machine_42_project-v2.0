@@ -1,0 +1,153 @@
+{
+  "label": "129-agent-q17-S5-1024",
+  "k": 5,
+  "sets": "all",
+  "timestamp": "2026-10-28T08:26:05",
+  "commit": "828df91",
+  "dirty": true,
+  "profile": "llm-qwen3-1.7b",
+  "generator": "Qwen/Qwen3-1.7B",
+  "device": "cuda",
+  "results": {
+    "agent": {
+      "conversations/first": {
+        "questions": 12,
+        "contains_answer": 1.0,
+        "f1": 0.1784,
+        "not_found": 0.0,
+        "seconds_per_answer": 4.3,
+        "tool_call_rate": 1.0,
+        "steps": 2.0,
+        "safety_net_rate": 0.0
+      },
+      "conversations/follow-up": {
+        "questions": 18,
+        "contains_answer": 0.7778,
+        "f1": 0.0832,
+        "not_found": 0.1111,
+        "seconds_per_answer": 6.64,
+        "tool_call_rate": 0.6111,
+        "steps": 1.78,
+        "safety_net_rate": 0.4444
+      },
+      "cv/en": {
+        "questions": 30,
+        "contains_answer": 0.9,
+        "f1": 0.157,
+        "not_found": 0.0667,
+        "seconds_per_answer": 3.17,
+        "tool_call_rate": 0.8333,
+        "steps": 1.87,
+        "safety_net_rate": 0.3333
+      },
+      "cv/es": {
+        "questions": 30,
+        "contains_answer": 0.8,
+        "f1": 0.1336,
+        "not_found": 0.1333,
+        "seconds_per_answer": 3.68,
+        "tool_call_rate": 0.8667,
+        "steps": 1.97,
+        "safety_net_rate": 0.5667
+      },
+      "xquad/en": {
+        "questions": 50,
+        "contains_answer": 0.78,
+        "f1": 0.0796,
+        "not_found": 0.14,
+        "seconds_per_answer": 5.58,
+        "tool_call_rate": 0.74,
+        "steps": 1.8,
+        "safety_net_rate": 0.38
+      },
+      "xquad/es": {
+        "questions": 50,
+        "contains_answer": 0.76,
+        "f1": 0.1211,
+        "not_found": 0.06,
+        "seconds_per_answer": 6.3,
+        "tool_call_rate": 0.9,
+        "steps": 1.92,
+        "safety_net_rate": 0.5
+      },
+      "public/docs": {
+        "questions": 25,
+        "contains_answer": 0.0,
+        "f1": 0.4477,
+        "not_found": 0.04,
+        "seconds_per_answer": 7.72,
+        "tool_call_rate": 1.0,
+        "steps": 2.0,
+        "safety_net_rate": 0.0
+      },
+      "public/code": {
+        "questions": 25,
+        "contains_answer": 0.0,
+        "f1": 0.3643,
+        "not_found": 0.16,
+        "seconds_per_answer": 6.73,
+        "tool_call_rate": 0.92,
+        "steps": 1.96,
+        "safety_net_rate": 0.08
+      }
+    },
+    "direct": {
+      "conversations/first": {
+        "questions": 12,
+        "contains_answer": 0.9167,
+        "f1": 0.1675,
+        "not_found": 0.0,
+        "seconds_per_answer": 3.57
+      },
+      "conversations/follow-up": {
+        "questions": 18,
+        "contains_answer": 0.3333,
+        "f1": 0.0278,
+        "not_found": 0.3889,
+        "seconds_per_answer": 3.72
+      },
+      "cv/en": {
+        "questions": 30,
+        "contains_answer": 0.9,
+        "f1": 0.1561,
+        "not_found": 0.0667,
+        "seconds_per_answer": 1.64
+      },
+      "cv/es": {
+        "questions": 30,
+        "contains_answer": 0.8333,
+        "f1": 0.1406,
+        "not_found": 0.1,
+        "seconds_per_answer": 1.85
+      },
+      "xquad/en": {
+        "questions": 50,
+        "contains_answer": 0.78,
+        "f1": 0.0794,
+        "not_found": 0.14,
+        "seconds_per_answer": 3.83
+      },
+      "xquad/es": {
+        "questions": 50,
+        "contains_answer": 0.78,
+        "f1": 0.1282,
+        "not_found": 0.06,
+        "seconds_per_answer": 4.04
+      },
+      "public/docs": {
+        "questions": 25,
+        "contains_answer": 0.0,
+        "f1": 0.4477,
+        "not_found": 0.04,
+        "seconds_per_answer": 5.81
+      },
+      "public/code": {
+        "questions": 25,
+        "contains_answer": 0.0,
+        "f1": 0.3643,
+        "not_found": 0.16,
+        "seconds_per_answer": 4.5
+      }
+    }
+  }
+}

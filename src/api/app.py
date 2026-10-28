@@ -59,6 +59,10 @@ NO_FILTER_MESSAGE = {
 }
 
 
+class ServerBusy(RuntimeError):
+    """The queue is full (RAG_API_MAX_QUEUE)."""
+
+
 class ChatRequest(BaseModel):
     """A message of the chat."""
 
@@ -437,11 +441,11 @@ class RagService:
 
     @contextmanager
     def queue_slot(self) -> Iterator[None]:
-        """Count a chat while it waits or answers; refuse it when the
-        queue is full."""
+        """Count a chat or search while it waits or runs; refuse it
+        (ServerBusy) when the queue is full."""
         with self.queue_lock:
             if self.max_queue and self.queued >= self.max_queue:
-                raise RuntimeError(
+                raise ServerBusy(
                     "The server is busy answering other questions: try "
                     "again in a minute.")
             self.queued += 1
@@ -584,8 +588,14 @@ def create_app(config: Optional[RagConfig] = None,
             threading.Thread(target=service.load, daemon=True).start()
         yield
 
+    # RAG_API_DOCS=0 (make api-public) hides FastAPI's /docs, /redoc and
+    # /openapi.json: a public server does not need to list its endpoints.
+    docs = os.environ.get("RAG_API_DOCS", "1") != "0"
     app = FastAPI(title="RAG against the Machine", version="2.0",
-                  lifespan=lifespan)
+                  lifespan=lifespan,
+                  docs_url="/docs" if docs else None,
+                  redoc_url="/redoc" if docs else None,
+                  openapi_url="/openapi.json" if docs else None)
     # The web is served from another origin (GitHub Pages).
     origins = [o.strip() for o in os.environ.get(
         "RAG_ALLOWED_ORIGINS", "*").split(",") if o.strip()]
@@ -662,9 +672,14 @@ def create_app(config: Optional[RagConfig] = None,
 
     @app.post("/search")
     def search(request: SearchRequest) -> dict[str, Any]:
-        result: dict[str, Any] = service.load().search(
-            request.query, request.domains or None, request.k
-        )
+        # Same cap as the chats: searches also use the GPU.
+        try:
+            with service.queue_slot():
+                result: dict[str, Any] = service.load().search(
+                    request.query, request.domains or None, request.k
+                )
+        except ServerBusy as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
         return result
 
     @app.get("/sources/{chunk_id}")

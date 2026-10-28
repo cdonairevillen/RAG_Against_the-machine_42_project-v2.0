@@ -101,6 +101,11 @@ class GenerationConfig(BaseModel):
     # llm_sdk default. False uses the transformers implementation instead
     # of the model repo's own code (needed when that code is outdated).
     trust_remote_code: bool = True
+    # Replaces rule 6 of the system prompt (answer length and form) for
+    # this model; empty keeps the default "Be direct and concise" rule.
+    # Per model, so each one gets the form it handles (Phase 8, FASE_8.md
+    # 8g).
+    style_rule: str = ""
 
 
 class ModelsConfig(BaseModel):
@@ -184,6 +189,10 @@ class SourceConfig(BaseModel):
     # a reminder one model needs and the others do not (Phase 8, Granite
     # and the CV's private data). The other models' prompts stay as is.
     model_rules: dict[str, str] = Field(default_factory=dict)
+    # Rule 6 (answer length and form) for this domain, over the model's
+    # style_rule: a domain whose answers must stay short (the CV, where
+    # longer answers made up facts; FASE_8.md 8g). None: the model's.
+    style_rule: Optional[str] = None
     # Sources given to the LLM when answering from this domain (None:
     # the caller's k). Retrieval benchmarks are not affected.
     answer_k: Optional[int] = None

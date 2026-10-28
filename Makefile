@@ -114,10 +114,12 @@ API_DOMAINS ?=
 # Chats waiting or answering at once (0: no cap) and the web origins
 # allowed to call the API (*: any). make api-public sets both.
 API_MAX_QUEUE ?= 0
+# FastAPI's /docs, /redoc and /openapi.json (0: hidden; make api-public).
+API_DOCS ?= 1
 API_ORIGINS ?= *
 api: db-up
 	RAG_API_DOMAINS=$(API_DOMAINS) RAG_API_MODELS=$(API_MODELS) RAG_API_MAX_TOKENS=$(API_MAX_TOKENS) \
-		RAG_API_DEFAULT_MODEL=$(API_DEFAULT_MODEL) RAG_API_DIRECT_ONLY=$(API_DIRECT_ONLY) 		RAG_API_MAX_QUEUE=$(API_MAX_QUEUE) RAG_ALLOWED_ORIGINS='$(API_ORIGINS)' \
+		RAG_API_DEFAULT_MODEL=$(API_DEFAULT_MODEL) RAG_API_DIRECT_ONLY=$(API_DIRECT_ONLY) 		RAG_API_MAX_QUEUE=$(API_MAX_QUEUE) RAG_ALLOWED_ORIGINS='$(API_ORIGINS)' RAG_API_DOCS=$(API_DOCS) \
 		$(ENV) $(UV) run --project . $(PY) -m src.api
 
 # The web public from this PC through a tunnel (Phase 8d, deploy/local/).
@@ -128,6 +130,7 @@ api: db-up
 PUBLIC_ORIGIN ?= *
 api-public: API_MAX_QUEUE = 4
 api-public: API_ORIGINS = $(PUBLIC_ORIGIN)
+api-public: API_DOCS = 0
 api-public: api
 
 # React web in development (Vite, http://localhost:5173, talks to make api).

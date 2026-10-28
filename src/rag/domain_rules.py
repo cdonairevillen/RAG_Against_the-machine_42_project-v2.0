@@ -72,6 +72,11 @@ class DomainRules:
             return source.prompt_rules
         return f"{source.prompt_rules.strip()}\n{own}".strip()
 
+    def style_rule(self, domain: Optional[str]) -> Optional[str]:
+        """The domain's own rule 6, or None to keep the model's."""
+        source = self.sources.get(domain or "")
+        return source.style_rule if source else None
+
     def not_found_message(self, domain: Optional[str],
                           question: str) -> Optional[str]:
         """The domain's "not found" answer in the question's language.

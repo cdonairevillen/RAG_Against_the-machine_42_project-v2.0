@@ -60,9 +60,9 @@ Since a real frontend is being built, the **modularisation** of the project coul
 - Each phase closes with its `changelog/FASE_N.md`: what was changed, the list of files, why, what it affects, and what to know about the architecture.
 
 ```
-Phase 0 ─► Phase 1 ─► Phase 2 ─► Phase 3 ─► [42 tests] ─► Phase 4 ─► Phase 5 ─► Phase 6 ─► Phase 7
-clean-up   ingestion  hybrid     generation  checkpoint    modes      agent +    web +      optional
-                                                                      MCP        deploy     & polish
+Phase 0 ─► Phase 1 ─► Phase 2 ─► Phase 3 ─► [42 tests] ─► Phase 4 ─► Phase 5 ─► Phase 6 ─► Phase 7 ─► Phase 8
+clean-up   ingestion  hybrid     generation  checkpoint    modes      agent +    web +      optional   Granite,
+                                                                      MCP        deploy     & polish   deployment
 ```
 
 ## Phase 0 — Clean-up and professionalisation of the repository
@@ -323,6 +323,7 @@ The results obtained during the evaluation must not get worse.
   - **Groundwork already done (Phase 2):** the `rag.toml` profiles (`available_profiles`) are the options an ingestion, reranker or embeddings picker could offer. The stable base is still the benchmark one. *To be raised in this phase.*
 - **Zero-cost deployment**:
   - ~~Backend in a Hugging Face Space (Docker, free CPU).~~ → **Oracle Cloud Always Free** (DEC-19, 2026-10-24): since July 2026, Docker Spaces are paid.
+  - **Updated (Phase 8, current):** for now the web is served from the author's computer (the 3080 Ti) through a Tailscale Funnel tunnel, as a stopgap. Oracle is left for later.
   - Static frontend on GitHub Pages.
   - **Google Cloud is not touched.**
   - The free deployment can probably hold only one loaded model; the rest, locally.
@@ -339,7 +340,7 @@ The results obtained during the evaluation must not get worse.
 >   - Stop button and example questions.
 >   - Retrievals of the answering domain in a carousel with dotted corners, and recall cards per domain.
 >   - The API serves the web at `/`. Commit `3378494`.
-> - **Deployment:** an HF Space (Docker, CPU) with Qdrant inside; the index in a bundle (`make bundle`, SHA256) in a **private dataset**; Pages with a manual workflow.
+> - **Deployment (the Phase 6 plan, no longer current):** an HF Space (Docker, CPU) with Qdrant inside; the index in a bundle (`make bundle`, SHA256) in a **private dataset**; Pages with a manual workflow. It then moved to Oracle (DEC-19) and, in Phase 8, the web is served from the author's computer through a Tailscale Funnel tunnel.
 > - **Left to the author:** creating the dataset and the Space, setting the secrets, and deciding the Space's LLM, the privacy strategy (DEC-09) and whether Streamlit is deleted (DEC-13).
 > - **P4 (modularisation):** the web exposes the domain filters, agent yes/no, the model (the `llm-*` profiles, one loaded at a time) and the depth.
 
@@ -397,6 +398,46 @@ The results obtained during the evaluation must not get worse.
 
 ---
 
+## Phase 8 — Granite, deployment and extra tests
+
+**Goal:** an optional model from another family (Granite), the web deployed (for now from the author's computer with a tunnel; Oracle later) and the tests that were parked. Phase opened on 2026-10-27, after commit `477bff9` (the end of Phase 7). Changelog in `changelog/FASE_8.md`.
+
+**The author's decisions (2026-10-27):**
+- **The base is still Qwen3-0.6B:** benchmarks, CLI and comparisons with 42.
+- **In the web, the default model becomes Qwen3-1.7B**, to show the RAG at its best.
+- **Qwen3-4B came back to the web's list, only with the agent off**; later in the phase, **IBM Granite 4.0 Micro replaced it** (8a.2): today the 4B is not in the web.
+- **Granite's limits are found by measuring**, without ruling it out beforehand.
+- **The decisions are the author's:** the assistant proposes, measures and documents.
+- **The agent's fallback is part of Phase 8** (8f).
+- **The 4B's memory in the web: option A**: when the 4B is chosen, the search moves to the CPU, as outside the web; the 4B still generates on the GPU.
+- **Granite: Granite 4.0 Micro** (`ibm-granite/granite-4.0-micro`, the dense 3B one; the hybrid one is `granite-4.0-h-micro`), tested with the same matrix as the Qwen models.
+- **Deployment: from the author's computer, as a stopgap.** The web is served locally through a tunnel; Oracle and Hugging Face PRO stay as likely options for the future (table below).
+
+**Solved in 8w (option A), and then the 4B left the web (8a.2):** the 4B did not load in the web's direct mode either: with the retrieval (`bge-m3` and the reranker) on the GPU it does not fit in 12 GB. With option A, choosing the 4B moves the retrieval to the CPU. Today the web offers Qwen3-1.7B (default), Qwen3-0.6B and Granite 4.0 Micro, all with and without the agent. On Oracle (CPU, 12 GB) the 4B is not measured.
+
+| Block | What | Status |
+|---|---|---|
+| 8w — Web | The web's default model: the 1.7B. Qwen3-4B in the picker, disabled with the agent on. Solve the 4B's memory | ✅ Implemented (`FASE_8.md` §8w): with the 4B, first token ~3.8 s and total 4.7–8.9 s, with the search on the CPU |
+| 8a — Granite | Optional `llm-granite-*` profile (Apache 2.0, Spanish among its languages). Check the template, stop tokens, default system message and tool format (`<tool_call>`); then the Qwen matrix (`gen-bench`, open bank, `agent-bench`, echo, loops, language, latency) | ✅ Granite 4.0 Micro measured (`FASE_8.md` §8a, matrix `110`): quality at the 4B's level, a good agent, and it fits on the GPU with the agent; worse with the CV's private questions (no leaks). **It replaces the 4B in the web** (the author's decision), with a rule of its own for the CV's private data (§8a.2) |
+| 8b — "about" threshold | Recalibrate with `gate_scores` on the clean index, to recover about-02, 04 and 11 (DEC-39), and repeat the `route-bench` | ✅ −1.25 (`FASE_8.md` §8b): recovers two project questions; −1.5 let an out-of-domain question through. The official `route-bench` is still to run |
+| 8c — Language hint | Option C of DEC-36 (the language in the system message). Only if nothing drops | Proposed, low priority |
+| 8d — Deployment | From the author's computer with a tunnel (the author's decision); Oracle later: CPU latency and memory (P12), `make bundle` with the clean index (DEC-38), `deploy/stage`, machine, `scp`, `.env` and Pages | 🟡 Local ready (`FASE_8.md` §8d): `make api-public` (a queue of 4 questions, restrictable origin) and the guide in `deploy/local/README.md`. Tunnel: Tailscale Funnel; Cloudflare's quick tunnel does not support the chat's streaming, and its fixed URL needs a paid domain (§8d.2). Security measures in `make api-public` and in the guide. The Tailscale account is still to be created |
+| 8g — More elaborate answers | Prompt rule 6 per model (`style_rule`) and per domain. The author's request of 2026-10-27 | ✅ Measured (`FASE_8.md` §8g): no rule is adopted (the best one, S5 on the 1.7B, makes code worse). S5 is left commented out in `rag.toml`; the CV always keeps the short rule |
+| 8f — Agent fallback | When the model makes no valid call, the agent searches with the previous query plus the new one (Phase 5); today it also passes that mix to the model, and the 0.6B answers both questions together (`FASE_6.md`). Improvement: search with the mix and answer only the original question. Measured with `agent-bench` (0.6B and 1.7B) before adopting it; if it works, turning the agent back on in the web is considered | In (the author's decision) |
+| 8e — Extra tests | Candidates: MRR and nDCG@10, Groq judge on the CV (P11), a server load test, measuring the LangChain chunker again | Which ones, to be decided |
+
+**Deployment: three options** (the second one chosen as a stopgap; checked on 2026-10-27):
+
+| Option | For | Against / to confirm |
+|---|---|---|
+| Oracle Cloud Always Free (DEC-19) | Free; 2 ARM CPUs and 12 GB; already prepared (`deploy/`) | CPU only (0.6B and maybe 1.7B; the 4B and Granite 3B not measured and hard in 12 GB). Creating the machine can fail for lack of capacity (`deploy/README.md`) |
+| Serving from the author's computer (the 3080 Ti) with a tunnel (Tailscale Funnel or Cloudflare Tunnel, §8d) | Free; GPU, so every web model (1.7B by default, 0.6B, Granite); no router ports opened | The web only works with the computer on; the home connection limits the traffic; Cloudflare's quick tunnels change URL on every start (a fixed URL needs a paid domain) and do not support the chat's streaming; exposing the machine requires reviewing the API's security |
+| Hugging Face PRO | A platform recruiters know | **Paid** (about $9/month according to several 2026 sources, not confirmed on the official page), which clashes with "I do not want to spend money" in `PLANING.md`. What PRO gives is mostly ZeroGPU quota; **still to confirm** whether ZeroGPU works for a Docker Space like ours |
+
+The usual rule: every step is measured separately, 42 cannot get worse and test questions are cited by id (DEC-39).
+
+---
+
 # Pending decisions #
 
 | # | Topic | When it must be decided |
@@ -409,7 +450,7 @@ The results obtained during the evaluation must not get worse.
 | P3 | ~~New domains~~ → resolved: XQuAD (general knowledge, en/es) and then MLQA | Done |
 | P4 | ~~Modularisation: which options the web exposes~~ → resolved in the Phase 6 review: domain filters, agent yes/no, model and depth | Done |
 | P11 | ~~Judge for the CV answers (Phase 7b)~~ → resolved (2026-10-24, the author's decision): **Groq**, also with the CV questions, until the free tokens run out. If needed, it is repeated with Qwen3-4B as a local judge | Done |
-| P12 | The server's LLM: the 0.6B (the base) or the 1.7B (a better agent; its CPU latency is not measured). On Oracle, the 1.7B would fit in memory (estimated ~9.5 GB of 12) | Before deployment |
+| P12 | The server's LLM: the 0.6B (the base) or the 1.7B (a better agent; its CPU latency is not measured). On Oracle, the 1.7B would fit in memory (estimated ~9.5 GB of 12). **Progress (2026-10-27, the author's decisions):** in the web, the 1.7B by default; the 4B came back only without the agent and was then replaced by Granite 4.0 Micro (Phase 8). For now the web is served from the author's computer with a tunnel; the latency and memory on Oracle's CPU are still to be measured | Phase 8 (8d) |
 | P5 | ~~The GPU of the 42 machines~~ → resolved: they do not accept CUDA (vLLM takes ~10 h to index). Indexing at 42 is ruled out and the project is served online | Done |
 | P10 | Hugging Face Datasets: use them as an ingestion source and host ours there (the 42 ones, the multimedia derivatives and maybe the index). Whether the 42 datasets' license allows publishing them is still to be checked. **Progress (2026-10-24):** with Oracle, the prebuilt index goes to the machine by `scp` (DEC-19); the **private** HF dataset (DEC-09) stays as an alternative. Publishing the 42 datasets has not been done: the license has not been checked | To develop; before Phase 6 (deployment) or 4c if it is resumed |
 | P6 | Provider of the free key for the LLM judge | Before Phase 3 |
@@ -466,3 +507,6 @@ The results obtained during the evaluation must not get worse.
 - **2026-10-27**: third autonomous session (DEC-32 to DEC-38), on top of commit `644c455`: a cleanup instead of going back (the author's decision). Phi-4-mini dropped, routing tricks removed, the "about" language filter on, and all the documentation synced (including the English translation, which had stopped at `8ff05d0`). The Qwen models identical on vLLM, XQuAD and CV; 42 identical (`97-final`). No commits. See `changelog/FASE_7.md` §7b.8.
 - **2026-10-27**: **Phase 7 closed** (the author's decision). What is pending moves to Phase 8: Granite, deployment and extra tests.
 - **2026-10-27**: quotes of test questions and wrong answers removed from the indexed documentation (the author's decision, DEC-39): the search returned those notes instead of the answer. The verbatim text is kept in `es/RESPUESTAS_ARCHIVADAS.md`, excluded from "about". See `changelog/FASE_7.md` §7b.9.
+- **2026-10-27**: **Phase 8 opened** after commit `477bff9`. The author's decisions: the base stays the 0.6B; in the web, the 1.7B by default and the 4B back, only with the agent off. Plan in Phase 8.
+- **2026-10-27**: **Granite 4.0 Micro replaces the 4B in the web** (the author's decision), with and without the agent, and with a rule of its own so that it never presents the public Gmail address as another address (`changelog/FASE_8.md` §8a.2). Local deployment prepared (`make api-public`, `deploy/local/README.md`, §8d).
+- **2026-10-28**: overnight session on the length of the answers (`changelog/FASE_8.md` §8g). A `style_rule` mechanism per model and per domain; 6 rules measured on the 1.7B and one on Granite and the 0.6B. None is adopted, because all of them make something worse; S5 is left ready to switch on in the 1.7B profile. No commits.

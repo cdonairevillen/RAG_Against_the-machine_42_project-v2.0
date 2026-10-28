@@ -102,3 +102,32 @@ def test_strip_echo_handles_copied_source_headers() -> None:
     # Headers used as citations become "[n] (path)".
     listed = "See the sources:\n\n[1] --- file: docs/a.md ---"
     assert strip_echo(listed) == "See the sources:\n\n[1] (docs/a.md)"
+
+
+def test_a_style_rule_replaces_rule_6_only() -> None:
+    from src.rag.generator import STYLE_RULE
+
+    plain = build_messages("q", ["x"], "en")[0]["content"]
+    styled = build_messages("q", ["x"], "en",
+                            style_rule="6. Explain in detail.")[0]["content"]
+    assert STYLE_RULE in plain and STYLE_RULE not in styled
+    assert styled == plain.replace(STYLE_RULE, "6. Explain in detail.")
+    assert build_messages("q", ["x"], "en", style_rule=" ")[0]["content"] \
+        == plain
+
+
+def test_a_domain_style_rule_is_read_from_its_source() -> None:
+    from src.config import RagConfig, SourceConfig
+    from src.rag.domain_rules import DomainRules
+    from src.rag.generator import STYLE_RULE
+
+    config = RagConfig()
+    config.sources = {
+        "cv": SourceConfig(root="cv", include=["*.md"],
+                           style_rule=STYLE_RULE),
+        "vllm": SourceConfig(root="v", include=["*.md"]),
+    }
+    rules = DomainRules(config)
+    assert rules.style_rule("cv") == STYLE_RULE
+    assert rules.style_rule("vllm") is None
+    assert rules.style_rule(None) is None

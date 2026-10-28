@@ -1,0 +1,109 @@
+{
+  "label": "123-q17-S3-vllm",
+  "suite": "vllm",
+  "domain": "vllm",
+  "k": 5,
+  "limit": 25,
+  "sample": null,
+  "timestamp": "2026-10-28T02:29:38",
+  "commit": "828df91",
+  "dirty": true,
+  "profile": "llm-qwen3-1.7b",
+  "generator": "Qwen/Qwen3-1.7B",
+  "max_new_tokens": 1024,
+  "device": "cuda",
+  "sets": {
+    "public/docs": {
+      "questions": 25,
+      "f1": 0.4388,
+      "f1_answered": 0.4388,
+      "contains_answer": 0.04,
+      "false_not_found": 0.0,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.88,
+      "cites": 0.88,
+      "citation_correct": 0.7727,
+      "language_match": 1.0,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "cut": 0.0,
+      "tokens": 173.0,
+      "tokens_max": 599,
+      "seconds_per_answer": 7.89
+    },
+    "public/code": {
+      "questions": 25,
+      "f1": 0.3958,
+      "f1_answered": 0.4801,
+      "contains_answer": 0.0,
+      "false_not_found": 0.2,
+      "refused_with_answer": 0.12,
+      "answer_in_context": 0.76,
+      "cites": 1.0,
+      "citation_correct": 0.85,
+      "language_match": 1.0,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "cut": 0.0,
+      "tokens": 72.7,
+      "tokens_max": 163,
+      "seconds_per_answer": 3.05
+    },
+    "es/docs": {
+      "questions": 10,
+      "f1": 0.2926,
+      "f1_answered": 0.2926,
+      "contains_answer": 0.0,
+      "false_not_found": 0.0,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.9,
+      "cites": 1.0,
+      "citation_correct": 0.7,
+      "language_match": 0.8,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "cut": 0.0,
+      "tokens": 82.1,
+      "tokens_max": 215,
+      "seconds_per_answer": 3.87
+    },
+    "es/code": {
+      "questions": 10,
+      "f1": 0.1991,
+      "f1_answered": 0.2212,
+      "contains_answer": 0.0,
+      "false_not_found": 0.1,
+      "refused_with_answer": 0.1,
+      "answer_in_context": 0.8,
+      "cites": 1.0,
+      "citation_correct": 0.8889,
+      "language_match": 1.0,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "cut": 0.0,
+      "tokens": 90.9,
+      "tokens_max": 169,
+      "seconds_per_answer": 5.09
+    },
+    "ood/en-far": {
+      "questions": 10,
+      "correct_not_found": 1.0
+    },
+    "ood/en-near": {
+      "questions": 10,
+      "correct_not_found": 0.9
+    },
+    "ood/es-far": {
+      "questions": 10,
+      "correct_not_found": 1.0
+    },
+    "ood/es-near": {
+      "questions": 10,
+      "correct_not_found": 0.8
+    }
+  }
+}

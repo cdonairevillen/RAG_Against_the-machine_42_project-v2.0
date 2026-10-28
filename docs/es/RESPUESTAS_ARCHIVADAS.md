@@ -177,6 +177,22 @@ Qué respondían las preguntas que nombran el proyecto al quitar `route_names`:
 
 ---
 
+## 9. Fase 8: Granite y la longitud de las respuestas (`FASE_8.md` §8a.2 y §8g)
+
+**§8a.2, Granite, pregunta de contacto que acabó en "about":** *"[5], [2][3]"* (solo números de cita, sin contenido).
+
+**§8g, Qwen3-1.7B con reglas de respuesta largas, preguntas del CV sin respuesta en español (`gen-bench`, `cv-ood/es-missing`):**
+
+| Regla | Pregunta | Respuesta |
+|---|---|---|
+| S1 | ¿Tiene Chrystian carnet de conducir? | "No, Chrystian Donaire Villén no tiene carnet de conducir. Esta información no se encuentra en los documentos proporcionados." |
+| S1, S3, S5 | ¿Tiene mascotas Chrystian? | "No, Chrystian Donaire Villén no tiene mascotas. Esta información no se encuentra en ningún de los fuentes proporcionadas." (S3: "…en los documentos proporcionados.") |
+| S4 | ¿Qué salario pide Chrystian? | "Chrystian Donaire Villén no menciona específicamente un salario en sus fuentes. Su enfoque principal es desarrollar software…" (contesta en lugar de dar el mensaje del CV) |
+
+Con la regla 6 de siempre (S0), las tres acaban en el mensaje del CV.
+
+---
+
 ## 8. Lo que no se ha movido aquí
 
 - **Las transcripciones del CV** ya estaban fuera del índice, marcadas con `about:skip` (`FASE_4.md` §4b, `FASE_5.md`, `FASE_6.md`; §7a.6). Se quedan donde estaban.

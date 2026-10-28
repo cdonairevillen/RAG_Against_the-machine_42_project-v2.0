@@ -1,0 +1,29 @@
+{
+  "label": "126-granite-S2-vllm",
+  "judge_model": "openai/gpt-oss-120b",
+  "limit": 25,
+  "api_calls": 67,
+  "timestamp": "2026-10-28T07:17:58",
+  "sets": {
+    "public/docs": {
+      "judged": 25,
+      "mean_score": 1.6,
+      "correct": 0.72
+    },
+    "public/code": {
+      "judged": 25,
+      "mean_score": 1.56,
+      "correct": 0.76
+    },
+    "es/docs": {
+      "judged": 10,
+      "mean_score": 2.0,
+      "correct": 1.0
+    },
+    "es/code": {
+      "judged": 10,
+      "mean_score": 1.4,
+      "correct": 0.7
+    }
+  }
+}

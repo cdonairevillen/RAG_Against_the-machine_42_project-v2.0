@@ -126,18 +126,22 @@ class RagPipeline:
             return RagAnswer(question, message, [], True,
                              seconds_retrieval)
 
+        domain = self.answered_domain()
         rules = self.rules.prompt_rules(
-            self.answered_domain(), getattr(self.generator, "model_name", ""))
+            domain, getattr(self.generator, "model_name", ""))
+        style = self.rules.style_rule(domain)
+        own = {"style_rule": style} if style is not None else {}
         start = time.perf_counter()
         if on_piece:
             pieces = []
             for piece in self.generator.stream_answer(question, blocks,
-                                                      rules):
+                                                      rules, **own):
                 pieces.append(piece)
                 on_piece(piece)
             text = clean_output("".join(pieces))
         else:
-            text = self.generator.answer_with_text(question, blocks, rules)
+            text = self.generator.answer_with_text(question, blocks, rules,
+                                                   **own)
         not_found = is_not_found(text)
         text = self.not_found(question) if not_found \
             else self.rules.redact_all(text)
