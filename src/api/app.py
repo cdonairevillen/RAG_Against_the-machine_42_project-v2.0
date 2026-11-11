@@ -114,6 +114,15 @@ def env_list(name: str) -> list[str]:
             if m.strip()]
 
 
+def web_domains(config: RagConfig, show: list[str]) -> list[str]:
+    """Indexed domains the web serves: those with `web = true` in
+    rag.toml, plus the hidden ones named in `show` (RAG_API_SHOW)."""
+    from src.rag.router import indexed_domains
+
+    return [d for d in indexed_domains(config)
+            if config.sources[d].web or d in show]
+
+
 def parse_max_tokens(value: str, models: list[str]) -> dict[str, int]:
     """Per-model token caps from "512" (every model) or
     "default=512,llm-qwen3-1.7b=768" (unknown ids are ignored)."""
@@ -288,7 +297,8 @@ class RagService:
 
                 # RAG_API_DOMAINS: the domains the web serves (default:
                 # every indexed one), to keep one out until it is ready.
-                domains = env_list("RAG_API_DOMAINS")
+                domains = env_list("RAG_API_DOMAINS") or web_domains(
+                    self.config, env_list("RAG_API_SHOW"))
                 tools = RagTools.load(self.config, domains=domains or None)
                 self.generator_for(self.models.default_id, tools)
                 self.tools = tools
@@ -413,6 +423,7 @@ class RagService:
                 "last_character_index": src.last_character_index,
                 "preview": text[:PREVIEW_CHARS],
                 "credit": XQUAD_CREDIT if domain == "xquad" else None,
+                **film_clip(domain, src.file_path, text),
             })
         return items
 
@@ -540,6 +551,8 @@ class RagService:
                     "text": tools.rules.redact(parent.text, parent.domain),
                     "credit": XQUAD_CREDIT if parent.domain == "xquad"
                     else None,
+                    **film_clip(parent.domain, parent.file_path,
+                                parent.text),
                 }
         raise KeyError(chunk_id)
 
@@ -560,6 +573,23 @@ def trim_to_sentence(text: str) -> str:
     if text.count("```") % 2:
         text += "\n```"
     return text + " …"
+
+
+def film_clip(domain: str, file_path: str, text: str) -> dict[str, Any]:
+    """For a film source: the title with its time, and the clip the web
+    can play (film id, start and end seconds; Phase 9, DEC-44)."""
+    if domain != "film":
+        return {}
+    from src.rag.sources.film import clip_of, film_id, stamp, title_of
+
+    title = title_of(file_path)
+    span = clip_of(text)
+    if span is None:
+        return {"title": title}
+    return {
+        "title": f"{title} · {stamp(span[0])}",
+        "clip": {"film": film_id(title), "start": span[0], "end": span[1]},
+    }
 
 
 def short_path(file_path: str) -> str:
@@ -688,6 +718,24 @@ def create_app(config: Optional[RagConfig] = None,
             return service.source(chunk_id)
         except KeyError:
             raise HTTPException(status_code=404, detail="Unknown source")
+
+    @app.get("/film/{film}/video")
+    def film_video(film: str) -> Any:
+        """A film's video for the clips of its sources (DEC-44). Only
+        while the film domain is served; by id, never by path. Range
+        requests: the browser fetches just the part it plays."""
+        from fastapi.responses import FileResponse
+        from src.rag.sources.film import videos
+
+        if "film" not in service.load().router.domains:
+            raise HTTPException(status_code=404, detail="Not found")
+        path = videos().get(film)
+        if path is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        import mimetypes
+
+        return FileResponse(path, media_type=mimetypes.guess_type(path)[0]
+                            or "video/mp4")
 
     @app.get("/metrics")
     def metrics() -> dict[str, Any]:

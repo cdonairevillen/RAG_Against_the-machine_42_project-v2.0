@@ -180,6 +180,16 @@ class SourceConfig(BaseModel):
     # The web always searches this domain: it joins every domain filter
     # and its chip cannot be turned off (Phase 7a: "about").
     pinned: bool = False
+    # False keeps this domain out of the web (the API) even when indexed,
+    # unless RAG_API_SHOW names it (make api-public API_SHOW=film). The
+    # CLI and the benchmarks still see it (Phase 9: the films, only on
+    # the demo days).
+    web: bool = True
+    # Rerank this domain's doc-branch results (retrieval.rerank_doc_branch
+    # for this source only; None keeps the global value). Phase 9: the
+    # films, where it lifts Spanish questions (FASE_9.md 9b); the vLLM
+    # docs keep it off (Phase 2: it lowered their recall).
+    rerank_doc_branch: Optional[bool] = None
     # Data hidden at answer time ("phone", "email"): masked in the
     # context given to the LLM, in the answer and in the sources shown.
     # The indexed material is not modified. public_emails stay visible.

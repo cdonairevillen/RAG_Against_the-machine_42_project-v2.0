@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  chat, getConfig, getHealth, getMetrics, getSource, resetChat,
+  chat, clipUrl, getConfig, getHealth, getMetrics, getSource, resetChat,
   type Config, type Metrics, type RecallSet, type Retrieval, type Source,
 } from "./api";
 import { EXAMPLES } from "./examples";
@@ -60,6 +60,7 @@ function traceBody(trace: Record<string, unknown>): string {
 
 function SourceCard({ source, cited }: { source: Source; cited: boolean }) {
   const [full, setFull] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
   return (
     <div className="source-card">
       <div className="source-path">
@@ -70,6 +71,13 @@ function SourceCard({ source, cited }: { source: Source; cited: boolean }) {
         chars {source.first_character_index}–{source.last_character_index}
         {source.credit ? ` · ${source.credit}` : ""}
       </div>
+      {source.clip && (playing ? (
+        <video className="source-clip" src={clipUrl(source.clip)} controls autoPlay preload="metadata" />
+      ) : (
+        <button type="button" className="link-button" onClick={() => setPlaying(true)}>
+          ▶ play this scene
+        </button>
+      ))}
       <div className="source-text">{full ?? `${source.preview}…`}</div>
       {source.id && full === null && (
         <button

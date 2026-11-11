@@ -1,6 +1,6 @@
 # Decisiones tomadas por necesidad (sesiones autónomas)
 
-Cuatro sesiones: la del 2026-10-23/24 (DEC-01 a DEC-18), la noche del 2026-10-24/25 (DEC-20 a DEC-26), la del 2026-10-25/26 (DEC-27 a DEC-31) la del 2026-10-26/27 (DEC-32 a DEC-38) y la mañana del 2026-10-27 (DEC-39, al final). DEC-19 (Oracle) se decidió contigo.
+Cuatro sesiones: la del 2026-10-23/24 (DEC-01 a DEC-18), la noche del 2026-10-24/25 (DEC-20 a DEC-26), la del 2026-10-25/26 (DEC-27 a DEC-31) la del 2026-10-26/27 (DEC-32 a DEC-38) la mañana del 2026-10-27 (DEC-39) y la Fase 9 (DEC-40 en adelante, al final). DEC-19 (Oracle) se decidió contigo.
 
 Primer encargo: cerrar las Fases 5 y 6 hasta el punto de despliegue mientras duermes. Este documento recoge las decisiones que he tomado sin consultarte, con las opciones que consideré y por qué elegí cada una, para revisarlas juntos.
 
@@ -791,3 +791,90 @@ No es una decisión, sino la lista de lo que he visto y he dejado como estaba, p
 **Regla a partir de ahora** (escrita en la cabecera del archivo): en los documentos indexados no se copia el texto de una pregunta de prueba sobre el proyecto ni una respuesta incorrecta; se usa el identificador y una descripción, y lo literal va al archivo.
 
 **Reversible:** sí. Lo literal está en el archivo, y la versión anterior de los documentos, en git hasta el commit `644c455` (lo escrito en la sesión del 26 al 27 no llegó a hacerse commit con las citas).
+
+---
+
+# Fase 9: dominio de películas (2026-11-11)
+
+Decisiones de la Fase 9. Las que tomaste tú lo dicen; el resto las tomé yo con tu vía libre ("tienes vía libre de hacer lo que creas necesario", 2026-11-10). Detalle y medidas en `changelog/FASE_9.md` §9a.
+
+## DEC-40 — Texto del diálogo: subtítulos primero, Whisper turbo de respaldo
+
+| Opción | Pros | Contras |
+|---|---|---|
+| **A. `.srt` junto al vídeo → pista de texto dentro del vídeo → Whisper `large-v3-turbo`** ✅ | Los subtítulos son exactos y gratis; Whisper solo cuando no hay texto (o los subtítulos son imágenes, como en DVD y Blu-ray) | Si el `.srt` está desincronizado, el minuto sale desplazado |
+| B. Siempre Whisper | Una sola ruta | Inventa texto en la música y pierde detalles que los subtítulos tienen |
+| C. Whisper `large-v3` | Algún detalle más fino | En la prueba juntó 3 minutos en un solo segmento y se dejó la última frase: peor minuto exacto |
+
+**Medido** (Gulliver, 5 min): turbo 1.5 s y 14 segmentos con su minuto; `large-v3` 2.7 s y 2 segmentos. Turbo lo eligió el autor; `large-v3` se midió por si acaso. Las dos películas de la demo (Shrek y Shrek 2) traen `.srt` en inglés, así que no usan Whisper. **Reversible:** sí, `--whisper_model`.
+
+## DEC-41 — Detección de planos propia (sin `scenedetect`)
+
+| Opción | Pros | Contras |
+|---|---|---|
+| **A. Histogramas de color con el OpenCV que ya está (≈40 líneas)** ✅ | Sin dependencias nuevas | Umbral fijo (0.45), ajustado a ojo |
+| B. `scenedetect` | Librería conocida | Depende de `opencv-python`, que pisa el módulo `cv2` de `opencv-python-headless` (ya instalado) |
+| C. Un fotograma cada N segundos | Lo más simple | Describe muchas veces el mismo plano y parte otros |
+
+**Medido:** Gulliver (76 min) da 425 planos y 493 fotogramas en 14 s de CPU; revisados 16 seguidos: todos son planos distintos. **Reversible:** sí.
+
+## DEC-42 — Modelo de visión: Qwen3-VL-2B
+
+| Opción | Pros | Contras |
+|---|---|---|
+| **A. Qwen3-VL-2B-Instruct (Apache 2.0)** ✅ | Describe bien lo que se ve y lee el texto en pantalla | 0.46 s por fotograma; se inventa el título de la película si no se le prohíbe |
+| B. Florence-2-large (MIT) | 0.29 s por fotograma | Confunde personajes y objetos (un rey como "Simba", un teléfono que no está) y lee peor el texto |
+
+**Medido:** los mismos 40 fotogramas de Gulliver con los dos (`data/output/fase9/vlm_compare.json`). La comparación la pediste tú; la elección es mía. **Reversible:** sí, `--captioner`.
+
+## DEC-43 — Dónde viven las películas y su texto
+
+- **Entrada:** `data/raw/film/<Título (Año)>/` con el vídeo y su `.srt`. El nombre de la carpeta es el título. Moví ahí las dos carpetas de Shrek que dejaste en `data/raw/`.
+- **Salida:** `data/film/<Título (Año)>.md` (la raíz del dominio) y lo intermedio en `data/film/.work/` (diálogo, planos, fotogramas y descripciones, para no repetir trabajo).
+- **Gulliver no entra en el dominio:** se usa para desarrollar (`data/raw/film_dev/`), así la demo solo tiene las películas que elegiste. **Reversible:** basta con mover su carpeta a `data/raw/film/`.
+
+Todo bajo `data/`, ignorado por git: al retirar las películas no queda nada en el repo.
+
+## DEC-44 — Clip de la película en la web (decisión tuya)
+
+**Tu petición (2026-11-11):** mostrar el fragmento de la película en la web, aunque luego se quite. Cómo lo hago:
+- La tarjeta de una fuente de `film` abre un reproductor que empieza en el minuto de la sección y para al final (`#t=inicio,fin`).
+- La API sirve el vídeo por **identificador de película**, nunca por ruta, con peticiones por rangos (el navegador solo descarga el trozo).
+- Solo existe si el dominio `film` está activo en la web.
+
+**Reversible:** sí, va detrás del mismo interruptor que el dominio.
+
+## DEC-45 — Cómo se enciende `film` en la web
+
+| Opción | Pros | Contras |
+|---|---|---|
+| **A. Campo `web = false` en la fuente + `make api-public API_SHOW=film`** ✅ | La web de siempre no cambia aunque `film` esté indexado; encenderlo es un argumento al arrancar | Un campo y una variable nuevos |
+| B. Listar los dominios a mano (`API_DOMAINS=vllm,xquad,cv,about,film`) | Ya existía | Hay que recordar la lista entera, y sin ella `film` saldría en la web en cuanto se indexa |
+| C. Indexar `film` solo los días de la demo | Nada nuevo en el código | Reindexar cada vez, y el benchmark no podría medirlo |
+
+**Reversible:** sí. Los demás dominios tienen `web = true` por defecto, así que nada cambia para ellos.
+
+## DEC-46 — Las preguntas de `film`, fuera de git
+
+`bench/datasets/film/` cita frases de las películas y apunta a ficheros que no estarán en el repo cuando se retiren, así que va en el `.gitignore`. El `route-bench` se salta `film` si el dominio no está indexado o faltan sus datasets, para que quien clone el repo pueda ejecutarlo igual. **Alternativa:** versionarlo, que haría reproducible la cifra pero dejaría las citas en el historial.
+
+## DEC-47 — Cuánta descripción de escena entra en cada tramo
+
+| Opción | EN R@5 | ES R@5 | Contras |
+|---|---|---|---|
+| Todas (hasta 8 por tramo, 2 frases) | 0.57 | 0.36 | Ahogan el diálogo en la búsqueda |
+| Solo diálogo | 0.71 | 0.14 | Sin escenas: no se puede preguntar por lo que se ve |
+| **Hasta 3 por tramo (los planos más largos), 1 frase** ✅ | 0.57 (R@10 0.93) | 0.21 | — |
+
+Medido con 14 preguntas de diálogo (`142`–`144`, `FASE_9.md` §9b). Las descripciones completas siguen guardadas en `data/film/.work/`; cambiar `SCENES_PER_SECTION` y repetir `make film` no vuelve a usar la GPU. **Reversible:** sí.
+
+## DEC-48 — Reranker en la rama de documentos, solo en `film`
+
+| Opción | Respuesta en top 5 (EN / ES) | Contras |
+|---|---|---|
+| Como hoy (sin reranker en documentos) | 11 / 4 | El español falla casi siempre |
+| **`rerank_doc_branch = true` solo en `film`, reranker actual** ✅ | 11 / 9 | Ninguno medido: es el modelo que ya está cargado |
+| Lo mismo con `bge-reranker-v2-m3` solo para `film` | 12 / 9 (R@5 0.79 / 0.57) | Un segundo reranker en la GPU (~2 GB más junto a la API) y un cambio en el código para tener un reranker por dominio. **Pendiente de tu decisión** |
+| Encenderlo para todos | — | Empeora los docs de vLLM (Fase 2) |
+
+**Reversible:** sí, un campo en `rag.toml`.

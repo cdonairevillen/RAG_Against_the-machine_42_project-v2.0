@@ -23,13 +23,16 @@ SUITES = {
     "xquad": ("bench/datasets/xquad", "xquad"),
     "cv": ("bench/datasets/cv", "cv"),
     "about": ("bench/datasets/about", "about"),
+    # Phase 9: the demo films (git-ignored; built by build_film_bench).
+    "film": ("bench/datasets/film", "film"),
 }
 # Datasets of each suite (default: the 42 docs/code pair) and the corpus
 # its ground truth points into (default: the --domain argument). XQuAD:
 # the same questions in English and Spanish over its own domain.
 SUITE_DATASETS = {"xquad": ("en", "es"), "cv": ("en", "es"),
-                  "about": ("en", "es")}
-SUITE_DOMAINS = {"xquad": "xquad", "cv": "cv", "about": "about"}
+                  "about": ("en", "es"), "film": ("en", "es")}
+SUITE_DOMAINS = {"xquad": "xquad", "cv": "cv", "about": "about",
+                 "film": "film"}
 RESULTS_DIR = "bench/results"
 # Retrieval path measured (the official 42 one). Kept in result names
 # and records so they stay comparable with the earlier runs.

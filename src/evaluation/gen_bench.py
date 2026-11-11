@@ -82,6 +82,13 @@ GEN_SUITES: dict[str, dict[str, Any]] = {
         "ood": None,
         "sample": None,
     },
+    # The demo films (Phase 9).
+    "film": {
+        "domain": "film",
+        "sets": [("film", "en", "en", True), ("film", "es", "es", True)],
+        "ood": None,
+        "sample": None,
+    },
 }
 
 

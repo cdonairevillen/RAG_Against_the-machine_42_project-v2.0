@@ -172,7 +172,7 @@ include = [".md", ".py"]
 exclude_dirs = [
     "data", "bench", "web", "tests", "llm_sdk", "__pycache__",
     "node_modules", "PLANING.md", "RESPUESTA.md", "Elements_frontend.md",
-    "CLAUDE.md",
+    "CLAUDE.md", "IMPORTANTE.md", "PLAN_FASES_9_10.md",
 ]
 # deploy/space/README.md is the old Hugging Face Space card (the
 # deployment is on Oracle): the project's README covers it.
@@ -244,6 +244,23 @@ default_chunker = "markdown_headers_packed"
 [sources.about.chunkers]
 ".py" = "python_ast"
 ".md" = "markdown_headers_packed"
+
+# Films (Phase 9): one Markdown file per film, built by `make film` from
+# data/raw/film/<Title (Year)>/ (video + .srt): dialogue and scene
+# descriptions in sections headed by their time ("## 00:12:30 - ...",
+# src/rag/sources/film.py). Git-ignored. Hidden from the web unless the
+# API starts with API_SHOW=film (only on the demo days).
+[sources.film]
+description = "Films, by time: what the characters say (subtitles) and what is seen on screen (scene descriptions)."
+root = "data/film"
+include = [".md"]
+exclude_dirs = [".work"]
+default_chunker = "markdown_headers_packed"
+web = false
+# Doc-branch reranking for this domain only (FASE_9.md 9b): the answer
+# in the top 5 for 9/14 Spanish questions instead of 4/14 (English 11/14
+# either way). The global setting stays off (it lowers the vLLM docs).
+rerank_doc_branch = true
 
 # Optional profiles: extra models as explicit options on top of the
 # stable base above (which is what the official benchmark uses and gives

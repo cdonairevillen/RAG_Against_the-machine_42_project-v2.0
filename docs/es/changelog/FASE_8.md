@@ -14,7 +14,7 @@ Fase abierta el 2026-10-27, tras el commit `477bff9` (cierre de la Fase 7). El p
 | 8c — Pista de idioma (opción C) | Propuesto, prioridad baja |
 | 8d — Despliegue | 🟡 Preparado para desplegar desde tu ordenador (§8d): `make api-public`, guía en `deploy/local/README.md` y ensayo completo. Túneles comprobados y medidas de seguridad en §8d.2: Tailscale Funnel es la única opción gratuita que sirve (el túnel rápido de Cloudflare no admite el streaming del chat). Falta que crees la cuenta de Tailscale |
 | 8e — Pruebas extra | Las de siempre (la matriz de los Qwen), para evaluar Granite |
-| 8f — Plan B del agente | Entra (decisión tuya, 2026-10-27); sin empezar |
+| 8f — Plan B del agente | Pasa a la Fase 10 (decisión tuya, 2026-11-05), junto al trabajo de lenguaje natural; sin empezar |
 | 8h — Documentación para "about" | ✅ README, ROADMAP, BENCHMARK_REPORT y la traducción de la Fase 8 al día; "about" reindexado (§8h). Una pregunta del banco abierto empeora por el umbral de "about" (8b) |
 | 8g — Respuestas más elaboradas | ✅ Medido (§8g): 6 reglas en el 1.7B y S2 en Granite y el 0.6B. **No se adopta ninguna** (todas empeoran algo; la mejor, S5 en el 1.7B, pierde en code). S5 queda comentada en `rag.toml`, lista para activarla; el CV mantiene siempre la regla corta |
 

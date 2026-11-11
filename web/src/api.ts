@@ -49,7 +49,20 @@ export interface Source {
   last_character_index: number;
   preview: string;
   credit: string | null;
+  // Film sources (Phase 9): the stretch of the film the source covers.
+  clip?: Clip;
 }
+
+export interface Clip {
+  film: string;
+  start: number;
+  end: number;
+}
+
+// A film's video, played from the clip's start to its end (media
+// fragment: the browser fetches only that part).
+export const clipUrl = (clip: Clip) =>
+  `${API_URL}/film/${encodeURIComponent(clip.film)}/video#t=${clip.start},${clip.end}`;
 
 // What one domain found for the question. The answered domain carries
 // the sources the answer used (their [n] citations); the others, their

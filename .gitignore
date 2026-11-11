@@ -10,11 +10,14 @@ __pycache__/
 # Data: local corpora, indices and outputs (regenerable). Versioned
 # datasets and results live in bench/.
 data/
+# Phase 9: the film questions quote the demo films (removed after it).
+bench/datasets/film/
 
 
 # Local config / secrets
 .streamlit/
 .env
+IMPORTANTE.md
 .cache/
 
 # OS / editors

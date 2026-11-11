@@ -109,8 +109,11 @@ API_DIRECT_ONLY ?=
 # Stop button cuts any of them. One number for every model, or per model
 # ("default=1024,llm-qwen3-1.7b=768").
 API_MAX_TOKENS ?= 1024
-# API_DOMAINS: the domains the web serves (empty: every indexed one).
+# API_DOMAINS: the domains the web serves (empty: every indexed one with
+# web = true in rag.toml). API_SHOW adds hidden ones: API_SHOW=film turns
+# on the films (Phase 9, only on the demo days).
 API_DOMAINS ?=
+API_SHOW ?=
 # Chats waiting or answering at once (0: no cap) and the web origins
 # allowed to call the API (*: any). make api-public sets both.
 API_MAX_QUEUE ?= 0
@@ -118,7 +121,7 @@ API_MAX_QUEUE ?= 0
 API_DOCS ?= 1
 API_ORIGINS ?= *
 api: db-up
-	RAG_API_DOMAINS=$(API_DOMAINS) RAG_API_MODELS=$(API_MODELS) RAG_API_MAX_TOKENS=$(API_MAX_TOKENS) \
+	RAG_API_DOMAINS=$(API_DOMAINS) RAG_API_SHOW=$(API_SHOW) RAG_API_MODELS=$(API_MODELS) RAG_API_MAX_TOKENS=$(API_MAX_TOKENS) \
 		RAG_API_DEFAULT_MODEL=$(API_DEFAULT_MODEL) RAG_API_DIRECT_ONLY=$(API_DIRECT_ONLY) 		RAG_API_MAX_QUEUE=$(API_MAX_QUEUE) RAG_ALLOWED_ORIGINS='$(API_ORIGINS)' RAG_API_DOCS=$(API_DOCS) \
 		$(ENV) $(UV) run --project . $(PY) -m src.api
 
@@ -192,6 +195,15 @@ space-stage: web-build
 
 # Every source in rag.toml, or only one with SOURCE=<name>.
 SOURCE    ?=
+# Films (Phase 9): data/raw/film/<Title (Year)>/ (video + .srt) -> one
+# Markdown file per film in data/film/ (dialogue + scene descriptions).
+# Needs `uv sync --extra film` and the GPU; then `make index SOURCE=film`.
+# FILM= rebuilds a single film; SCENES=0 skips the scene descriptions.
+FILM   ?=
+SCENES ?= 1
+film:
+	$(ENV) $(UV) run --project . --extra film $(PY) -m src prepare_film $(if $(FILM),--only "$(FILM)") $(if $(filter 0,$(SCENES)),--scenes False)
+
 index: db-up
 	$(RUN) index --max_chunk_size 2000 $(if $(SOURCE),--source $(SOURCE))
 
@@ -271,6 +283,6 @@ meme:
 	$(ENV) $(UV) run --project . $(PY) -m streamlit run src/web.py &
 	@echo "Web running at http://localhost:8501"
 
-.PHONY: install data data-vllm data-xquad db-up db-down db-reset run web web-stop index search-docs search-code \
+.PHONY: install data film data-vllm data-xquad db-up db-down db-reset run web web-stop index search-docs search-code \
         eval-docs eval-code bench route-bench agent-bench gen-bench judge mcp test lint clean meme \
         api api-public api-public-stop api-public-restart web-dev web-build bundle space-build space-run

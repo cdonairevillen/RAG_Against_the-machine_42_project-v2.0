@@ -259,6 +259,57 @@ class CLI:
         except (OSError, ValueError) as exc:
             print(f"Error building the about benchmark: {exc}")
 
+    def build_film_bench(self) -> None:
+        """Build the film datasets from bench/datasets/film/questions.json.
+
+        Locates every evidence in its film's Markdown file (re-run after
+        `make film`; fails if an evidence is missing or ambiguous).
+        """
+        from src.rag.sources.film import build_bench
+
+        try:
+            print(f"Film benchmark: {build_bench()} questions per language "
+                  f"(en, es), evidence verified.")
+        except (OSError, ValueError) as exc:
+            print(f"Error building the film benchmark: {exc}")
+
+    def prepare_film(self, only: Optional[str] = None,
+                     scenes: bool = True,
+                     captioner: Optional[str] = None,
+                     whisper_model: Optional[str] = None,
+                     films_dir: Optional[str] = None) -> None:
+        """Turn every film into a Markdown file for the film domain.
+
+        Reads data/raw/film/<Title (Year)>/ (video + optional .srt) and
+        writes data/film/<Title (Year)>.md: dialogue and scene
+        descriptions by time (see src/rag/sources/film.py). Offline and
+        GPU-heavy; needs `uv sync --extra film`. Then: make index
+        SOURCE=film.
+
+        Args:
+            only: Title (folder name) of a single film to rebuild.
+            scenes: False skips the scene descriptions.
+            captioner: Vision model ('qwen3-vl-2b', 'florence-2-large').
+            whisper_model: For films without text subtitles.
+            films_dir: Folder with one subfolder per film.
+        """
+        from src.rag.sources import film
+
+        try:
+            written = film.prepare(
+                films_dir=films_dir or film.FILMS_DIR,
+                output_dir=film.OUTPUT_DIR,
+                captioner_name=captioner or film.DEFAULT_CAPTIONER,
+                whisper_model=whisper_model or film.WHISPER_MODEL,
+                only=only, scenes=scenes,
+            )
+        except (ImportError, OSError, ValueError) as exc:
+            print(f"Error preparing the films: {exc}")
+            return
+        if not written:
+            print(f"No films found in {films_dir or film.FILMS_DIR} "
+                  f"(one folder per film, with its video).")
+
     def embed_children(self, ingester: "Ingester") -> dict:
         """Embed every child chunk with the configured model.
 

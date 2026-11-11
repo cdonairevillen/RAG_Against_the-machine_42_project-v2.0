@@ -331,9 +331,12 @@ class Retriever:
 
         settings = config.retrieval
         source = config.sources.get(domain)
-        if source is not None and source.relevance_threshold is not None:
+        if source is not None:
             settings = settings.model_copy(update={
-                "relevance_threshold": source.relevance_threshold,
+                key: value for key, value in {
+                    "relevance_threshold": source.relevance_threshold,
+                    "rerank_doc_branch": source.rerank_doc_branch,
+                }.items() if value is not None
             })
         retriever = cls(chunks=children, bm25=bm25,
                         settings=settings, models=config.models)

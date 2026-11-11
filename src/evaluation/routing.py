@@ -34,6 +34,10 @@ SETS = (
     ("cv", "es", "cv"),
     ("about", "en", "about"),
     ("about", "es", "about"),
+    # Phase 9: only when the film domain is indexed and its (git-ignored)
+    # datasets are built.
+    ("film", "en", "film"),
+    ("film", "es", "film"),
 )
 
 
@@ -114,6 +118,12 @@ def run_route_bench(label: str, k: int = 10, limit: Optional[int] = None,
     }
     output_dir = os.path.join(OUTPUT_DIR, label)
     for suite, name, expected in SETS:
+        folder, suffix = SUITES[suite]
+        if suite == "film" and (expected not in router.domains or not
+                                os.path.isfile(os.path.join(
+                                    folder, "UnansweredQuestions",
+                                    f"dataset_{name}_{suffix}.json"))):
+            continue
         run["sets"][f"{suite}/{name}"] = run_set(
             router, suite, name, expected, k, output_dir, limit
         )
