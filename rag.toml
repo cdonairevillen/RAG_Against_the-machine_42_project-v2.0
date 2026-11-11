@@ -3,7 +3,9 @@
 # RAG_<SECTION>_<KEY> (e.g. RAG_QDRANT_URL=http://other-host:6333).
 
 [qdrant]
-url = "http://localhost:6333"
+# 127.0.0.1, not localhost: on Windows, Python (httpx) tries IPv6 first
+# and waits ~2 s per request before falling back (FASE_9.md 9b, DEC-49).
+url = "http://127.0.0.1:6333"
 collection_prefix = "rag_"
 batch_size = 512
 
@@ -261,6 +263,11 @@ web = false
 # in the top 5 for 9/14 Spanish questions instead of 4/14 (English 11/14
 # either way). The global setting stays off (it lowers the vLLM docs).
 rerank_doc_branch = true
+# Own gate (`gate_scores`, 40 questions per group, FASE_9.md 9b): the
+# global 0.0 rejected 71% (en) / 71% (es) of the film questions; -3.0
+# accepts 79% / 71%. Spanish out-of-domain questions score high on every
+# domain: route-bench checks which domain wins them.
+relevance_threshold = -3.0
 
 # Optional profiles: extra models as explicit options on top of the
 # stable base above (which is what the official benchmark uses and gives

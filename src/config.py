@@ -17,7 +17,7 @@ ENV_PREFIX = "RAG_"
 class QdrantConfig(BaseModel):
     """Connection settings for the Qdrant server."""
 
-    url: str = "http://localhost:6333"
+    url: str = "http://127.0.0.1:6333"
     collection_prefix: str = "rag_"
     batch_size: int = 512
 

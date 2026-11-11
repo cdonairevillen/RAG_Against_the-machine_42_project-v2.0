@@ -114,7 +114,7 @@ def test_unknown_profile_is_reported(tmp_path: Path) -> None:
 def test_missing_file_gives_defaults(tmp_path: Path) -> None:
     config = load_config(str(tmp_path / "nope.toml"), environ={})
 
-    assert config.qdrant.url == "http://localhost:6333"
+    assert config.qdrant.url == "http://127.0.0.1:6333"
     assert config.sources == {}
 
 

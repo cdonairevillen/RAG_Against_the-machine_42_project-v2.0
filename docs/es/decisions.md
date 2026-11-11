@@ -878,3 +878,14 @@ Medido con 14 preguntas de diálogo (`142`–`144`, `FASE_9.md` §9b). Las descr
 | Encenderlo para todos | — | Empeora los docs de vLLM (Fase 2) |
 
 **Reversible:** sí, un campo en `rag.toml`.
+
+## DEC-49 — Qdrant en `127.0.0.1` en lugar de `localhost`
+
+**Lo que pasó:** el `route-bench` iba a 13 s por pregunta (antes ~0.4 s) con la GPU al 2 %. Perfilando una búsqueda: cada consulta a Qdrant tardaba 2.05 s clavados. En este Windows, Python (`httpx`, el cliente de Qdrant) prueba primero IPv6 (`::1`) para `localhost` y espera ~2 s antes de pasar a IPv4; `curl` no lo nota porque prueba las dos a la vez. Medido: `localhost` 2.21 s por petición, `127.0.0.1` 0.03 s. Ya ocurría el 2026-11-05 (el `route-bench` `140` tardó 8.5 h), así que no lo causó la Fase 9; probablemente una actualización de Windows o de Docker.
+
+| Opción | Pros | Contras |
+|---|---|---|
+| **A. `url = "http://127.0.0.1:6333"` en `rag.toml` (y el valor por defecto)** ✅ | Arregla el benchmark **y la web** (cada pregunta de un visitante pagaba ~2 s por consulta a Qdrant) | Ninguno: Docker publica Qdrant en `127.0.0.1` |
+| B. Desactivar IPv6 o tocar el `hosts` de Windows | Arregla todos los programas | Cambia el sistema, fuera del proyecto |
+
+**Reversible:** sí. La copia de `deploy/stage/` se regenera con `make space-stage`.

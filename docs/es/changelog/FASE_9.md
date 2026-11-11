@@ -154,7 +154,55 @@ En las preguntas de documentación el reranker no se usa (`rerank_doc_branch = f
 | + `mmarco` (el actual, `146`) | 0.29 / 0.57 / 0.64 / 0.86 | 0.07 / 0.21 / 0.36 / 0.71 | 11 / **9** |
 | + `bge-reranker-v2-m3` (`147`) | 0.43 / 0.79 / 0.79 / 0.93 | 0.29 / 0.43 / 0.57 / 0.79 | **12** / **9** |
 
+**Comprobado:** 42 idéntico con el cambio (`148-vllm-check`: docs 0.76 / 0.91 / 0.92 / 0.94, code 0.51 / 0.72 / 0.80 / 0.88).
+
 **Aplicado:** campo nuevo `rerank_doc_branch` por fuente (como `relevance_threshold`), encendido solo en `film` con el reranker actual (`148`: idéntico a `146`). Los demás dominios no cambian. El reranker grande queda propuesto (DEC-48): mejora más, pero es un segundo modelo en la GPU.
+
+### Umbral de `film` (`149-film-gate`, 40 preguntas por grupo)
+
+Primera prueba en la web: una pregunta de diálogo daba "not found" porque `film` usaba el umbral global (0.0), que rechaza el 71 % de sus preguntas. Proporción que pasa el filtro de `film` con cada umbral:
+
+| Grupo | −4.0 | −3.5 | **−3.0** | −2.5 | −2.0 |
+|---|---|---|---|---|---|
+| film/en (deben pasar) | 0.79 | 0.79 | **0.79** | 0.71 | 0.43 |
+| film/es (deben pasar) | 0.93 | 0.86 | **0.71** | 0.64 | 0.57 |
+| xquad/es (no deben) | 0.62 | 0.57 | **0.45** | 0.15 | 0.03 |
+| cv/es (no deben) | 0.53 | 0.47 | **0.23** | 0.13 | 0.03 |
+| es/docs (vLLM, no deben) | 0.50 | 0.40 | **0.20** | 0.20 | 0.10 |
+| Fuera de dominio cercanas (ES) | 0.70 | 0.60 | **0.60** | 0.40 | 0.30 |
+| 42 docs y code, XQuAD/EN, CV/EN, about | ≤ 0.12 | ≤ 0.10 | **≤ 0.03** | 0 | 0 |
+
+**Elegido: −3.0** (como el CV). Las preguntas en español puntúan alto en todos los dominios; pasar el filtro de `film` no basta para responder desde él, porque el router elige el dominio con mejor puntuación. El `route-bench` (`150`) dirá cuántas preguntas de otros dominios acaban en `film`, y el `gen-bench` cómo responde.
+
+### Qdrant lento desde Python: `localhost` → `127.0.0.1` (DEC-49)
+
+El `route-bench` de la noche (`150`) iba a 13 s por pregunta con la API cerrada y la GPU al 2 %. Perfilada una búsqueda: 12.4 de 13.1 s eran 6 consultas a Qdrant de 2.05 s cada una. En Windows, `httpx` prueba IPv6 primero con `localhost` y espera ~2 s. Medido: 2.21 s frente a 0.03 s con `127.0.0.1`. Ya pasaba el 2026-11-05 (el `140` tardó 8.5 h). **Arreglado en `rag.toml` y en el valor por defecto de `src/config.py`**; también acelera la web. El `150` se paró y se relanzó como `151`.
+
+**Noche interrumpida:** al parar el `150`, su script siguió con los `gen-bench` mientras arrancaba el `151`; con dos procesos en la GPU, el 1.7B iba a ~380 s por pregunta. A las 03:59 Windows Update reinició el equipo (KB5132061, reinicio planeado, sin fallo). Se repitió todo por orden el 2026-11-11 por la mañana: 25 min en total.
+
+### Route-bench con `film` (`151`, frente a `140`)
+
+| Set | `140` (sin `film`) | `151` (con `film`, −3.0) |
+|---|---|---|
+| 42 docs / code | 100 % / 100 % a vLLM | **igual** (0.76 / 0.91 / 0.92 / 0.94 y 0.51 / 0.72 / 0.80 / 0.88) |
+| es/docs, es/code, CV, about | — | **igual** |
+| xquad/en | 1 167 a xquad | 1 167 (1 pregunta pasa de vLLM a `film`) |
+| xquad/es | 1 160 a xquad (0.975) | **1 152 (0.968)**: 10 van a `film` (8 salen de xquad) |
+| film/en | — | 12 / 14 a `film` (2 a xquad); R@5 0.57 |
+| film/es | — | 12 / 14 a `film` (2 a vLLM); R@5 0.29 |
+
+El coste del umbral: 8 de 1 190 preguntas de XQuAD en español (−0.7 puntos). Nada más cambia.
+
+**Decisión tuya (2026-11-11):** se acepta −3.0. XQuAD **deja de ser prioridad**: se mantiene indexado y medido, pero sus pérdidas pequeñas no bloquean cambios en otros dominios. La comparación entre dos idiomas se hará con "about" y el CV (datos no estructurados, más cercanos a un caso real). Quitar XQuAD queda como opción, sin decidir.
+
+### Generación de `film` (`151`, 14 preguntas por idioma)
+
+| Modelo | Contiene la respuesta EN / ES | "Not found" en falso EN / ES | Idioma EN / ES | Latencia EN / ES |
+|---|---|---|---|---|
+| Qwen3-0.6B (`151-film-q06`) | 0.36 / 0.07 | 0.21 / 0.29 | 0.91 / 0.80 | 1.1 / 1.6 s |
+| Qwen3-1.7B (`151-film-q17`, el de la web) | 0.43 / 0.29 | 0.21 / 0.29 | 1.00 / 1.00 | 1.0 / 1.3 s |
+
+Los "not found" en falso son todos sin la respuesta en el contexto (columna "with answer in ctx" a 0.00): fallos de búsqueda o de enrutado, no del LLM. El `150-film-q06` (anoche) da las mismas cifras de calidad que el `151`.
 
 ## Ficheros cambiados
 
