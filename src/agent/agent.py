@@ -264,6 +264,7 @@ class Agent:
                         first_character_index=src["first_character_index"],
                         last_character_index=src["last_character_index"],
                     ))
+        sources = rules.context_order(sources, domain)
         blocks = build_context_blocks(
             sources, self.tools.router.get_parent_chunk_map(), rules
         )

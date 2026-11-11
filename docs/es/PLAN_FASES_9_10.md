@@ -73,6 +73,19 @@ Escrito el 2026-11-05. Fechas de referencia (noviembre de 2026):
 
 ## Fase 10 — LLM externo y lenguaje natural (tras el visto bueno)
 
+### Orden acordado (tú, 2026-11-11)
+
+1. **Enriquecimiento de `film`** (opción C de `FASE_9.md` §9b): resúmenes por personaje y por escena, generados offline e indexados como fragmentos más. Ver si funciona y valorar el cambio.
+2. **Credenciales del LLM externo en `.env`** (las creas tú). Candidato: NVIDIA (build.nvidia.com); límites y condiciones del nivel gratuito, a confirmar.
+3. **Probar que todo funciona con el modelo externo** (10a).
+4. **Web: dos modos separados.**
+   - **Local** ("RAG Against the Machine", rojo con el rayo): sin el interruptor del agente (no es funcional con los modelos pequeños). Modelos: 0.6B, 1.7B, Granite y **vuelve Qwen3-4B** (sin agente cabe con la recuperación en la CPU, opción A de 8w).
+   - **Externo** (azul con una nube): el interruptor del agente solo aquí. Modelo: un selector de 2–3 modelos o uno fijo, por decidir.
+   - **Transición con degradado** de un modo a otro, sin que parezca un cambio de página.
+   - **Modo por defecto (tú, 2026-11-11): el externo**, si funciona bien. El local queda como extra, sobre todo para la presentación.
+   - **Las métricas de recall se mantienen** en la transición: las da la recuperación, no el LLM.
+5. **Comprobar los agentes** con el modelo externo: que hagan lo que deben (`agent-bench` y pruebas a mano).
+
 ### 10a — LLM externo por API key
 
 - **Por qué toca el código de generación:** `Generator` (`src/rag/generator.py`) da por hecho que el modelo está en memoria: usa su tokenizador para contar tokens y aplicar la plantilla de chat, sus tokens de parada, `generate` de transformers (con el detector de bucles y el botón Stop dentro) y el agente renderiza y lee las llamadas a herramientas como texto. Una API externa recibe directamente la lista de mensajes (que `build_messages()` ya construye), aplica su propia plantilla y devuelve el texto o las llamadas a herramientas ya estructuradas. **No se reescribe nada:** se separa una interfaz con dos implementaciones, la local (el código de hoy, movido sin cambios) y la remota. Recuperación, router, filtros, reglas de dominio, limpieza y benchmarks no se tocan. **Garantía:** la ruta local debe dar respuestas idénticas antes y después (decodificación greedy, así que es comprobable con `gen-bench`), y 42 igual.

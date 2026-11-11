@@ -129,3 +129,17 @@ def test_source_gate_threshold_defaults_to_global(tmp_path: Path) -> None:
     ), encoding="utf-8")
     assert load_config(str(path), environ={}).source(
         "demo").relevance_threshold == -3.5
+
+
+def test_source_bm25_doc_branch_defaults_to_global(tmp_path: Path) -> None:
+    config = load_config(write_config(tmp_path), environ={})
+    assert config.retrieval.bm25_in_doc_branch is True
+    assert config.source("demo").bm25_in_doc_branch is None
+
+    path = tmp_path / "rag.toml"
+    path.write_text(CONFIG.replace(
+        'default_chunker = "size"',
+        'default_chunker = "size"\nbm25_in_doc_branch = false',
+    ), encoding="utf-8")
+    assert load_config(str(path), environ={}).source(
+        "demo").bm25_in_doc_branch is False

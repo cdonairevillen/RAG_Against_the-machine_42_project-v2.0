@@ -336,6 +336,7 @@ class Retriever:
                 key: value for key, value in {
                     "relevance_threshold": source.relevance_threshold,
                     "rerank_doc_branch": source.rerank_doc_branch,
+                    "bm25_in_doc_branch": source.bm25_in_doc_branch,
                 }.items() if value is not None
             })
         retriever = cls(chunks=children, bm25=bm25,
@@ -617,8 +618,12 @@ class Retriever:
         """Doc-mode branch of search_smart(). See that method."""
         fetch_k = min(k * 5, len(self.doc_chunk_indices))
         doc_sources: list[MinimalSource] = []
+        dense_only = (not self.settings.bm25_in_doc_branch
+                      and self.embedder is not None
+                      and self.embeddings.dense_in_doc_branch)
 
-        if self.bm25_doc is not None and self.doc_chunk_indices:
+        if (self.bm25_doc is not None and self.doc_chunk_indices
+                and not dense_only):
             try:
                 tokenized = self.tokenize(expanded, "doc")
                 results, _ = self.bm25_doc.retrieve(

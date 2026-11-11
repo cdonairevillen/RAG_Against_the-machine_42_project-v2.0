@@ -101,13 +101,47 @@ def run_dataset(retriever: Retriever, name: str, k: int,
         ).model_dump_json(indent=2))
 
     metrics = Evaluator().compute_recall(student_path, answered, k=k)
-    return {
+    out = {
         "recall_at_k": {
             str(kv): round(v, 4) for kv, v in metrics["recall_at_k"].items()
         },
         "seconds": round(seconds, 2),
         "questions": metrics["total"],
     }
+    valid_path = os.path.join(datasets_dir, "valid_sources.json")
+    if os.path.isfile(valid_path):
+        with open(valid_path, encoding="utf-8") as fh:
+            valid = json.load(fh)
+        out["recall_any_at_k"] = recall_any(results, valid, k)
+        print(f"  {name}: R@k with any valid source "
+              f"{out['recall_any_at_k']}")
+    return out
+
+
+def recall_any(results: list[MinimalSearchResults],
+               valid: dict[str, list[list[Any]]],
+               k: int) -> dict[str, float]:
+    """Complementary recall (film, FASE_9.md 9b): a question counts when
+    any of its top-k sources overlaps at least 5% (the 42 rule) with ANY
+    of its valid sources, instead of with all of them. The 42 evaluator
+    is not changed (D4)."""
+    overlap = Evaluator().overlap_ratio
+    cutoffs = sorted({1, 3, 5, k})
+    hits = {kv: 0 for kv in cutoffs}
+    counted = 0
+    for entry in results:
+        gts = [tuple(v) for v in valid.get(entry.question_id, [])]
+        if not gts:
+            continue
+        counted += 1
+        found = [(s.file_path, s.first_character_index,
+                  s.last_character_index) for s in entry.retrieved_sources]
+        for kv in cutoffs:
+            if any(overlap(gt, ret) >= 0.05
+                   for gt in gts for ret in found[:kv]):
+                hits[kv] += 1
+    return {str(kv): round(hits[kv] / counted, 4) if counted else 0.0
+            for kv in cutoffs}
 
 
 def load_history(results_dir: str = RESULTS_DIR) -> list[dict[str, Any]]:

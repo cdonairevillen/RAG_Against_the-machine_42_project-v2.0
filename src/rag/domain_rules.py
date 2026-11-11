@@ -7,6 +7,7 @@ can see is decided here. Configured per source in rag.toml.
 import re
 from typing import Optional
 
+from src.models import MinimalSource
 from src.config import RagConfig, SourceConfig
 from src.rag.language import detect_language
 
@@ -76,6 +77,17 @@ class DomainRules:
         """The domain's own rule 6, or None to keep the model's."""
         source = self.sources.get(domain or "")
         return source.style_rule if source else None
+
+    def context_order(self, sources: list[MinimalSource],
+                      domain: Optional[str]) -> list[MinimalSource]:
+        """The sources in the order the LLM reads them: relevance order,
+        or document order (file, then position) for a domain with
+        chronological_context."""
+        source = self.sources.get(domain or "")
+        if source is None or not source.chronological_context:
+            return sources
+        return sorted(sources, key=lambda s: (s.file_path,
+                                              s.first_character_index))
 
     def not_found_message(self, domain: Optional[str],
                           question: str) -> Optional[str]:

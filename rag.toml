@@ -174,7 +174,7 @@ include = [".md", ".py"]
 exclude_dirs = [
     "data", "bench", "web", "tests", "llm_sdk", "__pycache__",
     "node_modules", "PLANING.md", "RESPUESTA.md", "Elements_frontend.md",
-    "CLAUDE.md", "IMPORTANTE.md", "PLAN_FASES_9_10.md",
+    "CLAUDE.md", "IMPORTANTE.md", "PLAN_FASES_9_10.md", "LLM_EXTERNO.md",
 ]
 # deploy/space/README.md is the old Hugging Face Space card (the
 # deployment is on Oracle): the project's README covers it.
@@ -263,11 +263,23 @@ web = false
 # in the top 5 for 9/14 Spanish questions instead of 4/14 (English 11/14
 # either way). The global setting stays off (it lowers the vLLM docs).
 rerank_doc_branch = true
+# Doc branch without BM25 (dense list only, then the reranker): the
+# corpus is English, so BM25 finds nothing for Spanish questions and its
+# list buried the dense hits in the fusion (FASE_9.md 9b).
+bm25_in_doc_branch = false
+# Sources in film order (time) in the LLM context, not relevance order.
+chronological_context = true
 # Own gate (`gate_scores`, 40 questions per group, FASE_9.md 9b): the
 # global 0.0 rejected 71% (en) / 71% (es) of the film questions; -3.0
 # accepts 79% / 71%. Spanish out-of-domain questions score high on every
 # domain: route-bench checks which domain wins them.
-relevance_threshold = -3.0
+relevance_threshold = -2.0
+
+# The generated summaries (<Title>.summaries.md, film_enrich.py): one
+# chunk per section, so a profile is never packed with the last scene
+# summary (and cited or played with its clip). DEC-55.
+[sources.film.chunkers]
+".summaries.md" = "markdown_sections"
 
 # Optional profiles: extra models as explicit options on top of the
 # stable base above (which is what the official benchmark uses and gives

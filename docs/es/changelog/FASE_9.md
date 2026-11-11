@@ -204,6 +204,108 @@ El coste del umbral: 8 de 1 190 preguntas de XQuAD en español (−0.7 puntos). 
 
 Los "not found" en falso son todos sin la respuesta en el contexto (columna "with answer in ctx" a 0.00): fallos de búsqueda o de enrutado, no del LLM. El `150-film-q06` (anoche) da las mismas cifras de calidad que el `151`.
 
+### `film` sin BM25 en la rama de documentos (`152`)
+
+El corpus de `film` es todo inglés. Posición de la respuesta por lista (`film_ranks.py`, `152-ranks`; respuesta entre las 5 primeras, de 14):
+
+| Lista | EN | ES |
+|---|---|---|
+| BM25 solo | 10 | **0** |
+| Embeddings (`bge-m3`) solos | 11 | **11** |
+| BM25 + embeddings (RRF) | 11 | 5 |
+| Final (con el reranker) | 11 | 9 |
+
+BM25 no encuentra nada con palabras en español y su lista enterraba los aciertos de los embeddings en la fusión. Simulado (`film_variants.py`): embeddings + reranker (RRF, 15 candidatos) da **12 / 12**; el reranker grande (DEC-48) daba 12 / 9.
+
+**Aplicado:** campo `bm25_in_doc_branch` por fuente (por defecto `true`), `false` solo en `film`. Medido:
+
+| | Antes (`148`/`151`) | Sin BM25 (`152`) |
+|---|---|---|
+| `film` R@1/3/5/10 EN (route-bench) | 0.21 / 0.50 / 0.57 / 0.71 | **0.29 / 0.57 / 0.64 / 0.71** |
+| `film` R@1/3/5/10 ES (route-bench) | 0.07 / 0.14 / 0.29 / 0.57 | **0.14 / 0.50 / 0.57 / 0.71** |
+| Respuesta en las 5 primeras EN / ES | 11 / 9 | **12 / 12** |
+| xquad/es a su dominio | 1 152 | **1 156** (5 a `film`, antes 10) |
+| 42 | — | **idéntico** (`152-vllm-check`) |
+| `gen-bench` 0.6B, contiene EN / ES | 0.36 / 0.07 | 0.43 / 0.00 |
+| `gen-bench` 1.7B, contiene EN / ES | 0.43 / 0.29 | 0.36 / 0.21 |
+
+La búsqueda mejora, la generación no. Diagnóstico (`film_gate_check.py`): con o sin BM25, la respuesta llega al modelo **y pasa el filtro** en 9–10 / 14 (EN) y 7 / 14 (ES). El cuello de botella es el filtro: el reranker puntúa bajo los tramos correctos con preguntas en español (−3.3 a −3.7, umbral −3.0). Con 14 preguntas, cada una vale 0.07: la bajada del `gen-bench` está en el ruido. **Propuesta:** mantenerlo y recalibrar el umbral tras el enriquecimiento (cambiará las puntuaciones). Pendiente de tu decisión.
+
+### Contexto en orden de película (A, `153`)
+
+Campo `chronological_context` por fuente (solo `film`): las fuentes que pasan el filtro se ordenan por película y posición (el tiempo) antes de numerarlas [1]…[n]; cada tramo lleva su minuto en la cabecera. Se aplica en el flujo directo y en el del agente.
+
+| `gen-bench` (contiene EN / ES) | Sin orden (`152`) | Con orden (`153`) |
+|---|---|---|
+| 0.6B | 0.43 / 0.00 | 0.29 / 0.00 |
+| 1.7B | 0.36 / 0.21 | **0.57** / 0.14 |
+
+Mixto y dentro del ruido: el 1.7B gana 3 preguntas en inglés y pierde 1 en español; el 0.6B pierde 2 en inglés. Las 14 preguntas son de diálogo directo, donde el orden apenas importa; la A apunta a las preguntas de "primera vez" y de secuencia (film-15 a film-22, propuestas). Se decide con ellas.
+
+### Preguntas nuevas: personajes, "primera vez" y visuales (`154`, `155`)
+
+**Aprobado por ti:** se mantiene `bm25_in_doc_branch = false` en `film`. Set ampliado a 22 preguntas por idioma (film-15 a film-22, con menos peso en Asno y el Gato, a petición tuya): primera aparición de Asno y del dragón, DuLoc, quién es el Gato con Botas, el pantano de Shrek, el secreto de Fiona, el color del dragón y la madre del Príncipe Encantador. La prueba de film-15 es la primera frase de Asno (tramo 00:04:49, confirmado por ti); la respuesta "00:05" vale para esa escena.
+
+Recuperación (22 preguntas): EN 0.23 / 0.41 / 0.55 / 0.77, ES 0.14 / 0.36 / 0.50 / 0.59; respuesta entre las 5 primeras en 15 / 22 en los dos idiomas. De las nuevas, solo encuentra DuLoc, el color del dragón y la madre de Encantador; fallan las de "primera vez", "quién es el Gato", el pantano y el secreto de Fiona, como se esperaba.
+
+**La A con las 22 preguntas** (contiene la respuesta, EN / ES):
+
+| Modelo | Sin orden | Con orden de película |
+|---|---|---|
+| 0.6B | 0.27 / 0.05 | 0.23 / 0.05 |
+| 1.7B (el de la web) | 0.23 / 0.18 | **0.41** / 0.14 |
+
+El 1.7B gana 4 preguntas en inglés y pierde 1 en español; las citas correctas suben en español (0.75 → 0.88). El 0.6B pierde 1. **Se mantiene encendida** (`chronological_context = true`); no resuelve las preguntas de "primera vez", que siguen esperando al enriquecimiento.
+
+### Enriquecimiento: resúmenes de escena y fichas de personaje (`156`–`163`, DEC-50 a DEC-54)
+
+Opción C de las causas de abajo, decidida contigo: ventanas de 3 minutos y dos capas (resúmenes de escena y fichas de personaje). Código en `src/rag/sources/film_enrich.py`, `make film-enrich` (`ENRICH_PROVIDER=nvidia` para la API). Se añade al final del `.md` de cada película, sin mover los tramos (las pruebas del benchmark siguen valiendo); las cabeceras de los resúmenes llevan su rango de tiempo, así que la web reproduce su clip.
+
+**Ejecuciones:**
+1. **Qwen3-4B, primera (`156`):** bucle en la lista de personajes ("Man in Medieval Clothing" decenas de veces) y fichas de "Princess" o "Knight". Parada.
+2. **Qwen3-4B, segunda (`157`):** sin bucles, pero con errores que confirmaste: el Hada Madrina como madre de Fiona, Harold confuso, Pinocho "central character", fichas vacías de Lillian y Gingy, una ficha de "Dad", el Gato duplicado y la primera aparición de Asno en el minuto 13.
+3. **Nemotron 3.5 Lightning por la API (`158`, `159`, DEC-50):** tus correcciones salen bien (Encantador hijo del Hada Madrina, Lillian madre de Fiona, Harold padre de Fiona, Gingy la galleta). Asno, primera mención en 00:03:07–00:06:26 (su primera frase es a las 4:49). 3 min 50 s, sin GPU.
+
+**Reglas del código** (DEC-51): un nombre solo cuenta si está en el texto de su ventana; fuera los cargos y nombres comunes; los alias se unen ("Puss" → "Puss In Boots"); las menciones las busca el código, así que la ficha dice "First mentioned in the scene…"; la ficha se escribe también con las líneas de diálogo que nombran al personaje. **Nombre en español dado por el modelo** (DEC-52): falla en Asno (da "Burro").
+
+**Medidas** (umbral −2.0, DEC-53):
+
+| | Antes (`154`/`155`) | Con enriquecimiento (`160`–`163`) |
+|---|---|---|
+| R@1/3/5/10 oficial EN | 0.23 / 0.41 / 0.55 / 0.77 | 0.00 / 0.05 / 0.27 / 0.41 |
+| R@1/3/5/10 oficial ES | 0.14 / 0.36 / 0.50 / 0.59 | 0.05 / 0.14 / 0.27 / 0.41 |
+| **R@k con cualquier fuente válida EN** | (= oficial) | **0.45 / 0.68 / 0.82 / 0.91** |
+| **R@k con cualquier fuente válida ES** | (= oficial) | **0.41 / 0.64 / 0.77 / 0.91** |
+| Filtro: preguntas de `film` que pasan (EN / ES) | 0.79 / 0.71 (−3.0) | **0.91 / 0.91** (−2.0) |
+| 0.6B contiene / "not found" en falso (EN) | 0.23 / 0.32 | **0.50 / 0.09** |
+| 0.6B contiene / "not found" en falso (ES) | 0.05 / 0.27 | **0.27 / 0.09** |
+| 1.7B contiene / "not found" en falso (EN) | 0.41 / 0.27 | **0.59 / 0.14** |
+| 1.7B contiene / "not found" en falso (ES) | 0.14 / 0.27 | **0.27 / 0.23** |
+| `film` a su dominio (route-bench) | 12 / 14 | **21 / 22** (EN y ES) |
+| XQuAD a su dominio EN / ES | 1 167 / 1 156 (`152`) | 1 164 / 1 153 (`162`) |
+| 42, CV, "about" | — | **idénticos** (`161-vllm-check`, `162`) |
+
+**Error mío** (DEC-54): un `sed` cambió también el umbral del CV durante el `route-bench` `161`; se paró, se restauró y se repitió (`162`).
+
+**Pruebas en la web (2026-11-11, 1.7B):**
+- "Donkey, first appear" → "the scene 00:03:07 - 00:06:26" ✅
+- "¿Quién es Farquaad?" → el antagonista, gobernante de DuLoc ✅ (antes lo describía como un ogro verde). Añade "El nombre español de Farquaad es…", sobrante.
+- "Who is Prince Charming's mother?" → el Hada Madrina ✅
+- "¿Quién es Lillian?" → la reina, madre de Fiona ✅
+- "¿Quién es el Gato con Botas?" → "un gato de pelaje marrón" en *Shrek 2*: pobre, no dice que lo contrataron para matar a Shrek.
+- "¿Cuándo aparece Asno por primera vez en Shrek?" → "no aparece en las fuentes" ❌: el corpus dice "Donkey" y la ficha "Burro" (DEC-52).
+
+### Causas de los fallos de razonamiento (pregunta tuya)
+
+Ejemplos tuyos: "¿cuándo es la primera aparición de Asno?" y "¿quién es el Gato con Botas?". La información está en el índice (Asno, tramo 00:05:20 de *Shrek*; el Gato, 00:34:31 de *Shrek 2*). Causas:
+1. **"La primera vez" es una agregación:** el RAG ve 5 tramos, no puede saber que no hay uno anterior. Ningún modelo lo arregla solo.
+2. **Los subtítulos no dicen quién habla.**
+3. **Las descripciones no nombran a los personajes** ("a grey donkey", "a ginger cat with a black hat").
+4. **"¿Quién es X?" pide unir varios tramos**, lo que peor hacen los modelos pequeños.
+5. **Nombres en otro idioma** (Asno / Donkey, Gato con Botas / Puss in Boots): resuelto en parte por `152`.
+
+Opciones valoradas: A (orden de película, hecha), C (resúmenes por personaje y escena generados offline, siguiente paso), traducir la pregunta o una herramienta de búsqueda por tiempo en el agente (Fase 10), diarización y reconocimiento de personajes (coste alto).
+
 ## Ficheros cambiados
 
 | Fichero | Cambio |
@@ -223,3 +325,15 @@ Los "not found" en falso son todos sin la respuesta en el contexto (columna "wit
 | `web/src/api.ts`, `App.tsx`, `index.css` | Reproductor del fragmento en las tarjetas de `film` |
 | `tests/test_film.py` | Nuevo |
 | `docs/es/decisions.md` | DEC-40 a DEC-44 |
+| `src/config.py`, `src/rag/retriever.py`, `rag.toml` | `bm25_in_doc_branch` (global y por fuente), `false` en `film` |
+| `src/config.py`, `src/rag/domain_rules.py`, `src/rag/pipeline.py`, `src/agent/agent.py`, `rag.toml` | `chronological_context` por fuente (`context_order`), `true` en `film` |
+| `tests/test_config.py`, `tests/test_domain_rules.py` | Tests de los dos campos |
+| `src/rag/sources/film_enrich.py` | Nuevo: enriquecimiento (resúmenes de escena y fichas de personaje), generador local y por API compatible con OpenAI |
+| `src/rag/sources/film.py` | `enrich()`, `transcript_sections()`, `enrichment_text()` (la caché más reciente), cabecera de resumen en `SECTION_HEADER`, `valid_sources()` |
+| `src/cli.py`, `Makefile` | `enrich_film` / `make film-enrich` (`FILM`, `ENRICH_MODEL`, `ENRICH_PROVIDER`) |
+| `src/evaluation/bench.py` | `recall_any`: R@k con cualquier fuente válida (solo si existe `valid_sources.json`) |
+| `rag.toml` | `film`: `relevance_threshold = -2.0`; `LLM_EXTERNO.md` fuera de "about" |
+| `tests/test_film.py` | Tests del enriquecimiento y de las fuentes válidas |
+| `docs/es/LLM_EXTERNO.md` | Nuevo: requisitos, modelos de NVIDIA probados y lo que tienes que hacer tú |
+| `docs/es/decisions.md` | DEC-49 a DEC-54 |
+

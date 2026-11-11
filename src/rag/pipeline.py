@@ -116,6 +116,7 @@ class RagPipeline:
         else:
             sources = self.retriever.search_for_generation(question, k=k)
         seconds_retrieval = time.perf_counter() - start
+        sources = self.rules.context_order(sources, self.answered_domain())
         blocks = build_context_blocks(
             sources, self.retriever.get_parent_chunk_map(), self.rules
         )

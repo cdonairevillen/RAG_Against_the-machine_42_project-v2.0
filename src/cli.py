@@ -310,6 +310,33 @@ class CLI:
             print(f"No films found in {films_dir or film.FILMS_DIR} "
                   f"(one folder per film, with its video).")
 
+    def enrich_film(self, only: Optional[str] = None,
+                    model: Optional[str] = None,
+                    provider: str = "local") -> None:
+        """Add generated summaries to every film's Markdown file: scene
+        summaries (3-minute windows) and character profiles, written by
+        a local LLM (Qwen3-4B by default; see
+        src/rag/sources/film_enrich.py). Offline and GPU-heavy (stop the
+        API). Then: make index SOURCE=film.
+
+        Args:
+            only: Title (folder name) of a single film.
+            model: Hugging Face id of the LLM, or the provider's id.
+            provider: 'local' (llm_sdk) or 'nvidia' (OpenAI-compatible
+                API, key NVIDIA_API_KEY in .env; no GPU needed).
+        """
+        from src.rag.sources import film
+
+        try:
+            written = film.enrich(only=only, model=model,
+                                  provider=provider)
+        except (ImportError, OSError, ValueError) as exc:
+            print(f"Error enriching the films: {exc}")
+            return
+        if not written:
+            print(f"No film Markdown files in {film.OUTPUT_DIR} "
+                  f"(run make film first).")
+
     def embed_children(self, ingester: "Ingester") -> dict:
         """Embed every child chunk with the configured model.
 

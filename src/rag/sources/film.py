@@ -113,8 +113,19 @@ def frame_name(seconds: float) -> str:
 
 # --- what the web shows -------------------------------------------------
 
+# The generated summaries of a film live in their own file, one chunk
+# per section (DEC-55): never packed with the film or with each other.
+SUMMARIES_SUFFIX = ".summaries.md"
+# A character profile has no header time: its clip is the first section
+# of the film that names the character (film_enrich.render()).
+FIRST_NAMED = re.compile(
+    r"^First named in the film at (\d{2}):(\d{2}):(\d{2}) - "
+    r"(\d{2}):(\d{2}):(\d{2})\.", re.M)
+# Transcript sections and, with the suffix, the generated scene
+# summaries (film_enrich.py), so the web plays the clip of both.
 SECTION_HEADER = re.compile(
-    r"^## (\d{2}):(\d{2}):(\d{2}) - (\d{2}):(\d{2}):(\d{2})\s*$", re.M)
+    r"^## (\d{2}):(\d{2}):(\d{2}) - (\d{2}):(\d{2}):(\d{2})"
+    r"(?: \(scene summary\))?\s*$", re.M)
 
 
 def film_id(title: str) -> str:
@@ -124,14 +135,23 @@ def film_id(title: str) -> str:
 
 
 def title_of(file_path: str) -> str:
-    """Film title of a chunk's file (data/film/<Title>.md)."""
-    return os.path.splitext(os.path.basename(file_path))[0]
+    """Film title of a chunk's file (data/film/<Title>.md, or its
+    generated summaries, <Title>.summaries.md)."""
+    name = os.path.basename(file_path)
+    if name.endswith(SUMMARIES_SUFFIX):
+        return name[:-len(SUMMARIES_SUFFIX)]
+    return os.path.splitext(name)[0]
+
+
+def is_summary(file_path: str) -> bool:
+    """Whether a chunk comes from a film's generated summaries."""
+    return file_path.endswith(SUMMARIES_SUFFIX)
 
 
 def clip_of(text: str) -> Optional[tuple[float, float]]:
     """(start, end) seconds spanned by the sections of a chunk's text,
     or None if it holds no section header."""
-    found = SECTION_HEADER.findall(text)
+    found = SECTION_HEADER.findall(text) or FIRST_NAMED.findall(text)
     if not found:
         return None
     first, last = found[0], found[-1]
@@ -597,12 +617,104 @@ def prepare(films_dir: str = FILMS_DIR, output_dir: str = OUTPUT_DIR,
             save_json(path, captions)
 
         out = os.path.join(output_dir, f"{title}.md")
+        text = render(title, shots, lines, captions, data["source"])
         with open(out, "w", encoding="utf-8", newline="\n") as fh:
-            fh.write(render(title, shots, lines, captions, data["source"]))
+            fh.write(text)
         written.append(out)
+        if write_summaries(output_dir, title, work):
+            written.append(summaries_path(output_dir, title))
         print(f"  wrote {out}")
     if captioner is not None:
         captioner.close()
+    return written
+
+
+# --- enrichment (film_enrich.py) ----------------------------------------
+
+GENERATED = "\n# Generated summaries"
+
+
+def summaries_path(output_dir: str, title: str) -> str:
+    """The film's generated summaries file."""
+    return os.path.join(output_dir, f"{title}{SUMMARIES_SUFFIX}")
+
+
+def write_summaries(output_dir: str, title: str, work: str,
+                    data: Optional[dict] = None) -> bool:
+    """Write the film's summaries file from `data` or, by default, its
+    newest cached enrichment. Returns False when there is none."""
+    from src.rag.sources import film_enrich
+
+    if data is None:
+        path = film_enrich.newest_cache(work)
+        if path is None:
+            return False
+        data = load_json(path)
+    with open(summaries_path(output_dir, title), "w", encoding="utf-8",
+              newline="\n") as fh:
+        fh.write(film_enrich.render(data, data.get("model", "")))
+    return True
+
+
+def transcript_sections(text: str) -> list[tuple[float, float, str]]:
+    """(start, end, text) of every transcript section of a film's
+    Markdown file (generated summaries excluded)."""
+    text = text.split(GENERATED, 1)[0]
+    found = [m for m in SECTION_HEADER.finditer(text)
+             if "(scene summary)" not in m.group(0)]
+    out = []
+    for i, match in enumerate(found):
+        g = [int(x) for x in match.groups()]
+        end_at = found[i + 1].start() if i + 1 < len(found) else len(text)
+        out.append((float(g[0] * 3600 + g[1] * 60 + g[2]),
+                    float(g[3] * 3600 + g[4] * 60 + g[5]),
+                    text[match.start():end_at].strip()))
+    return out
+
+
+def enrich(output_dir: str = OUTPUT_DIR, only: Optional[str] = None,
+           model: Optional[str] = None,
+           provider: str = "local") -> list[str]:
+    """Add the generated summaries (scene summaries and character
+    profiles, film_enrich.py) to every film's Markdown file. Needs the
+    files from prepare(); GPU-heavy (a local LLM), so the API should be
+    stopped. Cached: a re-run only generates what is missing.
+
+    Returns:
+        The Markdown files rewritten.
+    """
+    from src.rag.sources import film_enrich
+
+    model = model or film_enrich.DEFAULT_MODEL
+    generate: Optional[film_enrich.Generate] = None
+    written = []
+    for name in sorted(os.listdir(output_dir)):
+        title, ext = os.path.splitext(name)
+        if ext != ".md" or name.endswith(SUMMARIES_SUFFIX) \
+                or (only and title != only):
+            continue
+        path = os.path.join(output_dir, name)
+        with open(path, encoding="utf-8", newline="") as fh:
+            base = fh.read().split(GENERATED, 1)[0].rstrip("\n")
+        work = os.path.join(output_dir, WORK_DIR, title)
+        os.makedirs(work, exist_ok=True)
+        cache = film_enrich.cache_path(work, model)
+        cached = load_json(cache) if os.path.isfile(cache) else None
+        if generate is None:
+            generate = film_enrich.local_generator(model) \
+                if provider == "local" \
+                else film_enrich.api_generator(model, provider)
+        print(f"{title}: enriching with {model} ({provider})")
+        result = film_enrich.enrich_film(
+            title, transcript_sections(base), generate, cached)
+        result["model"] = model
+        save_json(cache, result)
+        # Earlier runs appended the summaries to the film's file.
+        with open(path, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(base + "\n")
+        write_summaries(output_dir, title, work, result)
+        written.append(summaries_path(output_dir, title))
+        print(f"  wrote {summaries_path(output_dir, title)}")
     return written
 
 
@@ -663,4 +775,61 @@ def build_bench(output_dir: str = OUTPUT_DIR,
                       encoding="utf-8", newline="\n") as fh:
                 fh.write(RagDataset(rag_questions=list(items))
                          .model_dump_json(indent=2))
+    valid = {}
+    for q in questions:
+        extra = summaries_path(output_dir, q["film"])
+        summary_text = ""
+        if os.path.isfile(extra):
+            with open(extra, encoding="utf-8", newline="") as fh:
+                summary_text = fh.read()
+        valid[q["id"]] = valid_sources(
+            texts[spans[q["id"]][0]], spans[q["id"]],
+            q.get("characters", []), extra.replace(os.sep, "/"),
+            summary_text)
+    save_json(os.path.join(bench_dir, VALID_SOURCES), valid)
     return len(questions)
+
+
+# Every source that answers a question (FASE_9.md 9b, your decision): the
+# evidence, the generated scene summary of its window and the profiles of
+# the characters it is about ("characters" in questions.json). Used by
+# the complementary "any valid source" recall of the film suite; the 42
+# evaluator (one source per question, all required) is not changed.
+VALID_SOURCES = "valid_sources.json"
+ANY_HEADER = re.compile(r"^## .*$", re.M)
+PROFILE_HEADER = re.compile(r"^## Character: (.+?)\s*$", re.M)
+
+
+def valid_sources(text: str, evidence: tuple[str, int, int],
+                  characters: list[str], summaries_file: str = "",
+                  summaries: str = "") -> list[list[Any]]:
+    """[file_path, first, last] of every valid source of a question: its
+    evidence span in the film (`text`), and from the film's summaries
+    file (`summaries`, at `summaries_file`) the scene summary whose
+    window holds the evidence and the profiles of `characters` (matched
+    by name key)."""
+    from src.rag.sources.film_enrich import name_key
+
+    path, first, last = evidence
+    out: list[list[Any]] = [[path, first, last]]
+    headers = list(ANY_HEADER.finditer(summaries))
+
+    def section(match: re.Match) -> list[Any]:
+        later = [h.start() for h in headers if h.start() > match.start()]
+        return [summaries_file, match.start(),
+                later[0] if later else len(summaries)]
+
+    before = list(SECTION_HEADER.finditer(text[:first]))
+    if before:
+        g = [int(x) for x in before[-1].groups()]
+        at = g[0] * 3600 + g[1] * 60 + g[2]
+        for m in SECTION_HEADER.finditer(summaries):
+            h = [int(x) for x in m.groups()]
+            if h[0] * 3600 + h[1] * 60 + h[2] <= at \
+                    < h[3] * 3600 + h[4] * 60 + h[5]:
+                out.append(section(m))
+    wanted = {name_key(c) for c in characters}
+    for m in PROFILE_HEADER.finditer(summaries):
+        if name_key(m.group(1)) in wanted:
+            out.append(section(m))
+    return out

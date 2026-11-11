@@ -580,14 +580,22 @@ def film_clip(domain: str, file_path: str, text: str) -> dict[str, Any]:
     can play (film id, start and end seconds; Phase 9, DEC-44)."""
     if domain != "film":
         return {}
-    from src.rag.sources.film import clip_of, film_id, stamp, title_of
+    from src.rag.sources.film import (
+        PROFILE_HEADER, clip_of, film_id, is_summary, stamp, title_of,
+    )
 
     title = title_of(file_path)
     span = clip_of(text)
+    # Generated summaries say so (DEC-55): "summary" or the character.
+    kind = ""
+    if is_summary(file_path):
+        profile = PROFILE_HEADER.search(text)
+        kind = f" · {profile.group(1)} (profile)" if profile \
+            else " · summary"
     if span is None:
-        return {"title": title}
+        return {"title": title + kind}
     return {
-        "title": f"{title} · {stamp(span[0])}",
+        "title": f"{title}{kind} · {stamp(span[0])}",
         "clip": {"film": film_id(title), "start": span[0], "end": span[1]},
     }
 

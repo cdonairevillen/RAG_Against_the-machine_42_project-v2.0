@@ -216,7 +216,7 @@ class Ingester:
                 self.chunking.code_chunk_size if chunk_type == "code"
                 else self.chunking.doc_chunk_size
             )
-            chunker = get_chunker(self.source.chunker_for(ext))
+            chunker = get_chunker(self.source.chunker_for(abs_path))
             file_chunks = chunker(rel_path, content, max_size)
             if self.source.skip_marked:
                 # A section that was entirely blanked leaves no chunk.

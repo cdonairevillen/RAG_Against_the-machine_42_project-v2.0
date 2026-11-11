@@ -40,3 +40,22 @@ def test_rules_per_domain_and_not_found_message() -> None:
         "I don't know."
     )
     assert rules.not_found_message("vllm", "anything") is None
+
+
+def test_chronological_context_orders_by_file_and_position() -> None:
+    from src.models import MinimalSource
+
+    def src(path: str, start: int) -> MinimalSource:
+        return MinimalSource(file_path=path, first_character_index=start,
+                             last_character_index=start + 10)
+
+    rules = DomainRules(RagConfig(sources={
+        "film": SourceConfig(root="r", include=[".md"],
+                             chronological_context=True),
+        "vllm": SourceConfig(root="r", include=[".md"]),
+    }))
+    found = [src("b.md", 5), src("a.md", 900), src("a.md", 30)]
+    assert rules.context_order(found, "film") == [
+        src("a.md", 30), src("a.md", 900), src("b.md", 5)]
+    assert rules.context_order(found, "vllm") == found
+    assert rules.context_order(found, None) == found

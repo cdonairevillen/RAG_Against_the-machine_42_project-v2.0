@@ -889,3 +889,84 @@ Medido con 14 preguntas de diálogo (`142`–`144`, `FASE_9.md` §9b). Las descr
 | B. Desactivar IPv6 o tocar el `hosts` de Windows | Arregla todos los programas | Cambia el sistema, fuera del proyecto |
 
 **Reversible:** sí. La copia de `deploy/stage/` se regenera con `make space-stage`.
+
+## DEC-50 — El enriquecimiento de `film` se genera con Nemotron Lightning (API de NVIDIA), no con Qwen3-4B
+
+**Contexto (2026-11-11, mientras comías; me diste vía libre):** elegiste Qwen3-4B, ventanas de 3 minutos y las dos capas (resúmenes de escena y fichas de personaje, `FASE_9.md` §9b). La segunda ejecución con el 4B (la primera tenía bucles en la lista de personajes) salió con errores que tú confirmaste:
+- El Hada Madrina como madre de Fiona.
+- Harold confuso.
+- Pinocho "central character".
+- Fichas vacías de Lillian y Gingy, y una ficha de "Dad".
+- Dos fichas para el Gato.
+- La primera aparición de Asno en el minuto 13.
+
+**Decidido:** repetirlo con `nvidia/nemotron-3.5-lightning-30b-a3b` por la API (la clave ya estaba en `.env`, `LLM_EXTERNO.md`), con el razonamiento apagado. Es solo para la ingesta: la web no cambia de modelo. Coste: unas 80 llamadas, 3 min 50 s, sin GPU.
+
+| Opción | A favor | En contra |
+|---|---|---|
+| A. Qwen3-4B local (tu elección) | Todo local; misma familia que la base | Errores de identidad y relaciones; 8 GB de GPU con la API parada |
+| **B. Lightning por la API** ✅ | Tus correcciones salen bien: Encantador hijo del Hada Madrina, Lillian madre de Fiona, Harold padre de Fiona, Gingy la galleta, el Gato contratado… | Depende de NVIDIA para regenerar (la caché queda en `data/film/.work/`); algún detalle inventado menor (ver revisión en `FASE_9.md`) |
+| C. Indexar el resultado del 4B tal cual | Rápido | Metería errores en el índice |
+
+**Reversible:** sí. Las dos cachés se guardan (`enrichment-qwen3-4b.json`, `enrichment-nemotron-3.5-lightning-30b-a3b.json`) y `make film` usa la más reciente. Para volver al 4B: `make film-enrich` (sin `ENRICH_PROVIDER`) y reindexar.
+
+## DEC-51 — Qué es un personaje y cuándo aparece lo decide el código, no el modelo
+
+**Contexto:** tus correcciones y la revisión de las dos primeras ejecuciones.
+
+**Decidido** (`src/rag/sources/film_enrich.py`):
+- **Un nombre solo cuenta si está escrito en el texto de su ventana.** Además, no puede ser un cargo ni un nombre común (lista `GENERIC`: Princess, Knight, Captain, Dad, Mom, Cat, Handsome…) y tiene tres palabras como mucho. Así salen "Woman in Green Dress", "Dad" o "Knight".
+- **Los alias se unen.** Una clave de una palabra que empieza o termina exactamente otra más larga es el mismo personaje: "Puss" → "Puss In Boots", "Godmother" → "Fairy Godmother". Los nombres se buscan aunque haya puntuación en medio ("Puss... in Boots!").
+- **Las ventanas de un personaje** son las que el modelo listó más las que **mencionan** su nombre en el texto, buscadas por el código ("a talking donkey" cuenta para Asno aunque el modelo no lo liste). Por eso la ficha dice **"First mentioned in the scene…"** y no "first appears". Es una mención, y en el prólogo de *Shrek* se menciona al dragón antes de verlo.
+- **La ficha se escribe con los resúmenes y las líneas de diálogo que nombran al personaje**, elegidas por el código (hasta 15). Así Lillian y Gingy tienen ficha.
+- **Una ficha que solo dice "no se menciona"** se descarta; quedan los datos de mención.
+
+**Reversible:** sí, todo está en un fichero, con tests en `tests/test_film.py`.
+
+## DEC-52 — Nombre en español de cada personaje, dado por el modelo y marcado como tal
+
+**Contexto:** tu pregunta "Primera aparición de Asno" daba "no se encuentra": el corpus dice "Donkey", y la búsqueda no une "Asno" con "Donkey".
+
+**Decidido:** la ficha pide al modelo el nombre del personaje en la versión de España y lo escribe como `Spanish name (given by the model): …`. Es conocimiento del modelo, no de la película, y por eso va marcado.
+
+**Problema conocido:** para Asno, Lightning da **"Burro"** (el doblaje latinoamericano), no "Asno". El Hada Madrina sale como "hada madrina", que es correcto. Si se quiere exactitud, la alternativa es una tabla de nombres que escribas tú (son datos estructurados, que preferías evitar) o pedir los dos doblajes.
+
+| Opción | A favor | En contra |
+|---|---|---|
+| **A. Nombre del modelo, marcado** ✅ | Sin trabajo manual; ayuda a la búsqueda en español | Puede fallar (Burro / Asno) |
+| B. Tabla tuya de nombres | Exacta | Trabajo manual, datos estructurados |
+| C. Sin nombre en español | Nada inventado | Las preguntas en español con nombres traducidos siguen fallando |
+
+**Reversible:** sí, una línea del prompt y otra del render.
+
+## DEC-53 — Se indexa el enriquecimiento de `film`, con umbral −2.0 y una métrica complementaria
+
+**Contexto:** el enriquecimiento de Lightning (DEC-50) medido con las 22 preguntas (`160`–`163`, `FASE_9.md` §9b). La web vuelve a estar arriba con él.
+
+**Decidido (con tu vía libre):**
+1. **Se indexa.** La generación mejora como nunca en `film`:
+   - El 0.6B contiene la respuesta en 0.50 (EN) / 0.27 (ES), antes 0.23 / 0.05.
+   - El 1.7B, en 0.59 / 0.27, antes 0.41 / 0.14.
+   - Los "not found" en falso caen a la tercera parte.
+2. **Umbral de `film`: −3.0 → −2.0.** Con el enriquecimiento las preguntas de `film` puntúan mucho más alto: con −2.0 pasa el 91 % (EN y ES), y de los demás dominios pasa como mucho el 10 %, salvo las preguntas trampa del CV en español (30 %).
+3. **Métrica complementaria "R@k con cualquier fuente válida"** (decisión tuya: el resumen y la ficha cuentan como fuente válida). El evaluador de 42 exige todas las fuentes del ground truth y no se toca (D4), así que va aparte (`recall_any` en `src/evaluation/bench.py`, `valid_sources.json`). Con ella: EN 0.45 / 0.68 / 0.82 / 0.91 y ES 0.41 / 0.64 / 0.77 / 0.91. La oficial baja (R@5 0.55 → 0.27 en EN) porque los resúmenes ocupan los primeros puestos y no son "el tramo".
+4. **Qué ficha vale para cada pregunta** (campo `characters` de `questions.json`), elegido por mí:
+   - film-02 y film-16: Farquaad.
+   - film-12: Harold y el Gato.
+   - film-15: Asno.
+   - film-17: el Gato.
+   - film-20: Fiona.
+   - film-21: el dragón.
+   - film-22: Encantador y el Hada Madrina.
+
+   A revisar contigo.
+
+**Coste medido (`162`):** XQuAD pierde preguntas hacia `film`: 3 en inglés (1 167 → 1 164) y 3 en español (1 156 → 1 153). XQuAD ya no es prioridad (2026-11-11). CV, "about" y 42 quedan idénticos. `film` llega a su dominio en 21 / 22 preguntas por idioma (antes 12 / 14).
+
+**Reversible:** sí. Sin enriquecimiento: copia en `data/output/fase9/md-before-enrich/`, `make index SOURCE=film` y umbral −3.0.
+
+## DEC-54 — Error mío: el umbral del CV cambió durante una medida (corregido)
+
+**Lo que pasó:** para poner el umbral de `film` en −2.0 usé un `sed` que cambió **todas** las líneas `relevance_threshold = -3.0`, y también la del CV. Lo vi al revisar el diff. Afectaba solo al `route-bench` que estaba en marcha (`161`): lo paré, restauré el CV a −3.0 y lo repetí (`162`). Los `gen-bench` de `film` y la comprobación de 42 no dependen del umbral del CV.
+
+**Medida para que no se repita:** en `rag.toml`, los cambios se hacen con edición exacta de una línea (o con `sed` sobre el número de línea), y se revisa el diff antes de medir.

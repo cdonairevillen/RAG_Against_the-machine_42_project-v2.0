@@ -63,6 +63,9 @@ class RetrievalConfig(BaseModel):
     relevance_threshold: Optional[float] = 0.0
     # Rerank the doc branch too (v1 removed it: ms-marco hurt docs).
     rerank_doc_branch: bool = False
+    # BM25 in the doc branch (fused with the dense list). False leaves
+    # the doc branch to the dense list alone (if embeddings are enabled).
+    bm25_in_doc_branch: bool = True
     # Identifier splitting for BM25: "none", "query", "both" or "code".
     # Changing it needs a re-index (see src/rag/ingestion/tokens.py).
     code_aware_tokens: Literal["none", "query", "both", "code", "doc"] = (
@@ -185,11 +188,21 @@ class SourceConfig(BaseModel):
     # CLI and the benchmarks still see it (Phase 9: the films, only on
     # the demo days).
     web: bool = True
+    # Give this domain's sources to the LLM in document order (file,
+    # then position) instead of relevance order. Phase 9: the films,
+    # where position is time, so the model sees the scenes in sequence
+    # (FASE_9.md 9b).
+    chronological_context: bool = False
     # Rerank this domain's doc-branch results (retrieval.rerank_doc_branch
     # for this source only; None keeps the global value). Phase 9: the
     # films, where it lifts Spanish questions (FASE_9.md 9b); the vLLM
     # docs keep it off (Phase 2: it lowered their recall).
     rerank_doc_branch: Optional[bool] = None
+    # BM25 in this domain's doc branch (retrieval.bm25_in_doc_branch for
+    # this source only; None keeps the global value). Phase 9: the films,
+    # an English corpus where Spanish questions get only noise from BM25
+    # and lose the dense hits in the fusion (FASE_9.md 9b).
+    bm25_in_doc_branch: Optional[bool] = None
     # Data hidden at answer time ("phone", "email"): masked in the
     # context given to the LLM, in the answer and in the sources shown.
     # The indexed material is not modified. public_emails stay visible.
@@ -220,9 +233,13 @@ class SourceConfig(BaseModel):
     chunk_size: Optional[int] = None
     child_size: Optional[int] = None
 
-    def chunker_for(self, extension: str) -> str:
-        """Return the chunker name configured for a file extension."""
-        return self.chunkers.get(extension, self.default_chunker)
+    def chunker_for(self, name: str) -> str:
+        """Return the chunker configured for a file: the longest key of
+        `chunkers` the name ends with (an extension such as ".py", or a
+        longer suffix such as ".summaries.md"), else default_chunker."""
+        found = [k for k in self.chunkers if name.endswith(k)]
+        return self.chunkers[max(found, key=len)] if found \
+            else self.default_chunker
 
     def chunk_type_for(self, extension: str) -> str:
         """Return 'code' or 'doc' for a file extension."""

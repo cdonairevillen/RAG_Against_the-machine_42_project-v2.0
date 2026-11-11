@@ -204,6 +204,15 @@ SCENES ?= 1
 film:
 	$(ENV) $(UV) run --project . --extra film $(PY) -m src prepare_film $(if $(FILM),--only "$(FILM)") $(if $(filter 0,$(SCENES)),--scenes False)
 
+# Generated summaries for the films (scene summaries + character
+# profiles, FASE_9.md 9b): a local LLM, offline, with the API stopped.
+# FILM= one film; ENRICH_MODEL= another LLM; ENRICH_PROVIDER=nvidia uses
+# the NVIDIA API (NVIDIA_API_KEY in .env, no GPU). Then: make index SOURCE=film.
+ENRICH_MODEL    ?=
+ENRICH_PROVIDER ?= local
+film-enrich:
+	$(ENV) $(UV) run --project . $(PY) -m src enrich_film $(if $(FILM),--only "$(FILM)") $(if $(ENRICH_MODEL),--model "$(ENRICH_MODEL)") --provider $(ENRICH_PROVIDER)
+
 index: db-up
 	$(RUN) index --max_chunk_size 2000 $(if $(SOURCE),--source $(SOURCE))
 
@@ -283,6 +292,6 @@ meme:
 	$(ENV) $(UV) run --project . $(PY) -m streamlit run src/web.py &
 	@echo "Web running at http://localhost:8501"
 
-.PHONY: install data film data-vllm data-xquad db-up db-down db-reset run web web-stop index search-docs search-code \
+.PHONY: install data film film-enrich data-vllm data-xquad db-up db-down db-reset run web web-stop index search-docs search-code \
         eval-docs eval-code bench route-bench agent-bench gen-bench judge mcp test lint clean meme \
         api api-public api-public-stop api-public-restart web-dev web-build bundle space-build space-run

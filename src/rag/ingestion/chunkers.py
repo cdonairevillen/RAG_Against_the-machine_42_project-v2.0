@@ -395,6 +395,47 @@ def chunk_markdown_packed(file_path: str, content: str,
     return chunks
 
 
+def chunk_markdown_sections(file_path: str, content: str,
+                            max_chunk_size: int = DEFAULT_DOC_CHUNK_SIZE
+                            ) -> list[Chunk]:
+    """Chunk Markdown with one chunk per header section, never packing
+    sections together (a film's generated summaries, DEC-55: each scene
+    summary and character profile is a source of its own, so it is not
+    cited, or played, with its neighbour). A section larger than the
+    limit is split, every piece keeping its header.
+
+    Args:
+        file_path: Relative path used for chunk metadata.
+        content: Full text content of the file.
+        max_chunk_size: Maximum characters per chunk.
+
+    Returns:
+        List of Chunk objects with exact file offsets.
+    """
+    chunks: list[Chunk] = []
+    for start, end, title in markdown_sections(content):
+        text = content[start:end]
+        if not text.strip():
+            continue
+        if end - start > max_chunk_size:
+            body_start = start
+            if title:
+                body_start += len(text.split("\n", 1)[0])
+            chunks.extend(split_with_header(
+                content[body_start:end],
+                title + "\n" if title else "",
+                file_path, "doc", max_chunk_size, body_start,
+            ))
+            continue
+        lead = len(text) - len(text.lstrip())
+        chunks.append(Chunk(
+            text=text.strip(), file_path=file_path,
+            first_character_index=start + lead,
+            last_character_index=end, chunk_type="doc",
+        ))
+    return chunks
+
+
 ChunkerFn = Callable[[str, str, int], list[Chunk]]
 
 # Chunkers selectable from rag.toml, by name. Every chunker receives
@@ -402,6 +443,7 @@ ChunkerFn = Callable[[str, str, int], list[Chunk]]
 CHUNKERS: dict[str, ChunkerFn] = {
     "python_ast": chunk_python_file,
     "markdown_headers_packed": chunk_markdown_packed,
+    "markdown_sections": chunk_markdown_sections,
     "size": chunk_text_file,
 }
 

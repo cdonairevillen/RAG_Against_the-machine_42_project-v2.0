@@ -66,3 +66,142 @@ def test_render_groups_shots_into_timed_sections() -> None:
     assert "Scene: A swamp. A door." in text
     assert "## 00:00:40 - 00:00:50" in text
     assert '- "Bye."' in text
+
+
+def test_enrichment_windows_names_and_render() -> None:
+    from src.rag.sources.film import transcript_sections
+    from src.rag.sources.film_enrich import (
+        characters, enrich_film, parse_summary, render, windows,
+    )
+
+    secs = [(float(i * 60), float(i * 60 + 60), f"## part {i}")
+            for i in range(7)]
+    assert [(w[0], w[1]) for w in windows(secs)] == [
+        (0.0, 180.0), (180.0, 360.0), (360.0, 420.0)]
+
+    names, summary = parse_summary(
+        "**SUMMARY:** Donkey is sold.\nThe guards  take him.\n\n"
+        "CHARACTERS: Lord Farquaad, Donkey, unnamed guard, Princess, "
+        "Woman in Green Dress, Farquaad, Shrek, none",
+        '- "By order of Lord Farquaad!" - "A talking donkey."')
+    assert names == ["Lord Farquaad", "Donkey"]
+    assert summary == "Donkey is sold. The guards take him."
+
+    people = characters([
+        {"characters": ["Lord Farquaad"]}, {"characters": ["Donkey"]},
+        {"characters": ["Farquaad", "Donkey"]}, {"characters": ["Fiona"]},
+    ])
+    assert people["farquaad"]["first"] == 0
+    assert people["donkey"]["windows"] == [1, 2]
+    assert "fiona" not in people  # named in a single window
+
+    secs = [(a, b, t + " Shrek!") for a, b, t in secs]
+    replies = iter(["SUMMARY: A.\nCHARACTERS: Shrek", "SUMMARY: B.\n"
+                    "CHARACTERS: Shrek", "SUMMARY: C.\nCHARACTERS: none",
+                    "Shrek is an ogre."])
+    result = enrich_film("T (2000)", secs, lambda s, u, n: next(replies))
+    text = render(result, "m")
+    assert "## 00:00:00 - 00:03:00 (scene summary)" in text
+    assert "## Character: Shrek" in text
+    assert "First mentioned in the scene 00:00:00 - 00:03:00." in text
+    assert clip_of(text) == (0.0, 420.0)
+    # The generated part is never read back as transcript.
+    film = "## 00:00:00 - 00:01:00\n\nDialogue:\n- \"x\"\n\n" + text
+    assert len(transcript_sections(film)) == 1
+
+
+def test_enrichment_merges_names_and_finds_first_mention() -> None:
+    from src.rag.sources.film_enrich import (
+        characters, evidence_lines, parse_profile,
+    )
+
+    summaries = [{"characters": []}, {"characters": ["Puss"]},
+                 {"characters": ["Puss In Boots", "Donkey"]},
+                 {"characters": ["Donkey"]}]
+    texts = ['- "A talking donkey."', "x", "y", "z"]
+    people = characters(summaries, texts)
+    assert set(people) == {"puss in boots", "donkey"}
+    assert people["puss in boots"]["windows"] == [1, 2]
+    # The code finds "donkey" in the first window's text, though the
+    # model listed him from the third one.
+    assert people["donkey"]["first"] == 0
+    assert people["donkey"]["first_listed"] == 2
+
+    groups = [(0.0, 180.0, '- "Hi, Donkey!"\n- "Bye."'),
+              (180.0, 360.0, '- "donkey again"')]
+    assert evidence_lines(["donkey"], groups) == [
+        '- 00:00:00: "Hi, Donkey!"', '- 00:03:00: "donkey again"']
+
+    assert parse_profile("PROFILE: A cat.\nSPANISH NAME: Gato con Botas") \
+        == ("A cat.", "Gato con Botas")
+    assert parse_profile("PROFILE: Lillian is not mentioned in the "
+                         "summaries.\nSPANISH NAME: Lillian")[0] == ""
+
+
+def test_enrichment_aliases_join_suffixes_and_count_mentions() -> None:
+    from src.rag.sources.film_enrich import characters
+
+    summaries = [{"characters": ["Cat"]}, {"characters": ["Godmother"]},
+                 {"characters": ["Fairy Godmother", "Puss In Boots"]},
+                 {"characters": ["Puss In Boots"]}]
+    texts = ["Look! A little cat.", '- "Puss... in Boots!"', "", ""]
+    people = characters(summaries, texts)
+    assert set(people) == {"fairy godmother", "puss in boots"}
+    assert people["fairy godmother"]["aliases"] == ["fairy godmother",
+                                                    "godmother"]
+    # "Cat" is a common noun; "Puss... in Boots!" still counts.
+    assert people["puss in boots"]["windows"] == [1, 2, 3]
+
+
+def test_valid_sources_add_scene_summary_and_profile() -> None:
+    from src.rag.sources.film import valid_sources
+
+    text = ("## 00:00:00 - 00:00:30\n\nDialogue:\n- \"Hi, Donkey!\"\n\n"
+            "## 00:00:30 - 00:01:00\n\nDialogue:\n- \"Bye.\"\n")
+    extra = ("## 00:00:00 - 00:03:00 (scene summary)\n\nThey meet.\n\n"
+             "## Character: Donkey\n\nA talking donkey.\n")
+    first = text.index("Hi, Donkey!")
+    found = valid_sources(text, ("f.md", first, first + 11), ["Donkey"],
+                          "f.summaries.md", extra)
+    profile = extra.index("## Character: Donkey")
+    assert found == [["f.md", first, first + 11],
+                     ["f.summaries.md", 0, profile],
+                     ["f.summaries.md", profile, len(extra)]]
+
+
+def test_summaries_file_title_clip_and_chunks() -> None:
+    from src.config import SourceConfig
+    from src.rag.ingestion.chunkers import chunk_markdown_sections
+    from src.rag.sources.film import is_summary
+    from src.rag.sources.film_enrich import parse_profile, render
+
+    data = {"windows": [{"start": 0.0, "end": 180.0,
+                         "characters": ["Donkey"], "summary": "They meet."}],
+            "characters": {"donkey": {
+                "name": "Donkey", "aliases": ["donkey"], "windows": [0],
+                "first": 0, "first_listed": 0, "first_section": [30.0, 60.0],
+                "profile": "A talking donkey.", "spanish": "Asno / Burro"}}}
+    text = render(data, "m")
+    profile = text[text.index("## Character: Donkey"):]
+    # The profile plays the first section that names him, not a window.
+    assert clip_of(profile) == (30.0, 60.0)
+    assert "Spanish names (given by the model): Asno / Burro" in profile
+    # One chunk per section: the profile is never packed with a summary.
+    chunks = chunk_markdown_sections("Shrek (2001).summaries.md", text)
+    assert [c.text.split("\n", 1)[0] for c in chunks] == [
+        "## 00:00:00 - 00:03:00 (scene summary)", "## Character: Donkey"]
+    assert is_summary("data/film/Shrek (2001).summaries.md")
+    assert film_id("Shrek (2001)") == "shrek-2001"
+    from src.rag.sources.film import title_of
+    assert title_of("data/film/Shrek (2001).summaries.md") == "Shrek (2001)"
+    assert title_of("data/film/Shrek (2001).md") == "Shrek (2001)"
+    source = SourceConfig(root="r", include=[".md"],
+                          default_chunker="markdown_headers_packed",
+                          chunkers={".summaries.md": "markdown_sections"})
+    assert source.chunker_for("a/X.summaries.md") == "markdown_sections"
+    assert source.chunker_for("a/X.md") == "markdown_headers_packed"
+    assert parse_profile("PROFILE: A donkey.\nSPANISH NAMES: Spain: Asno; "
+                         "Latin America: Burro") == ("A donkey.",
+                                                     "Asno / Burro")
+    assert parse_profile("PROFILE: An ogre.\nSPANISH NAMES: Spain: Shrek; "
+                         "Latin America: Shrek")[1] == "Shrek"
