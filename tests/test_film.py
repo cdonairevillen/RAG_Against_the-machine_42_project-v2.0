@@ -100,13 +100,14 @@ def test_enrichment_windows_names_and_render() -> None:
                     "CHARACTERS: Shrek", "SUMMARY: C.\nCHARACTERS: none",
                     "Shrek is an ogre."])
     result = enrich_film("T (2000)", secs, lambda s, u, n: next(replies))
-    text = render(result, "m")
-    assert "## 00:00:00 - 00:03:00 (scene summary)" in text
-    assert "## Character: Shrek" in text
-    assert "First mentioned in the scene 00:00:00 - 00:03:00." in text
-    assert clip_of(text) == (0.0, 420.0)
-    # The generated part is never read back as transcript.
-    film = "## 00:00:00 - 00:01:00\n\nDialogue:\n- \"x\"\n\n" + text
+    scenes, people_text = render(result)
+    assert "## 00:00:00 - 00:03:00 (scene summary)" in scenes
+    assert "## Character: Shrek" in people_text
+    assert "First mentioned in the scene 00:00:00 - 00:03:00." \
+        in people_text
+    assert clip_of(scenes) == (0.0, 420.0)
+    # Summary headers are never read back as transcript.
+    film = "## 00:00:00 - 00:01:00\n\nDialogue:\n- \"x\"\n\n" + scenes
     assert len(transcript_sections(film)) == 1
 
 
@@ -132,10 +133,9 @@ def test_enrichment_merges_names_and_finds_first_mention() -> None:
     assert evidence_lines(["donkey"], groups) == [
         '- 00:00:00: "Hi, Donkey!"', '- 00:03:00: "donkey again"']
 
-    assert parse_profile("PROFILE: A cat.\nSPANISH NAME: Gato con Botas") \
-        == ("A cat.", "Gato con Botas")
+    assert parse_profile("**PROFILE:** A cat.\n") == "A cat."
     assert parse_profile("PROFILE: Lillian is not mentioned in the "
-                         "summaries.\nSPANISH NAME: Lillian")[0] == ""
+                         "summaries.") == ""
 
 
 def test_enrichment_aliases_join_suffixes_and_count_mentions() -> None:
@@ -161,47 +161,51 @@ def test_valid_sources_add_scene_summary_and_profile() -> None:
     extra = ("## 00:00:00 - 00:03:00 (scene summary)\n\nThey meet.\n\n"
              "## Character: Donkey\n\nA talking donkey.\n")
     first = text.index("Hi, Donkey!")
+    scenes, people = extra.split("## Character")
+    people = "## Character" + people
     found = valid_sources(text, ("f.md", first, first + 11), ["Donkey"],
-                          "f.summaries.md", extra)
-    profile = extra.index("## Character: Donkey")
+                          [("f.summaries.md", scenes),
+                           ("f.characters.md", people)])
     assert found == [["f.md", first, first + 11],
-                     ["f.summaries.md", 0, profile],
-                     ["f.summaries.md", profile, len(extra)]]
+                     ["f.summaries.md", 0, len(scenes)],
+                     ["f.characters.md", 0, len(people)]]
 
 
 def test_summaries_file_title_clip_and_chunks() -> None:
     from src.config import SourceConfig
     from src.rag.ingestion.chunkers import chunk_markdown_sections
     from src.rag.sources.film import is_summary
-    from src.rag.sources.film_enrich import parse_profile, render
+    from src.rag.sources.film import title_of
+    from src.rag.sources.film_enrich import render
 
     data = {"windows": [{"start": 0.0, "end": 180.0,
                          "characters": ["Donkey"], "summary": "They meet."}],
             "characters": {"donkey": {
                 "name": "Donkey", "aliases": ["donkey"], "windows": [0],
                 "first": 0, "first_listed": 0, "first_section": [30.0, 60.0],
-                "profile": "A talking donkey.", "spanish": "Asno / Burro"}}}
-    text = render(data, "m")
-    profile = text[text.index("## Character: Donkey"):]
+                "profile": "A talking donkey."},
+                "fiona": {
+                "name": "Fiona", "aliases": ["fiona"], "windows": [0],
+                "first": 0, "first_listed": 0, "first_section": None,
+                "profile": "A princess."}}}
+    scenes, people = render(data)
+    assert "## Character:" not in scenes and "scene summary" not in people
     # The profile plays the first section that names him, not a window.
-    assert clip_of(profile) == (30.0, 60.0)
-    assert "Spanish names (given by the model): Asno / Burro" in profile
-    # One chunk per section: the profile is never packed with a summary.
-    chunks = chunk_markdown_sections("Shrek (2001).summaries.md", text)
+    assert clip_of(people.split("## Character: Fiona")[0]) == (30.0, 60.0)
+    # One chunk per profile: never packed with another one.
+    chunks = chunk_markdown_sections("Shrek (2001).characters.md", people)
     assert [c.text.split("\n", 1)[0] for c in chunks] == [
-        "## 00:00:00 - 00:03:00 (scene summary)", "## Character: Donkey"]
+        "## Character: Donkey", "## Character: Fiona"]
     assert is_summary("data/film/Shrek (2001).summaries.md")
+    assert is_summary("data/film/Shrek (2001).characters.md")
+    assert not is_summary("data/film/Shrek (2001).md")
     assert film_id("Shrek (2001)") == "shrek-2001"
-    from src.rag.sources.film import title_of
-    assert title_of("data/film/Shrek (2001).summaries.md") == "Shrek (2001)"
-    assert title_of("data/film/Shrek (2001).md") == "Shrek (2001)"
+    for name in ("Shrek (2001).summaries.md", "Shrek (2001).characters.md",
+                 "Shrek (2001).md"):
+        assert title_of(f"data/film/{name}") == "Shrek (2001)"
     source = SourceConfig(root="r", include=[".md"],
                           default_chunker="markdown_headers_packed",
-                          chunkers={".summaries.md": "markdown_sections"})
-    assert source.chunker_for("a/X.summaries.md") == "markdown_sections"
+                          chunkers={".characters.md": "markdown_sections"})
+    assert source.chunker_for("a/X.characters.md") == "markdown_sections"
+    assert source.chunker_for("a/X.summaries.md") == "markdown_headers_packed"
     assert source.chunker_for("a/X.md") == "markdown_headers_packed"
-    assert parse_profile("PROFILE: A donkey.\nSPANISH NAMES: Spain: Asno; "
-                         "Latin America: Burro") == ("A donkey.",
-                                                     "Asno / Burro")
-    assert parse_profile("PROFILE: An ogre.\nSPANISH NAMES: Spain: Shrek; "
-                         "Latin America: Shrek")[1] == "Shrek"

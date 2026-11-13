@@ -970,3 +970,63 @@ Medido con 14 preguntas de diálogo (`142`–`144`, `FASE_9.md` §9b). Las descr
 **Lo que pasó:** para poner el umbral de `film` en −2.0 usé un `sed` que cambió **todas** las líneas `relevance_threshold = -3.0`, y también la del CV. Lo vi al revisar el diff. Afectaba solo al `route-bench` que estaba en marcha (`161`): lo paré, restauré el CV a −3.0 y lo repetí (`162`). Los `gen-bench` de `film` y la comprobación de 42 no dependen del umbral del CV.
 
 **Medida para que no se repita:** en `rag.toml`, los cambios se hacen con edición exacta de una línea (o con `sed` sobre el número de línea), y se revisa el diff antes de medir.
+
+## DEC-55 — Resúmenes y fichas en un fichero aparte, un fragmento por sección, con el clip de la presentación del personaje
+
+**Contexto (2026-11-11, tu prueba en la web):** la ficha de Asno iba en el mismo fragmento que el último resumen de la película (el troceador junta secciones pequeñas). Al no tener minuto, la web le ponía el de ese resumen (01:29:57) y reproducía los créditos. El modelo, además, cita la ficha (explica mejor) y no el tramo de la presentación (enseña mejor).
+
+**Decidido (tú: la A):**
+- Los resúmenes y las fichas van en `<Título>.summaries.md`, troceado con `markdown_sections` (un fragmento por sección, sin juntar). `chunker_for` admite ahora sufijos (`.summaries.md`); las extensiones de siempre no cambian (test, y 42 idéntico).
+- Cada ficha lleva "First named in the film at …": la primera sección de 30 s que nombra al personaje, buscada por el código. Es su clip.
+- La API marca la tarjeta: "· summary" o "· Donkey (profile)".
+- Nombres de España y Latinoamérica pedidos al modelo, como regla general (tu pregunta: una tabla sería una trampa; esto vale para cualquier película).
+
+**Medido (`164`, frente a `160`–`163`):**
+
+| | Antes (todo en el `.md`) | Fichero aparte |
+|---|---|---|
+| Clip de la ficha de Asno / Gato / Farquaad | 01:29:57 (créditos) / ventana de 3 min / ventana | **00:05:20 / 00:34:31 / 00:06:57** (su presentación) |
+| R@1/3/5/10 con cualquier fuente válida EN | 0.45 / 0.68 / 0.82 / 0.91 | 0.45 / 0.73 / 0.73 / 0.91 |
+| R@1/3/5/10 con cualquier fuente válida ES | 0.41 / 0.64 / 0.77 / 0.91 | 0.50 / 0.68 / 0.77 / 0.95 |
+| 0.6B contiene EN / ES | 0.50 / 0.27 | 0.50 / **0.14** |
+| 1.7B contiene EN / ES | 0.59 / 0.27 | **0.50 / 0.14** |
+| XQuAD a su dominio EN / ES | 1 164 / 1 153 | **1 167 / 1 156** (como antes del enriquecimiento) |
+| `film` a su dominio EN / ES | 21 / 21 | 21 / 20 |
+| 42, CV, "about" | idénticos | idénticos |
+
+La "citation ok" del `gen-bench` cae a ~0.1, pero es un efecto de la métrica: compara ficheros, y citar `*.summaries.md` cuenta como fichero equivocado.
+
+**Problemas abiertos:**
+1. **La generación baja** 2–3 preguntas (el 1.7B en español, de 6 a 3). Hipótesis: cada fuente es ahora más pequeña (una ficha suelta en lugar de un fragmento con varias secciones), así que con 5 fuentes el modelo recibe menos texto. Propuesta: juntar los resúmenes de escena entre ellos y dejar sueltas solo las fichas.
+2. **Los nombres en español no sirven.** Lightning no conoce el doblaje de España: da "Burro" para los dos, y además se equivoca en otros ("Madrastra Mágica" para el Hada Madrina, "Ogro" para Shrek). "¿Quién es Asno?" sigue sin encontrarse. Propuesta: quitar esa línea (mete errores) y resolverlo de forma general traduciendo la pregunta al idioma del corpus antes de buscar, con el modelo externo o el agente (Fase 10). Traducir "Asno" → "Donkey" es una traducción, no conocimiento del doblaje.
+
+**Reversible:** sí (todo junto en el `.md` era la versión `160`).
+
+## DEC-56 — Resúmenes juntos y fichas sueltas, en dos ficheros; fuera los nombres en español
+
+**Contexto:** DEC-55 arregló los vídeos, pero la generación bajó (1.7B en español, de 6 a 3 preguntas) y los nombres en español del modelo eran erróneos. Tú aprobaste los dos cambios.
+
+**Decidido:**
+- Dos ficheros generados por película:
+  - `<Título>.summaries.md`: resúmenes de escena, juntados por el troceador de siempre.
+  - `<Título>.characters.md`: una ficha por fragmento (`markdown_sections`), con el clip de la presentación del personaje.
+- Fuera la línea "Spanish names". Los nombres en otro idioma se resolverán traduciendo la pregunta antes de buscar (Fase 10).
+
+**Medido (`165`):**
+
+| | Todo en el `.md` (`160`–`163`) | Un fichero, todo suelto (`164`) | **Dos ficheros (`165`)** |
+|---|---|---|---|
+| R@1/3/5/10 cualquier fuente válida EN | 0.45 / 0.68 / 0.82 / 0.91 | 0.45 / 0.73 / 0.73 / 0.91 | **0.45 / 0.64 / 0.86 / 0.91** |
+| R@1/3/5/10 cualquier fuente válida ES | 0.41 / 0.64 / 0.77 / 0.91 | 0.50 / 0.68 / 0.77 / 0.95 | **0.50 / 0.68 / 0.77 / 0.91** |
+| 1.7B (web) contiene EN / ES | 0.59 / 0.27 | 0.50 / 0.14 | **0.55 / 0.27** |
+| 0.6B (base) contiene EN / ES | 0.50 / 0.27 | 0.50 / 0.14 | 0.32 / 0.27 |
+| Vídeo de las fichas | ❌ (créditos, ventanas) | ✅ | ✅ |
+| `film` a su dominio EN / ES | 21 / 21 | 21 / 20 | **22 / 21** |
+| XQuAD a su dominio EN / ES | 1 164 / 1 153 | 1 167 / 1 156 | 1 165 / 1 153 |
+| 42, CV, "about" | idénticos | idénticos | idénticos |
+
+**Lectura:** el 1.7B (el modelo de la web) recupera lo que perdió `164` y la R@5 en inglés es la mejor de las tres. El 0.6B baja en inglés (de 11 a 7 preguntas). Con 22 preguntas, cada una vale 0.045, y el 0.6B oscila mucho entre ejecuciones de este dominio (FASE_9.md). Se queda `165` por el vídeo y por el modelo de la web, con esta bajada del 0.6B anotada.
+
+**Coste conocido:** "Quien es burro" vuelve a "no se encuentra" (era la línea quitada). Pendiente de la traducción de la pregunta.
+
+**Reversible:** sí (variantes `160` y `164` arriba).

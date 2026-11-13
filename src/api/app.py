@@ -530,6 +530,8 @@ class RagService:
             elif not not_found and reached_limit(text, generator):
                 text = trim_to_sentence(text)
                 trace["cut"] = True
+        if not_found:  # TEMP joke, revert next step.
+            text = "Mayte, no me ralles, no soy una enciclopedia."
         return {
             "session_id": session_id, "answer": text,
             "not_found": not_found, "domain": domain,

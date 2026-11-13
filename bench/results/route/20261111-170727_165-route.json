@@ -1,0 +1,231 @@
+{
+  "label": "165-route",
+  "k": 10,
+  "limit": null,
+  "timestamp": "2026-11-11T16:39:44",
+  "commit": "f1dc58f",
+  "dirty": true,
+  "domains": [
+    "vllm",
+    "xquad",
+    "cv",
+    "about",
+    "film"
+  ],
+  "profile": "default",
+  "retrieval": {
+    "classifier_margin": 0.5,
+    "code_signal_weight": 0.5,
+    "doc_signal_weight": 0.5,
+    "skip_rerank_score": Infinity,
+    "bm25_score_floor": 5.5,
+    "reranker_model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    "rerank_fusion": "rrf",
+    "rrf_k": 60,
+    "doc_signal_languages": [
+      "en",
+      "es"
+    ],
+    "relevance_threshold": 0.0,
+    "rerank_doc_branch": false,
+    "bm25_in_doc_branch": true,
+    "code_aware_tokens": "code"
+  },
+  "device": "cuda",
+  "sets": {
+    "public/docs": {
+      "expected": "vllm",
+      "routing_accuracy": 1.0,
+      "chosen": {
+        "vllm": 100
+      },
+      "recall_at_k": {
+        "1": 0.76,
+        "3": 0.91,
+        "5": 0.92,
+        "10": 0.94
+      },
+      "seconds": 47.02,
+      "questions": 100
+    },
+    "public/code": {
+      "expected": "vllm",
+      "routing_accuracy": 1.0,
+      "chosen": {
+        "vllm": 100
+      },
+      "recall_at_k": {
+        "1": 0.51,
+        "3": 0.72,
+        "5": 0.8,
+        "10": 0.88
+      },
+      "seconds": 65.08,
+      "questions": 100
+    },
+    "es/docs": {
+      "expected": "vllm",
+      "routing_accuracy": 0.9,
+      "chosen": {
+        "about": 1,
+        "vllm": 9
+      },
+      "recall_at_k": {
+        "1": 0.5,
+        "3": 0.7,
+        "5": 0.7,
+        "10": 0.8
+      },
+      "seconds": 6.72,
+      "questions": 10
+    },
+    "es/code": {
+      "expected": "vllm",
+      "routing_accuracy": 1.0,
+      "chosen": {
+        "vllm": 10
+      },
+      "recall_at_k": {
+        "1": 0.5,
+        "3": 0.7,
+        "5": 0.8,
+        "10": 0.9
+      },
+      "seconds": 7.09,
+      "questions": 10
+    },
+    "xquad/en": {
+      "expected": "xquad",
+      "routing_accuracy": 0.979,
+      "chosen": {
+        "xquad": 1165,
+        "vllm": 16,
+        "film": 4,
+        "about": 1,
+        "cv": 4
+      },
+      "recall_at_k": {
+        "1": 0.9378,
+        "3": 0.9697,
+        "5": 0.9739,
+        "10": 0.9773
+      },
+      "seconds": 665.83,
+      "questions": 1190
+    },
+    "xquad/es": {
+      "expected": "xquad",
+      "routing_accuracy": 0.9689,
+      "chosen": {
+        "xquad": 1153,
+        "vllm": 21,
+        "film": 11,
+        "cv": 3,
+        "about": 2
+      },
+      "recall_at_k": {
+        "1": 0.9034,
+        "3": 0.9622,
+        "5": 0.9647,
+        "10": 0.9664
+      },
+      "seconds": 785.16,
+      "questions": 1190
+    },
+    "cv/en": {
+      "expected": "cv",
+      "routing_accuracy": 0.9667,
+      "chosen": {
+        "cv": 29,
+        "about": 1
+      },
+      "recall_at_k": {
+        "1": 0.4667,
+        "3": 0.7667,
+        "5": 0.9,
+        "10": 0.9333
+      },
+      "seconds": 16.34,
+      "questions": 30
+    },
+    "cv/es": {
+      "expected": "cv",
+      "routing_accuracy": 0.9667,
+      "chosen": {
+        "cv": 29,
+        "about": 1
+      },
+      "recall_at_k": {
+        "1": 0.6667,
+        "3": 0.8,
+        "5": 0.9333,
+        "10": 0.9667
+      },
+      "seconds": 20.57,
+      "questions": 30
+    },
+    "about/en": {
+      "expected": "about",
+      "routing_accuracy": 0.8333,
+      "chosen": {
+        "about": 15,
+        "vllm": 3
+      },
+      "recall_at_k": {
+        "1": 0.1111,
+        "3": 0.2778,
+        "5": 0.2778,
+        "10": 0.4444
+      },
+      "seconds": 10.49,
+      "questions": 18
+    },
+    "about/es": {
+      "expected": "about",
+      "routing_accuracy": 0.8889,
+      "chosen": {
+        "about": 16,
+        "vllm": 2
+      },
+      "recall_at_k": {
+        "1": 0.2778,
+        "3": 0.3333,
+        "5": 0.3889,
+        "10": 0.5
+      },
+      "seconds": 11.18,
+      "questions": 18
+    },
+    "film/en": {
+      "expected": "film",
+      "routing_accuracy": 1.0,
+      "chosen": {
+        "film": 22
+      },
+      "recall_at_k": {
+        "1": 0.0,
+        "3": 0.0909,
+        "5": 0.2727,
+        "10": 0.4091
+      },
+      "seconds": 12.36,
+      "questions": 22
+    },
+    "film/es": {
+      "expected": "film",
+      "routing_accuracy": 0.9545,
+      "chosen": {
+        "film": 21,
+        "vllm": 1
+      },
+      "recall_at_k": {
+        "1": 0.0455,
+        "3": 0.0909,
+        "5": 0.1364,
+        "10": 0.3636
+      },
+      "seconds": 14.36,
+      "questions": 22
+    }
+  }
+}

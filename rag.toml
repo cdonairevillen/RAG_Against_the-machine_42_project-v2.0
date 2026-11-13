@@ -275,11 +275,12 @@ chronological_context = true
 # domain: route-bench checks which domain wins them.
 relevance_threshold = -2.0
 
-# The generated summaries (<Title>.summaries.md, film_enrich.py): one
-# chunk per section, so a profile is never packed with the last scene
-# summary (and cited or played with its clip). DEC-55.
+# The character profiles (<Title>.characters.md, film_enrich.py): one
+# chunk each, so a profile is never packed with anything else (and cited
+# or played with another clip). The scene summaries (<Title>.summaries.md)
+# keep the default, packed together. DEC-55, DEC-56.
 [sources.film.chunkers]
-".summaries.md" = "markdown_sections"
+".characters.md" = "markdown_sections"
 
 # Optional profiles: extra models as explicit options on top of the
 # stable base above (which is what the official benchmark uses and gives

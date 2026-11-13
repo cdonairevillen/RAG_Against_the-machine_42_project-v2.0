@@ -113,9 +113,13 @@ def frame_name(seconds: float) -> str:
 
 # --- what the web shows -------------------------------------------------
 
-# The generated summaries of a film live in their own file, one chunk
-# per section (DEC-55): never packed with the film or with each other.
+# A film's generated material lives in two files of its own (DEC-55,
+# DEC-56): the scene summaries (packed together by the usual chunker) and
+# the character profiles (one chunk each, `markdown_sections`), so a
+# profile is never packed, cited or played with anything else.
 SUMMARIES_SUFFIX = ".summaries.md"
+CHARACTERS_SUFFIX = ".characters.md"
+GENERATED_SUFFIXES = (SUMMARIES_SUFFIX, CHARACTERS_SUFFIX)
 # A character profile has no header time: its clip is the first section
 # of the film that names the character (film_enrich.render()).
 FIRST_NAMED = re.compile(
@@ -135,17 +139,18 @@ def film_id(title: str) -> str:
 
 
 def title_of(file_path: str) -> str:
-    """Film title of a chunk's file (data/film/<Title>.md, or its
-    generated summaries, <Title>.summaries.md)."""
+    """Film title of a chunk's file (data/film/<Title>.md, or one of its
+    generated files, <Title>.summaries.md / <Title>.characters.md)."""
     name = os.path.basename(file_path)
-    if name.endswith(SUMMARIES_SUFFIX):
-        return name[:-len(SUMMARIES_SUFFIX)]
+    for suffix in GENERATED_SUFFIXES:
+        if name.endswith(suffix):
+            return name[:-len(suffix)]
     return os.path.splitext(name)[0]
 
 
 def is_summary(file_path: str) -> bool:
-    """Whether a chunk comes from a film's generated summaries."""
-    return file_path.endswith(SUMMARIES_SUFFIX)
+    """Whether a chunk comes from a film's generated files."""
+    return file_path.endswith(GENERATED_SUFFIXES)
 
 
 def clip_of(text: str) -> Optional[tuple[float, float]]:
@@ -634,15 +639,17 @@ def prepare(films_dir: str = FILMS_DIR, output_dir: str = OUTPUT_DIR,
 GENERATED = "\n# Generated summaries"
 
 
-def summaries_path(output_dir: str, title: str) -> str:
-    """The film's generated summaries file."""
-    return os.path.join(output_dir, f"{title}{SUMMARIES_SUFFIX}")
+def summaries_path(output_dir: str, title: str,
+                   suffix: str = SUMMARIES_SUFFIX) -> str:
+    """One of the film's generated files (summaries by default)."""
+    return os.path.join(output_dir, f"{title}{suffix}")
 
 
 def write_summaries(output_dir: str, title: str, work: str,
                     data: Optional[dict] = None) -> bool:
-    """Write the film's summaries file from `data` or, by default, its
-    newest cached enrichment. Returns False when there is none."""
+    """Write the film's generated files (scene summaries and character
+    profiles) from `data` or, by default, its newest cached enrichment.
+    Returns False when there is none."""
     from src.rag.sources import film_enrich
 
     if data is None:
@@ -650,9 +657,10 @@ def write_summaries(output_dir: str, title: str, work: str,
         if path is None:
             return False
         data = load_json(path)
-    with open(summaries_path(output_dir, title), "w", encoding="utf-8",
-              newline="\n") as fh:
-        fh.write(film_enrich.render(data, data.get("model", "")))
+    for suffix, text in zip(GENERATED_SUFFIXES, film_enrich.render(data)):
+        with open(summaries_path(output_dir, title, suffix), "w",
+                  encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
     return True
 
 
@@ -690,7 +698,7 @@ def enrich(output_dir: str = OUTPUT_DIR, only: Optional[str] = None,
     written = []
     for name in sorted(os.listdir(output_dir)):
         title, ext = os.path.splitext(name)
-        if ext != ".md" or name.endswith(SUMMARIES_SUFFIX) \
+        if ext != ".md" or name.endswith(GENERATED_SUFFIXES) \
                 or (only and title != only):
             continue
         path = os.path.join(output_dir, name)
@@ -713,8 +721,9 @@ def enrich(output_dir: str = OUTPUT_DIR, only: Optional[str] = None,
         with open(path, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(base + "\n")
         write_summaries(output_dir, title, work, result)
-        written.append(summaries_path(output_dir, title))
-        print(f"  wrote {summaries_path(output_dir, title)}")
+        for suffix in GENERATED_SUFFIXES:
+            written.append(summaries_path(output_dir, title, suffix))
+            print(f"  wrote {written[-1]}")
     return written
 
 
@@ -777,15 +786,17 @@ def build_bench(output_dir: str = OUTPUT_DIR,
                          .model_dump_json(indent=2))
     valid = {}
     for q in questions:
-        extra = summaries_path(output_dir, q["film"])
-        summary_text = ""
-        if os.path.isfile(extra):
-            with open(extra, encoding="utf-8", newline="") as fh:
-                summary_text = fh.read()
+        generated = []
+        for suffix in GENERATED_SUFFIXES:
+            extra = summaries_path(output_dir, q["film"], suffix)
+            text = ""
+            if os.path.isfile(extra):
+                with open(extra, encoding="utf-8", newline="") as fh:
+                    text = fh.read()
+            generated.append((extra.replace(os.sep, "/"), text))
         valid[q["id"]] = valid_sources(
             texts[spans[q["id"]][0]], spans[q["id"]],
-            q.get("characters", []), extra.replace(os.sep, "/"),
-            summary_text)
+            q.get("characters", []), generated)
     save_json(os.path.join(bench_dir, VALID_SOURCES), valid)
     return len(questions)
 
@@ -801,35 +812,39 @@ PROFILE_HEADER = re.compile(r"^## Character: (.+?)\s*$", re.M)
 
 
 def valid_sources(text: str, evidence: tuple[str, int, int],
-                  characters: list[str], summaries_file: str = "",
-                  summaries: str = "") -> list[list[Any]]:
+                  characters: list[str],
+                  generated: Optional[list[tuple[str, str]]] = None
+                  ) -> list[list[Any]]:
     """[file_path, first, last] of every valid source of a question: its
-    evidence span in the film (`text`), and from the film's summaries
-    file (`summaries`, at `summaries_file`) the scene summary whose
+    evidence span in the film (`text`) and, from the film's generated
+    files (`generated`: (path, text) pairs), the scene summary whose
     window holds the evidence and the profiles of `characters` (matched
     by name key)."""
     from src.rag.sources.film_enrich import name_key
 
     path, first, last = evidence
     out: list[list[Any]] = [[path, first, last]]
-    headers = list(ANY_HEADER.finditer(summaries))
-
-    def section(match: re.Match) -> list[Any]:
-        later = [h.start() for h in headers if h.start() > match.start()]
-        return [summaries_file, match.start(),
-                later[0] if later else len(summaries)]
-
     before = list(SECTION_HEADER.finditer(text[:first]))
-    if before:
-        g = [int(x) for x in before[-1].groups()]
-        at = g[0] * 3600 + g[1] * 60 + g[2]
-        for m in SECTION_HEADER.finditer(summaries):
-            h = [int(x) for x in m.groups()]
-            if h[0] * 3600 + h[1] * 60 + h[2] <= at \
-                    < h[3] * 3600 + h[4] * 60 + h[5]:
-                out.append(section(m))
     wanted = {name_key(c) for c in characters}
-    for m in PROFILE_HEADER.finditer(summaries):
-        if name_key(m.group(1)) in wanted:
-            out.append(section(m))
+    for extra_path, extra in generated or []:
+        headers = [h.start() for h in ANY_HEADER.finditer(extra)]
+
+        def section(match: re.Match, extra: str = extra,
+                    extra_path: str = extra_path,
+                    headers: list[int] = headers) -> list[Any]:
+            later = [h for h in headers if h > match.start()]
+            return [extra_path, match.start(),
+                    later[0] if later else len(extra)]
+
+        if before:
+            g = [int(x) for x in before[-1].groups()]
+            at = g[0] * 3600 + g[1] * 60 + g[2]
+            for m in SECTION_HEADER.finditer(extra):
+                h = [int(x) for x in m.groups()]
+                if h[0] * 3600 + h[1] * 60 + h[2] <= at \
+                        < h[3] * 3600 + h[4] * 60 + h[5]:
+                    out.append(section(m))
+        for m in PROFILE_HEADER.finditer(extra):
+            if name_key(m.group(1)) in wanted:
+                out.append(section(m))
     return out

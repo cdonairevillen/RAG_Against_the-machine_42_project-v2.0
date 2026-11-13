@@ -46,7 +46,7 @@ PROFILE_TOKENS = 350
 # generated again (window summaries are kept if their prompt did not
 # change: SUMMARY_VERSION).
 SUMMARY_VERSION = 2
-PROFILE_VERSION = 3
+PROFILE_VERSION = 4
 
 SUMMARY_SYSTEM = (
     "You summarise a stretch of a film transcript. The transcript has "
@@ -78,10 +78,7 @@ PROFILE_USER = (
     "the story, their relationships with the other characters and what "
     "they do. Only what the material says: do not add how the story "
     "ends or anything else you may know. No times. If the material says "
-    "little, write less.\n"
-    "SPANISH NAMES: Spain: <the name of {name} in the Spanish dub from "
-    "Spain>; Latin America: <the name in the Latin American dub>. If you "
-    "do not know a dub, give the usual Spanish translation of the name."
+    "little, write less."
 )
 
 TITLES = re.compile(
@@ -162,29 +159,19 @@ def parse_summary(reply: str, source: str) -> tuple[list[str], str]:
     return names[:MAX_NAMES], " ".join(text.split())
 
 
-def parse_profile(reply: str) -> tuple[str, str]:
-    """(profile, Spanish names) from a 'PROFILE: ... SPANISH NAMES:
-    Spain: X; Latin America: Y' reply. The names come out as 'X / Y'
-    (one name when both dubs agree), so a question with either one
-    finds the profile (DEC-52: "Asno" in Spain, "Burro" in Latin
-    America). The profile is '' when it only says the material is
-    silent about the character (EMPTY_PROFILE)."""
+def parse_profile(reply: str) -> str:
+    """The profile from a 'PROFILE: ...' reply; '' when it only says the
+    material is silent about the character (EMPTY_PROFILE).
+
+    No Spanish names (DEC-56): the model did not know the Spanish dubs
+    ("Burro" for both, "Madrastra Mágica" for the Fairy Godmother), so
+    names in another language are left to translating the question
+    before the search (Phase 10)."""
     clean = reply.replace("**", "")
-    profile = re.search(r"PROFILE:\s*(.*?)\s*(?:SPANISH NAMES?:|$)",
-                        clean, re.IGNORECASE | re.DOTALL)
-    spanish = re.search(r"SPANISH NAMES?:\s*(.*?)\s*(?:\n|$)", clean,
-                        re.IGNORECASE)
-    text = " ".join((profile.group(1) if profile else re.sub(
-        r"SPANISH NAMES?:.*", "", clean, flags=re.DOTALL)).split())
-    if EMPTY_PROFILE.search(text):
-        text = ""
-    names: list[str] = []
-    for part in re.split(r";", spanish.group(1) if spanish else ""):
-        name = re.sub(r"^\s*(spain|latin america)\s*:", "", part,
-                      flags=re.IGNORECASE).strip(" .\"'*<>")
-        if name and name.lower() not in [n.lower() for n in names]:
-            names.append(name)
-    return text, " / ".join(names)
+    profile = re.search(r"PROFILE:\s*(.*)", clean,
+                        re.IGNORECASE | re.DOTALL)
+    text = " ".join((profile.group(1) if profile else clean).split())
+    return "" if EMPTY_PROFILE.search(text) else text
 
 
 def name_key(name: str) -> str:
@@ -311,7 +298,6 @@ def enrich_film(title: str, sections: list[tuple[float, float, str]],
         if previous.get("windows") == person["windows"] \
                 and "profile" in previous:
             person["profile"] = previous["profile"]
-            person["spanish"] = previous.get("spanish", "")
             continue
         scenes = "\n".join(
             f"- {stamp(summaries[i]['start'])}: {summaries[i]['summary']}"
@@ -321,7 +307,7 @@ def enrich_film(title: str, sections: list[tuple[float, float, str]],
         reply = generate(PROFILE_SYSTEM, PROFILE_USER.format(
             title=title, name=person["name"], scenes=scenes, lines=lines),
             PROFILE_TOKENS)
-        person["profile"], person["spanish"] = parse_profile(reply)
+        person["profile"] = parse_profile(reply)
         print(f"  profile: {person['name']} "
               f"({len(person['windows'])} scenes"
               f"{', empty' if not person['profile'] else ''})")
@@ -336,12 +322,17 @@ def enrich_film(title: str, sections: list[tuple[float, float, str]],
             "profile_version": PROFILE_VERSION}
 
 
-def render(enrichment: dict, model: str) -> str:
-    """The film's generated summaries file (<Title>.summaries.md, one
-    chunk per section: the `markdown_sections` chunker). Summary headers
-    keep the window's span and a profile names the first section that
-    names the character, so the web plays the right clip of each (DEC-55).
-    `model` is recorded in the cache, not in the indexed text."""
+def render(enrichment: dict) -> tuple[str, str]:
+    """The film's two generated files (DEC-55, DEC-56):
+
+    - <Title>.summaries.md: the scene summaries, packed together by the
+      usual chunker (a source holds several, so the LLM reads more).
+      Headers keep each window's span (the clip).
+    - <Title>.characters.md: the profiles, one chunk each
+      (`markdown_sections`), never packed with anything else. A profile
+      names the first section of the film that names the character: the
+      web plays it as the profile's clip (their presentation).
+    """
     from src.rag.sources.film import stamp
 
     summaries = enrichment["windows"]
@@ -352,24 +343,22 @@ def render(enrichment: dict, model: str) -> str:
         if w["characters"]:
             out += [f"Characters: {', '.join(w['characters'])}", ""]
         out += [w["summary"], ""]
+    people: list[str] = []
     for person in enrichment["characters"].values():
         first = summaries[person["first"]]
         times = ", ".join(stamp(summaries[i]["start"])
                           for i in person["windows"])
-        out += [f"## Character: {person['name']}", ""]
-        if person.get("spanish"):
-            out += [f"Spanish names (given by the model): "
-                    f"{person['spanish']}", ""]
+        people += [f"## Character: {person['name']}", ""]
         if person.get("first_section"):
             start, end = person["first_section"]
-            out += [f"First named in the film at {stamp(start)} - "
-                    f"{stamp(end)}.", ""]
-        out += [f"First mentioned in the scene {stamp(first['start'])} - "
-                f"{stamp(first['end'])}. Appears or is mentioned in the "
-                f"scenes starting at {times}.", ""]
+            people += [f"First named in the film at {stamp(start)} - "
+                       f"{stamp(end)}.", ""]
+        people += [f"First mentioned in the scene {stamp(first['start'])} "
+                   f"- {stamp(first['end'])}. Appears or is mentioned in the "
+                   f"scenes starting at {times}.", ""]
         if person.get("profile"):
-            out += [person["profile"], ""]
-    return "\n".join(out)
+            people += [person["profile"], ""]
+    return "\n".join(out), "\n".join(people)
 
 
 def cache_path(work: str, model: str) -> str:
