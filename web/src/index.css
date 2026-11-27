@@ -4,21 +4,155 @@
 
 :root {
   --bg: #0a0a0a;
-  --panel: #111;
+  --panel: #111111;
   --card: #0f0f0f;
   --line: #1a1a1a;
-  --line-strong: #222;
+  --line-strong: #222222;
   --text: #e0e0e0;
   --text-answer: #d0d0d0;
-  --muted: #555;
-  --dim: #444;
-  --faint: #333;
+  --muted: #555555;
+  --dim: #444444;
+  --faint: #333333;
+  --soft: #888888;
+  --softer: #666666;
+  --soft-empty: #777777;
+  --hover: #1d1d1d;
+  --hover-soft: #181818;
+  --surface: #171717;
+  --menu: #141414;
+  --sunken: #0c0c0c;
+  --switch-bg: #0e0e0e;
+  --border-input: #383838;
+  --border-focus: #5a5a5a;
+  --border-hover: #444444;
+  --dots: #3a3a3a;
+  --scroll: #2a2a2a;
+  --shadow: rgba(0, 0, 0, 0.6);
+  --card-shadow: rgba(0, 0, 0, 0);
+  --off: #333333;
   --accent: #ff3b3b;
   --accent-hover: #cc2f2f;
+  --accent-track: #3a1414;
+  --accent-deep: #2a1414;
+  --accent-line: rgba(255, 59, 59, 0.35);
+  --accent-glow: rgba(255, 59, 59, 0.45);
+  --accent-haze: rgba(255, 59, 59, 0.05);
   --ok: #2ecc71;
   --mono: "JetBrains Mono", monospace;
   --sans: "Inter", sans-serif;
+  /* The switch between modes is a transition, not a new screen. */
+  transition: --bg 0.9s ease,
+    --panel 0.9s ease,
+    --card 0.9s ease,
+    --line 0.9s ease,
+    --line-strong 0.9s ease,
+    --text 0.9s ease,
+    --text-answer 0.9s ease,
+    --muted 0.9s ease,
+    --dim 0.9s ease,
+    --faint 0.9s ease,
+    --soft 0.9s ease,
+    --softer 0.9s ease,
+    --soft-empty 0.9s ease,
+    --hover 0.9s ease,
+    --hover-soft 0.9s ease,
+    --surface 0.9s ease,
+    --menu 0.9s ease,
+    --sunken 0.9s ease,
+    --switch-bg 0.9s ease,
+    --border-input 0.9s ease,
+    --border-focus 0.9s ease,
+    --border-hover 0.9s ease,
+    --dots 0.9s ease,
+    --scroll 0.9s ease,
+    --shadow 0.9s ease,
+    --card-shadow 0.9s ease,
+    --off 0.9s ease,
+    --accent 0.9s ease,
+    --accent-hover 0.9s ease,
+    --accent-track 0.9s ease,
+    --accent-deep 0.9s ease,
+    --accent-line 0.9s ease,
+    --accent-glow 0.9s ease,
+    --accent-haze 0.9s ease;
 }
+
+/* Two modes (Phase 10): local (dark with red, the original look) and
+   cloud (light with blue). App.tsx sets data-mode on <html>. Every color
+   is registered so the browser can animate it: the whole page shifts
+   from one look to the other, it does not reload. */
+:root[data-mode="cloud"] {
+  --bg: #f3f6fa;
+  --panel: #ffffff;
+  --card: #fafbfd;
+  --line: #e1e7ef;
+  --line-strong: #cdd6e1;
+  --text: #1b2430;
+  --text-answer: #2b3543;
+  --muted: #6b7685;
+  --dim: #7b8695;
+  --faint: #9aa4b1;
+  --soft: #566170;
+  --softer: #6f7a88;
+  --soft-empty: #6f7a88;
+  --hover: #e9eff6;
+  --hover-soft: #eef3f8;
+  --surface: #ffffff;
+  --menu: #ffffff;
+  --sunken: #f7f9fc;
+  --switch-bg: #e9eef5;
+  --border-input: #c6d0dc;
+  --border-focus: #93a5ba;
+  --border-hover: #a9b7c7;
+  --dots: #c2cbd6;
+  --scroll: #c6d0dc;
+  --shadow: rgba(31, 122, 224, 0.16);
+  --card-shadow: rgba(31, 122, 224, 0.1);
+  --off: #c2cbd6;
+  --accent: #1f7ae0;
+  --accent-hover: #1866bd;
+  --accent-track: #cfe2f9;
+  --accent-deep: #d3e5fb;
+  --accent-line: rgba(31, 122, 224, 0.35);
+  --accent-glow: rgba(31, 122, 224, 0.3);
+  --accent-haze: rgba(31, 122, 224, 0.1);
+  color-scheme: light;
+}
+
+@property --bg { syntax: "<color>"; inherits: true; initial-value: #0a0a0a; }
+@property --panel { syntax: "<color>"; inherits: true; initial-value: #111111; }
+@property --card { syntax: "<color>"; inherits: true; initial-value: #0f0f0f; }
+@property --line { syntax: "<color>"; inherits: true; initial-value: #1a1a1a; }
+@property --line-strong { syntax: "<color>"; inherits: true; initial-value: #222222; }
+@property --text { syntax: "<color>"; inherits: true; initial-value: #e0e0e0; }
+@property --text-answer { syntax: "<color>"; inherits: true; initial-value: #d0d0d0; }
+@property --muted { syntax: "<color>"; inherits: true; initial-value: #555555; }
+@property --dim { syntax: "<color>"; inherits: true; initial-value: #444444; }
+@property --faint { syntax: "<color>"; inherits: true; initial-value: #333333; }
+@property --soft { syntax: "<color>"; inherits: true; initial-value: #888888; }
+@property --softer { syntax: "<color>"; inherits: true; initial-value: #666666; }
+@property --soft-empty { syntax: "<color>"; inherits: true; initial-value: #777777; }
+@property --hover { syntax: "<color>"; inherits: true; initial-value: #1d1d1d; }
+@property --hover-soft { syntax: "<color>"; inherits: true; initial-value: #181818; }
+@property --surface { syntax: "<color>"; inherits: true; initial-value: #171717; }
+@property --menu { syntax: "<color>"; inherits: true; initial-value: #141414; }
+@property --sunken { syntax: "<color>"; inherits: true; initial-value: #0c0c0c; }
+@property --switch-bg { syntax: "<color>"; inherits: true; initial-value: #0e0e0e; }
+@property --border-input { syntax: "<color>"; inherits: true; initial-value: #383838; }
+@property --border-focus { syntax: "<color>"; inherits: true; initial-value: #5a5a5a; }
+@property --border-hover { syntax: "<color>"; inherits: true; initial-value: #444444; }
+@property --dots { syntax: "<color>"; inherits: true; initial-value: #3a3a3a; }
+@property --scroll { syntax: "<color>"; inherits: true; initial-value: #2a2a2a; }
+@property --shadow { syntax: "<color>"; inherits: true; initial-value: rgba(0, 0, 0, 0.6); }
+@property --card-shadow { syntax: "<color>"; inherits: true; initial-value: rgba(0, 0, 0, 0); }
+@property --off { syntax: "<color>"; inherits: true; initial-value: #333333; }
+@property --accent { syntax: "<color>"; inherits: true; initial-value: #ff3b3b; }
+@property --accent-hover { syntax: "<color>"; inherits: true; initial-value: #cc2f2f; }
+@property --accent-track { syntax: "<color>"; inherits: true; initial-value: #3a1414; }
+@property --accent-deep { syntax: "<color>"; inherits: true; initial-value: #2a1414; }
+@property --accent-line { syntax: "<color>"; inherits: true; initial-value: rgba(255, 59, 59, 0.35); }
+@property --accent-glow { syntax: "<color>"; inherits: true; initial-value: rgba(255, 59, 59, 0.45); }
+@property --accent-haze { syntax: "<color>"; inherits: true; initial-value: rgba(255, 59, 59, 0.05); }
 
 * { box-sizing: border-box; }
 
@@ -39,7 +173,25 @@ html, body {
   padding: 1.2rem 1.5rem 0.8rem;
   display: flex;
   flex-direction: column;
+  background: radial-gradient(ellipse 70% 40% at 50% 0%, var(--accent-haze), transparent 70%);
 }
+header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+
+/* Local / Cloud: a two-button switch in the header */
+.mode-switch { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px; gap: 2px; background: var(--switch-bg); }
+.mode-option {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--dim);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  transition: color 0.3s, background 0.3s;
+}
+.mode-option:hover:not(:disabled) { color: var(--text); }
+.mode-option.on { color: var(--accent); background: var(--accent-deep); }
 
 .rag-title {
   font-family: var(--mono);
@@ -72,12 +224,12 @@ html, body {
 /* Domain filters and agent switch */
 .controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
 
-.switch { display: inline-flex; align-items: center; gap: 0.6rem; margin-left: auto; cursor: pointer; font-family: var(--mono); font-size: 0.75rem; color: #888; }
+.switch { display: inline-flex; align-items: center; gap: 0.6rem; margin-left: auto; cursor: pointer; font-family: var(--mono); font-size: 0.75rem; color: var(--soft); }
 .switch-label { text-align: right; }
 .switch input { display: none; }
 .switch-track { width: 34px; height: 18px; border-radius: 9px; background: var(--line-strong); position: relative; transition: background 0.15s; }
-.switch-thumb { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #888; transition: left 0.15s, background 0.15s; }
-.switch input:checked + .switch-track { background: #3a1414; }
+.switch-thumb { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--soft); transition: left 0.15s, background 0.15s; }
+.switch input:checked + .switch-track { background: var(--accent-track); }
 .switch input:checked + .switch-track .switch-thumb { left: 18px; background: var(--accent); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
@@ -96,17 +248,17 @@ html, body {
 .chip.pinned { cursor: default; }
 .chip.pinned::before { content: "● "; font-size: 0.55rem; vertical-align: 0.1em; }
 
-.notice { font-family: var(--mono); font-size: 0.75rem; color: #888; border: 1px dashed var(--line-strong); border-radius: 4px; padding: 0.7rem 1rem; margin-top: 1rem; }
+.notice { font-family: var(--mono); font-size: 0.75rem; color: var(--soft); border: 1px dashed var(--line-strong); border-radius: 4px; padding: 0.7rem 1rem; margin-top: 1rem; }
 
 /* Conversation */
 .conversation { flex: 1; min-height: 0; overflow-y: auto; margin: 1rem 0 0.6rem; padding-right: 0.5rem; }
-.empty-state { color: #777; font-size: 0.9rem; line-height: 1.7; max-width: 560px; margin: 18vh auto 0; text-align: center; }
+.empty-state { color: var(--soft-empty); font-size: 0.9rem; line-height: 1.7; max-width: 560px; margin: 18vh auto 0; text-align: center; }
 .turn { margin-bottom: 1.6rem; }
 .question { font-family: var(--mono); font-size: 0.85rem; color: var(--text); margin-bottom: 0.6rem; }
 
 .answer-box {
   background: var(--panel);
-  border: 1px solid #1e1e1e;
+  border: 1px solid var(--line);
   border-left: 3px solid var(--accent);
   border-radius: 4px;
   padding: 1.2rem 1.4rem;
@@ -115,17 +267,18 @@ html, body {
   color: var(--text-answer);
   white-space: pre-wrap;
   word-break: break-word;
+  box-shadow: 0 2px 10px var(--card-shadow);
 }
 
 .trace { font-family: var(--mono); font-size: 0.65rem; color: var(--dim); margin-top: 0.4rem; }
 
 /* Retrievals: one block per searched domain, one source at a time */
 .retrievals { margin-top: 0.4rem; }
-.retrieval { position: relative; border: 1px solid var(--line); border-radius: 4px; padding: 0.6rem 0.8rem 0.2rem; margin-bottom: 0.6rem; background: #0c0c0c; }
+.retrieval { position: relative; border: 1px solid var(--line); border-radius: 4px; padding: 0.6rem 0.8rem 0.2rem; margin-bottom: 0.6rem; background: var(--sunken); box-shadow: 0 2px 8px var(--card-shadow); }
 
 /* Dotted corners: four 3x3 dot grids, the top-left one rotated 90° for
    each other corner; the dots take the color of .corner-dots. */
-.corner-dots { position: absolute; inset: -1px; pointer-events: none; color: #3a3a3a; }
+.corner-dots { position: absolute; inset: -1px; pointer-events: none; color: var(--dots); }
 .retrieval.used .corner-dots { color: var(--accent); }
 .corner { position: absolute; width: 12px; height: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
 .corner-0 { top: 0; left: 0; }
@@ -137,10 +290,10 @@ html, body {
 .retrieval-domain { color: var(--text); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
 .retrieval.used .retrieval-domain { color: var(--accent); }
 .retrieval-badge { color: var(--muted); }
-.carousel { margin-left: auto; display: inline-flex; align-items: center; gap: 0.5rem; color: #888; }
+.carousel { margin-left: auto; display: inline-flex; align-items: center; gap: 0.5rem; color: var(--soft); }
 .carousel button {
   background: var(--panel);
-  color: #888;
+  color: var(--soft);
   border: 1px solid var(--line-strong);
   border-radius: 4px;
   font-family: var(--mono);
@@ -165,7 +318,7 @@ html, body {
 .source-path { color: var(--accent); font-weight: 700; margin-bottom: 0.3rem; word-break: break-all; }
 .source-meta { color: var(--dim); margin-bottom: 0.4rem; }
 .source-text {
-  color: #666;
+  color: var(--softer);
   font-size: 0.7rem;
   line-height: 1.5;
   border-top: 1px solid var(--line);
@@ -181,13 +334,13 @@ html, body {
 /* Lighter than the page and with a visible border: on some phone screens
    the old #111 on #0a0a0a could not be told apart from the background. */
 .composer {
-  background: #171717;
-  border: 1px solid #383838;
+  background: var(--surface);
+  border: 1px solid var(--border-input);
   border-radius: 10px;
   padding: 0.7rem 0.8rem 0.5rem;
-  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 -6px 18px var(--shadow);
 }
-.composer:focus-within { border-color: #5a5a5a; }
+.composer:focus-within { border-color: var(--border-focus); }
 .composer textarea {
   width: 100%;
   resize: none;
@@ -201,12 +354,12 @@ html, body {
   padding: 0.2rem 0.3rem;
   max-height: 200px;
 }
-.composer textarea::placeholder { color: #666; }
+.composer textarea::placeholder { color: var(--softer); }
 .composer-bar { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; }
 .composer-spacer { flex: 1; }
 .composer-new {
   background: transparent;
-  color: #888;
+  color: var(--soft);
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   font-family: var(--mono);
@@ -214,7 +367,7 @@ html, body {
   padding: 0.4rem 0.7rem;
   cursor: pointer;
 }
-.composer-new:hover:not(:disabled) { color: var(--text); border-color: #444; }
+.composer-new:hover:not(:disabled) { color: var(--text); border-color: var(--border-hover); }
 .composer-send {
   background: var(--accent);
   color: var(--bg);
@@ -228,15 +381,15 @@ html, body {
   cursor: pointer;
 }
 .composer-send:hover:not(:disabled) { background: var(--accent-hover); }
-.composer-send.stop { background: #1d1d1d; color: var(--accent); border: 1px solid var(--accent); font-size: 0.8rem; }
-.composer-send.stop:hover { background: #2a1414; }
+.composer-send.stop { background: var(--hover); color: var(--accent); border: 1px solid var(--accent); font-size: 0.8rem; }
+.composer-send.stop:hover { background: var(--accent-deep); }
 button:disabled { opacity: 0.4; cursor: default; }
 
 /* Pickers (model, depth): a menu that opens upwards */
 .picker { position: relative; }
 .picker-button {
   background: transparent;
-  color: #999;
+  color: var(--soft);
   border: 1px solid transparent;
   border-radius: 6px;
   font-family: var(--mono);
@@ -244,7 +397,7 @@ button:disabled { opacity: 0.4; cursor: default; }
   padding: 0.35rem 0.55rem;
   cursor: pointer;
 }
-.picker-button:hover, .picker-button[aria-expanded="true"] { background: #181818; border-color: var(--line-strong); color: var(--text); }
+.picker-button:hover, .picker-button[aria-expanded="true"] { background: var(--hover-soft); border-color: var(--line-strong); color: var(--text); }
 .picker-caret { font-size: 0.6rem; color: var(--muted); margin-left: 0.2rem; }
 .picker-menu {
   position: absolute;
@@ -252,11 +405,11 @@ button:disabled { opacity: 0.4; cursor: default; }
   left: 0;
   z-index: 10;
   min-width: 250px;
-  background: #141414;
+  background: var(--menu);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   padding: 0.35rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 8px 24px var(--shadow);
 }
 .picker-title { font-family: var(--mono); font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; padding: 0.35rem 0.6rem 0.25rem; }
 .picker-option {
@@ -272,7 +425,7 @@ button:disabled { opacity: 0.4; cursor: default; }
   cursor: pointer;
   text-align: left;
 }
-.picker-option:hover { background: #1d1d1d; }
+.picker-option:hover { background: var(--hover); }
 .picker-option:disabled { cursor: not-allowed; opacity: 0.45; }
 .picker-option:disabled:hover { background: none; }
 .picker-option.selected .picker-option-label { color: var(--accent); }
@@ -289,23 +442,23 @@ button:disabled { opacity: 0.4; cursor: default; }
   margin-bottom: 0.8rem;
   margin-top: 1.2rem;
 }
-.metric-card { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 1rem; margin-bottom: 0.8rem; }
+.metric-card { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 1rem; margin-bottom: 0.8rem; box-shadow: 0 2px 10px var(--card-shadow); }
 .metric-label { font-family: var(--mono); font-size: 0.65rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.6rem; }
 .recall-row { display: flex; align-items: center; margin-bottom: 0.4rem; gap: 0.6rem; }
 .recall-label { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); width: 70px; flex-shrink: 0; }
 .recall-bar-bg { flex: 1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
 .recall-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; }
-.recall-value { font-family: var(--mono); font-size: 0.7rem; color: #888; width: 36px; text-align: right; flex-shrink: 0; }
+.recall-value { font-family: var(--mono); font-size: 0.7rem; color: var(--soft); width: 36px; text-align: right; flex-shrink: 0; }
 .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); margin-right: 0.4rem; }
 .status-line { font-family: var(--mono); font-size: 0.7rem; color: var(--dim); margin-bottom: 0.3rem; }
 
 footer { margin-top: 1.2rem; border-top: 1px solid var(--line); padding-top: 0.8rem; font-family: var(--mono); font-size: 0.62rem; color: var(--dim); line-height: 1.8; }
-footer a { color: #888; }
+footer a { color: var(--soft); }
 
 /* Recall cards: one per domain, its sets behind the arrows */
 .metric-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; }
 .metric-head .metric-label { margin-bottom: 0; }
-.metric-part { color: #888; }
+.metric-part { color: var(--soft); }
 .metric-head .carousel { margin-left: 0; font-family: var(--mono); font-size: 0.65rem; }
 
 /* Example questions: off by default, shown above the composer */
@@ -320,16 +473,16 @@ footer a { color: #888; }
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  background: #141414;
+  background: var(--menu);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   padding: 0.6rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 8px 24px var(--shadow);
 }
 .example {
   font-family: var(--mono);
   font-size: 0.72rem;
-  color: #888;
+  color: var(--soft);
   background: var(--card);
   border: 1px solid var(--line-strong);
   border-radius: 999px;
@@ -340,34 +493,19 @@ footer a { color: #888; }
 .example:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
 .examples-empty { font-family: var(--mono); font-size: 0.68rem; color: var(--dim); }
 
-/* Dark scrollbars (provisional, until the final style is chosen) */
-* { scrollbar-width: thin; scrollbar-color: #2a2a2a transparent; }
+/* Scrollbars (provisional, until the final style is chosen) */
+* { scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
+*::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 4px; }
 *::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 .others-toggle { display: block; text-decoration: none; padding: 0 0 0.6rem; }
 .others-toggle:hover { color: var(--accent); }
 
 /* Recall cards: a soft red glow on the left edge, only to lift them off
    the background. */
-.col-right .metric-card { border-left-color: rgba(255, 59, 59, 0.35); box-shadow: -4px 0 12px -6px rgba(255, 59, 59, 0.45); }
+.col-right .metric-card { border-left-color: var(--accent-line); box-shadow: -4px 0 12px -6px var(--accent-glow), 0 2px 10px var(--card-shadow); }
 
-/* Agent switch: a work-in-progress note floats under it */
+/* Agent switch (cloud mode only) */
 .agent-toggle { position: relative; margin-left: auto; }
 .agent-toggle .switch { margin-left: 0; }
-.wip-note {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  right: 0;
-  z-index: 5;
-  width: 280px;
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  line-height: 1.5;
-  color: #d9a441;
-  background: #17130a;
-  border: 1px solid #3d3215;
-  border-radius: 6px;
-  padding: 0.5rem 0.7rem;
-}

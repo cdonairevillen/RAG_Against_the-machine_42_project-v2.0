@@ -27,7 +27,7 @@ from src.evaluation.bench import git_revision
 from src.evaluation.gen_bench import (
     contains_answer, even_sample, load_questions, token_f1,
 )
-from src.rag.generator import Generator
+from src.llm import create_generator
 from src.rag.pipeline import RagPipeline
 from src.server.tools import RagTools
 
@@ -125,7 +125,10 @@ def run_single(mode: str, agent: Agent, pipeline: RagPipeline,
 
 
 def run_agent_bench(label: str, k: int = 5, sets: str = "all",
-                    config: Optional[RagConfig] = None) -> dict[str, Any]:
+                    config: Optional[RagConfig] = None,
+                    fallback_answer: str = "mixed",
+                    answer_with: Optional[str] = None,
+                    modes: str = "agent,direct") -> dict[str, Any]:
     """Run the agent and the direct flow over the benchmark sets.
 
     Args:
@@ -133,18 +136,26 @@ def run_agent_bench(label: str, k: int = 5, sets: str = "all",
         k: Sources per search / answer.
         sets: "conversations", "single" or "all".
         config: Pipeline configuration (the profile picks the LLM).
+        fallback_answer: What the agent answers after its fallback
+            ("mixed" or "original", Agent.__init__).
+        answer_with: What the agent answers after its own searches
+            ("rewrite", "original" or "context", Agent.__init__;
+            None: the profile's agent_answer_with).
+        modes: "agent,direct", or one of them (the direct flow does not
+            depend on the agent options: no need to repeat it).
 
     Returns:
         The run dict (also saved to bench/results/agent/).
     """
     config = config or get_config()
-    tools = RagTools.load(config, Generator(config.generation))
-    agent = Agent(tools, k=k)
+    tools = RagTools.load(config, create_generator(config.generation))
+    agent = Agent(tools, k=k, fallback_answer=fallback_answer,
+                  answer_with=answer_with)
     pipeline = tools.get_pipeline()
 
     details: list[dict[str, Any]] = []
     results: dict[str, Any] = {}
-    for mode in ("agent", "direct"):
+    for mode in [m.strip() for m in str(modes).split(",") if m.strip()]:
         rows: list[dict[str, Any]] = []
         if sets in ("all", "conversations"):
             rows += run_conversations(mode, agent, pipeline, k)
@@ -163,6 +174,8 @@ def run_agent_bench(label: str, k: int = 5, sets: str = "all",
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         **git_revision(), "profile": config.profile,
         "generator": config.generation.model,
+        "fallback_answer": fallback_answer,
+        "answer_with": answer_with or config.generation.agent_answer_with,
         "device": config.models.resolved_device(),
         "results": results,
     }
@@ -187,7 +200,11 @@ def print_agent_table(run: dict[str, Any]) -> None:
               f"{'s/answer a/d':>13} {'tool calls':>10}")
     print(header)
     print("-" * len(header))
-    agent, direct = run["results"]["agent"], run["results"]["direct"]
+    agent = run["results"].get("agent", {})
+    direct = run["results"].get("direct", {})
+    if not agent:
+        # Direct only: its numbers in the agent's columns' place.
+        agent, direct = direct, {}
     for group, a in agent.items():
         d = direct.get(group, {})
         print(f"{group:<26} "

@@ -40,6 +40,7 @@ from src.api.metrics import latest_metrics
 from src.config import (
     GenerationConfig, RagConfig, get_config, load_config,
 )
+from src.llm.remote import RemoteUnavailable
 from src.rag.language import detect_language
 
 # Sessions kept in memory and idle time before one is forgotten.
@@ -178,10 +179,16 @@ class ModelPool:
             self.retrieval_device[profile] = (
                 profile_config.models.resolved_device())
         wanted = env_list("RAG_API_MODELS")
+        # The models that answer, in order, when an API model fails
+        # (rate limit, outage; Phase 10). Those not in RAG_API_MODELS
+        # are kept but hidden: they only answer as a fallback.
+        chain = env_list("RAG_API_FALLBACK_MODEL")
         if wanted:
             self.options = OrderedDict(
                 (k, v) for k, v in self.options.items()
-                if k in wanted or k == "default")
+                if k in wanted or k in chain or k == "default")
+        self.hidden = {k for k in chain if wanted and k not in wanted
+                       and k != "default"}
         caps = parse_max_tokens(os.environ.get("RAG_API_MAX_TOKENS", ""),
                                 list(self.options))
         for key, cap in caps.items():
@@ -189,6 +196,8 @@ class ModelPool:
                 update={"max_new_tokens": cap})
         self.default_id = self.resolve(
             os.environ.get("RAG_API_DEFAULT_MODEL", "").strip(), "default")
+        # Empty chain: the API's error reaches the user.
+        self.fallback_ids = [k for k in chain if k in self.options]
         self.direct_only = {m for m in env_list("RAG_API_DIRECT_ONLY")
                             if m in self.options and m != self.default_id}
         self.max_loaded = max(1, int(os.environ.get(
@@ -199,13 +208,25 @@ class ModelPool:
         """The options as /config shows them."""
         return [{"id": key, "label": model_label(gen.model),
                  "model": gen.model, "loaded": key in self.loaded,
-                 "agent": key not in self.direct_only}
-                for key, gen in self.options.items()]
+                 "agent": key not in self.direct_only,
+                 # An API model (Phase 10): the web's cloud mode.
+                 "remote": gen.provider != "local"}
+                for key, gen in self.options.items()
+                if key not in self.hidden]
+
+    def default_cloud(self) -> str:
+        """The cloud mode's first model: RAG_API_DEFAULT_CLOUD_MODEL, or
+        the first API model offered ('' when there is none)."""
+        remote = [k for k, g in self.options.items()
+                  if g.provider != "local" and k not in self.hidden]
+        wanted = os.environ.get("RAG_API_DEFAULT_CLOUD_MODEL", "").strip()
+        return wanted if wanted in remote else (remote[0] if remote
+                                                else "")
 
     def resolve(self, model: Optional[str],
                 fallback: Optional[str] = None) -> str:
         """A valid model id (unknown ids fall back to the web's default)."""
-        if model and model in self.options:
+        if model and model in self.options and model not in self.hidden:
             return model
         return fallback or self.default_id
 
@@ -228,11 +249,11 @@ class ModelPool:
         while len(self.loaded) >= self.max_loaded:
             self.loaded.popitem(last=False)
             free_memory()
-        from src.rag.generator import Generator
+        from src.llm import create_generator
 
         error = ""
         try:
-            self.loaded[model] = Generator(self.options[model])
+            self.loaded[model] = create_generator(self.options[model])
         except Exception as exc:
             # Usually memory: on a GPU that cannot hold it, llm_sdk
             # offloads part of the model and then fails to move it.
@@ -488,6 +509,33 @@ class RagService:
             raise RuntimeError(
                 f"{self.models.label(model)} only runs without the agent: "
                 f"turn the agent off or pick another model.")
+        tried = [model]
+        while True:
+            try:
+                result = self.answer(request, session_id, domains, model,
+                                     on_piece, cancel)
+                break
+            except RemoteUnavailable as exc:
+                # The next model of the chain not tried yet (an API
+                # model fails before writing anything).
+                model = next((m for m in self.models.fallback_ids
+                              if m not in tried), "")
+                if not model or cancel.is_set():
+                    raise
+                print(f"{self.models.label(tried[-1])} unavailable "
+                      f"({exc}); answering with "
+                      f"{self.models.label(model)}.")
+                tried.append(model)
+        if len(tried) > 1:
+            result["trace"]["fallback_from"] = ", ".join(
+                self.models.label(m) for m in tried[:-1])
+        return result
+
+    def answer(self, request: ChatRequest, session_id: str,
+               domains: Any, model: str, on_piece: Any,
+               cancel: threading.Event) -> dict[str, Any]:
+        """chat() with a given model (the chosen one, or the fallback
+        when an API model fails before writing anything)."""
         with self.lock, self.depth(request.depth):
             if cancel.is_set():
                 # Stopped while waiting for its turn: nothing to do.
@@ -530,8 +578,6 @@ class RagService:
             elif not not_found and reached_limit(text, generator):
                 text = trim_to_sentence(text)
                 trace["cut"] = True
-        if not_found:  # TEMP joke, revert next step.
-            text = "Mayte, no me ralles, no soy una enciclopedia."
         return {
             "session_id": session_id, "answer": text,
             "not_found": not_found, "domain": domain,
@@ -561,6 +607,10 @@ class RagService:
 
 def reached_limit(text: str, generator: Any) -> bool:
     """Whether an answer used (nearly) all of max_new_tokens."""
+    finish = getattr(generator, "last_finish_reason", None)
+    if finish is not None:
+        # An API model says why it stopped (no local tokenizer).
+        return bool(finish == "length")
     tokens = len(generator.tokenizer.encode(text))
     return tokens >= int(generator.max_new_tokens * 0.95)
 
@@ -660,6 +710,15 @@ def create_app(config: Optional[RagConfig] = None,
             ],
             "models": service.models.describe(),
             "model_default": service.models.default_id,
+            # Two modes in the web (Phase 10): local models (red) and API
+            # models (blue). The web starts in RAG_API_DEFAULT_MODE when
+            # it has models for it.
+            "model_default_cloud": service.models.default_cloud(),
+            "mode_default": (
+                os.environ.get("RAG_API_DEFAULT_MODE", "cloud").strip()
+                if service.models.default_cloud() else "local"),
+            "agent_default_cloud": os.environ.get(
+                "RAG_API_AGENT_CLOUD", "0") == "1",
             "depths": DEPTHS,
             "depth_default": DEPTH_DEFAULT,
             "agent_default": AGENT_DEFAULT,

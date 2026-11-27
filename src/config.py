@@ -109,6 +109,30 @@ class GenerationConfig(BaseModel):
     # Per model, so each one gets the form it handles (Phase 8, FASE_8.md
     # 8g).
     style_rule: str = ""
+    # Where the model runs (Phase 10, 10a). "local": loaded through
+    # llm_sdk (every model until Phase 10). "openai": an OpenAI-compatible
+    # API (NVIDIA, Groq...) at base_url, with the key read from the
+    # environment variable api_key_env (or .env); src/llm/remote.py.
+    provider: Literal["local", "openai"] = "local"
+    base_url: str = ""
+    api_key_env: str = ""
+    # Extra request fields for the API (NVIDIA: reasoning off).
+    extra_body: dict[str, Any] = Field(default_factory=dict)
+    # Seconds to wait for the API, and attempts on rate limits (429) or
+    # server errors before giving up (the web then falls back to a local
+    # model: RAG_API_FALLBACK_MODEL).
+    timeout: float = 60.0
+    retries: int = 3
+    # Minimum seconds between two requests, to stay under a free tier's
+    # requests-per-minute limit in long benchmarks (0: no pacing).
+    min_interval: float = 0.0
+    # What the agent answers with this model after its own searches
+    # (src/agent/agent.py ANSWER_WITH): "rewrite" (its search query, the
+    # behaviour until Phase 10) or "context" (the user's question plus
+    # the rewrite in brackets in a conversation). Per model, measured
+    # with agent-bench (FASE_10.md, DEC-63).
+    agent_answer_with: Literal[
+        "rewrite", "original", "context", "both"] = "rewrite"
 
 
 class ModelsConfig(BaseModel):
@@ -164,6 +188,10 @@ class SourceConfig(BaseModel):
     # Machine", "este rag"): a matching domain wins and its gate does
     # not apply, since the question is explicitly about it.
     route_names: list[str] = Field(default_factory=list)
+    # Films (Phase 10): also name the domain by the titles of the films
+    # in `root` ("Shrek 2 (2004).md" names "Shrek 2"); see
+    # src/rag/sources/film.py title_patterns.
+    route_names_from_titles: bool = False
     # Search query for questions whose words find nothing useful
     # ("what are you?"), as {pattern: query}: a question that matches a
     # pattern is searched in this domain with that query instead. The
@@ -214,6 +242,11 @@ class SourceConfig(BaseModel):
     # "Not found" answer of this domain, per language ("es", "en"...);
     # empty uses the generic message.
     not_found_message: dict[str, str] = Field(default_factory=dict)
+    # Expressions (case-insensitive) a question must match for that
+    # message; empty: always. The CV's "ask him yourself" only fits
+    # questions about the author, not "where was Nikola Tesla born?"
+    # routed to the CV (Phase 10).
+    not_found_when: list[str] = Field(default_factory=list)
     # Extra rules appended to the system prompt when answering from this
     # domain (e.g. the CV mode's persona and secrecy rules).
     prompt_rules: str = ""

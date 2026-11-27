@@ -35,6 +35,8 @@ import urllib.request
 from collections import Counter
 from typing import Any, Callable, Optional
 
+from src.rag.language import LANGUAGE_NAMES, detect_language
+
 WINDOW_SECONDS = 180.0
 MIN_WINDOWS = 2
 MAX_CHARACTERS = 15
@@ -42,11 +44,13 @@ MAX_EVIDENCE_LINES = 15
 DEFAULT_MODEL = "Qwen/Qwen3-4B"
 SUMMARY_TOKENS = 300
 PROFILE_TOKENS = 350
+SYNOPSIS_TOKENS = 700
 # Bumped when the prompts change: cached profiles of another version are
 # generated again (window summaries are kept if their prompt did not
 # change: SUMMARY_VERSION).
 SUMMARY_VERSION = 2
 PROFILE_VERSION = 4
+SYNOPSIS_VERSION = 3
 
 SUMMARY_SYSTEM = (
     "You summarise a stretch of a film transcript. The transcript has "
@@ -59,10 +63,28 @@ SUMMARY_SYSTEM = (
 )
 SUMMARY_USER = (
     "Film: {title}. Stretch {start} - {end}.\n\n{text}\n\n"
-    "Answer in English, in exactly this format:\n"
+    "Answer in {language}, in exactly this format:\n"
     "SUMMARY: 3 to 5 sentences: what happens, who does what, where.\n"
     "CHARACTERS: the characters named in the dialogue of this stretch, "
     "comma separated, at most 8 (or 'none')"
+)
+# The whole film in a few sentences (Phase 10): "what is the film about?"
+# found only scattered lines before, since every other source covers a
+# stretch of time.
+SYNOPSIS_SYSTEM = (
+    "You write the synopsis of a film from summaries of its scenes, in "
+    "film order. Use only this material: no knowledge of the film from "
+    "elsewhere."
+)
+SYNOPSIS_USER = (
+    "Film: {title}.\n\nScene summaries, in film order:\n{scenes}\n\n"
+    "Answer in exactly this format:\n"
+    "SYNOPSIS: in {language}, 6 to 9 sentences, at most 250 words: "
+    "what the film is about, "
+    "its main characters and what happens, in order, covering the whole "
+    "film: the beginning, the middle and how it ends (give the middle "
+    "and the end as much room as the beginning). Only what the "
+    "summaries say. No times."
 )
 PROFILE_SYSTEM = (
     "You write a short profile of a film character from summaries of "
@@ -74,7 +96,8 @@ PROFILE_USER = (
     "Film: {title}. Character: {name}.\n\nScenes, in film order:\n"
     "{scenes}\n\nDialogue lines that name {name}:\n{lines}\n\n"
     "Answer in exactly this format:\n"
-    "PROFILE: in English, 3 to 5 sentences: who {name} is, their role in "
+    "PROFILE: in {language}, 3 to 5 sentences: who {name} is, their role "
+    "in "
     "the story, their relationships with the other characters and what "
     "they do. Only what the material says: do not add how the story "
     "ends or anything else you may know. No times. If the material says "
@@ -83,7 +106,7 @@ PROFILE_USER = (
 
 TITLES = re.compile(
     r"^(the|lord|lady|princess|prince|king|queen|sir|mr|mrs|miss|"
-    r"dr)\.?\s+", re.IGNORECASE)
+    r"dr|señor|señora|señorita|don|doña|sr|sra)\.?\s+", re.IGNORECASE)
 NOT_A_NAME = re.compile(
     r"\b(unnamed|unknown|unidentified|narrator|none|n/a|various)\b",
     re.IGNORECASE)
@@ -97,13 +120,19 @@ GENERIC = {
     "villagers", "narrator", "everyone", "dad", "mom", "mum", "daddy",
     "mommy", "mummy", "son", "daughter", "captain", "horse", "boss",
     "sir", "darling", "honey", "baby", "kid", "kids", "cat", "handsome",
+    # Films in Spanish (Phase 10): the same roles and nouns.
+    "señor", "señora", "señorita", "papá", "mamá", "jefe", "jefa", "chico",
+    "chica", "hombre", "mujer", "gente", "padre", "madre", "hijo", "hija",
+    "cariño", "tío", "tía", "nadie", "todos", "usted", "ustedes",
 }
 MAX_NAMES = 8
 # A profile that only says the material does not describe the character
 # (first run: Lillian, Gingy) is dropped; the mention facts stay.
 EMPTY_PROFILE = re.compile(
     r"not (directly )?(mentioned|featured|described|present)|cannot be "
-    r"determined|no details|not enough information", re.IGNORECASE)
+    r"determined|no details|not enough information|no se (menciona|"
+    r"describe|puede determinar)|no hay (suficiente )?informaci[oó]n",
+    re.IGNORECASE)
 DIALOGUE_LINE = re.compile(r'^- "(.*)"\s*$', re.M)
 
 Generate = Callable[[str, str, int], str]
@@ -172,6 +201,13 @@ def parse_profile(reply: str) -> str:
                         re.IGNORECASE | re.DOTALL)
     text = " ".join((profile.group(1) if profile else clean).split())
     return "" if EMPTY_PROFILE.search(text) else text
+
+
+def parse_synopsis(reply: str) -> str:
+    """The synopsis from a 'SYNOPSIS: ...' reply."""
+    clean = reply.replace("**", "")
+    found = re.search(r"SYNOPSIS:\s*(.*)", clean, re.IGNORECASE | re.DOTALL)
+    return " ".join((found.group(1) if found else clean).split())
 
 
 def name_key(name: str) -> str:
@@ -254,6 +290,16 @@ def evidence_lines(keys: list[str],
     return [found[int(i * step)] for i in range(limit)]
 
 
+def film_language(sections: list[tuple[float, float, str]]) -> str:
+    """Language of a film's dialogue ('es' or 'en'): the summaries and
+    profiles are written in it (Phase 10). English when unsure, as
+    every film before El método."""
+    dialogue = " ".join(line for _, _, text in sections
+                        for line in DIALOGUE_LINE.findall(text))
+    found = detect_language(dialogue)
+    return found if found in LANGUAGE_NAMES else "en"
+
+
 def enrich_film(title: str, sections: list[tuple[float, float, str]],
                 generate: Generate,
                 cached: Optional[dict] = None) -> dict:
@@ -272,6 +318,7 @@ def enrich_film(title: str, sections: list[tuple[float, float, str]],
     """
     from src.rag.sources.film import stamp
 
+    language = LANGUAGE_NAMES[film_language(sections)]
     cached = cached or {}
     old = {(w["start"], w["end"]): w for w in cached.get("windows", [])} \
         if cached.get("summary_version") == SUMMARY_VERSION else {}
@@ -282,7 +329,8 @@ def enrich_film(title: str, sections: list[tuple[float, float, str]],
             summaries.append(old[(start, end)])
             continue
         reply = generate(SUMMARY_SYSTEM, SUMMARY_USER.format(
-            title=title, start=stamp(start), end=stamp(end), text=text),
+            title=title, start=stamp(start), end=stamp(end), text=text,
+            language=language),
             SUMMARY_TOKENS)
         names, summary = parse_summary(reply, text)
         summaries.append({"start": start, "end": end,
@@ -305,7 +353,8 @@ def enrich_film(title: str, sections: list[tuple[float, float, str]],
         lines = "\n".join(
             evidence_lines(person["aliases"], groups)) or "(none)"
         reply = generate(PROFILE_SYSTEM, PROFILE_USER.format(
-            title=title, name=person["name"], scenes=scenes, lines=lines),
+            title=title, name=person["name"], scenes=scenes, lines=lines,
+            language=language),
             PROFILE_TOKENS)
         person["profile"] = parse_profile(reply)
         print(f"  profile: {person['name']} "
@@ -317,13 +366,27 @@ def enrich_film(title: str, sections: list[tuple[float, float, str]],
         person["first_section"] = next(
             ([start, end] for start, end, text in sections
              if any(mentions(a, text) for a in person["aliases"])), None)
-    return {"windows": summaries, "characters": people,
+    spans = [[w["start"], w["end"]] for w in summaries]
+    synopsis = ""
+    if cached.get("synopsis_version") == SYNOPSIS_VERSION \
+            and cached.get("synopsis_spans") == spans:
+        synopsis = cached.get("synopsis", "")
+    if not synopsis:
+        scenes = "\n".join(f"- {w['summary']}" for w in summaries)
+        synopsis = parse_synopsis(generate(
+            SYNOPSIS_SYSTEM, SYNOPSIS_USER.format(
+                title=title, scenes=scenes, language=language),
+            SYNOPSIS_TOKENS))
+        print(f"  synopsis: {len(synopsis.split())} words")
+    return {"title": title, "windows": summaries, "characters": people,
+            "synopsis": synopsis, "synopsis_spans": spans,
             "summary_version": SUMMARY_VERSION,
-            "profile_version": PROFILE_VERSION}
+            "profile_version": PROFILE_VERSION,
+            "synopsis_version": SYNOPSIS_VERSION}
 
 
-def render(enrichment: dict) -> tuple[str, str]:
-    """The film's two generated files (DEC-55, DEC-56):
+def render(enrichment: dict) -> tuple[str, str, str]:
+    """The film's three generated files (DEC-55, DEC-56):
 
     - <Title>.summaries.md: the scene summaries, packed together by the
       usual chunker (a source holds several, so the LLM reads more).
@@ -332,6 +395,8 @@ def render(enrichment: dict) -> tuple[str, str]:
       (`markdown_sections`), never packed with anything else. A profile
       names the first section of the film that names the character: the
       web plays it as the profile's clip (their presentation).
+    - <Title>.synopsis.md: the whole film in a few sentences, one chunk
+      (Phase 10). No times, so no clip.
     """
     from src.rag.sources.film import stamp
 
@@ -358,7 +423,17 @@ def render(enrichment: dict) -> tuple[str, str]:
                    f"scenes starting at {times}.", ""]
         if person.get("profile"):
             people += [person["profile"], ""]
-    return "\n".join(out), "\n".join(people)
+    synopsis: list[str] = []
+    if enrichment.get("synopsis"):
+        # The title in the header: "what happens in Shrek?" finds it.
+        title = enrichment.get("title", "")
+        synopsis = [f"## Synopsis of the whole film: {title}".rstrip(": "),
+                    "",
+                    enrichment["synopsis"], ""]
+        names = [p["name"] for p in enrichment["characters"].values()]
+        if names:
+            synopsis += [f"Characters: {', '.join(names)}", ""]
+    return "\n".join(out), "\n".join(people), "\n".join(synopsis)
 
 
 def cache_path(work: str, model: str) -> str:

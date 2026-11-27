@@ -104,7 +104,7 @@ El problema: la gente pregunta como a un chatbot y choca con las reglas pensadas
 1. **Charla y preguntas sobre el asistente** (saludos, gracias, "qué puedes hacer") con una respuesta propia, sin pasar por la búsqueda ni el filtro.
 2. **"No encontrado" más útil:** decir qué dominios hay y sugerir preguntas, en lugar de un rechazo seco.
 3. **Reglas del prompt por modelo:** más libertad con los modelos grandes y el externo (S5 de 8g ya está lista); el 0.6B se queda como está.
-4. **Plan B del agente (8f):** buscar con la mezcla y responder solo a la pregunta original.
+4. ~~**Plan B del agente (8f):** buscar con la mezcla y responder solo a la pregunta original.~~ → medido y descartado (DEC-64); se adopta `agent_answer_with` por modelo (DEC-63). Ver `FASE_10.md` §10h.
 
 **Tipo de pregunta (tú, 2026-11-05):** preguntas vagas sobre el propio asistente ("qué eres", "para qué sirves"). **Norma: nada de pistas nuevas en el prompt ni de frases fijas** (las trampas que se quitaron en DEC-33). Caminos generales, a medir:
 

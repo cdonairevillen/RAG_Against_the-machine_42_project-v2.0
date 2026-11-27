@@ -1,0 +1,299 @@
+{
+  "description": "Basic questions check (Phase 10): everyday questions about every domain, sent to the running web API as a visitor would. Not a script to rehearse: a miss points to a general cause to fix (a missing fact in the indexed documents, a routing rule), never to a per-question patch. Each one has the domain that should answer it and words of which at least one must appear in the answer (lowercase, accents ignored); 'not_found' ones must be refused. Questions with the same 'session' are one conversation (the agent's memory). Run: make demo-check. 'domain' may be a list (any of them is right). 'agent_only': a follow-up that needs the conversation, skipped with --direct (the direct flow has no memory).",
+  "questions": [
+    {
+      "id": "about-what-es",
+      "q": "¿Qué eres?",
+      "domain": "about",
+      "any": [
+        "rag",
+        "retrieval"
+      ]
+    },
+    {
+      "id": "about-what-en",
+      "q": "What are you?",
+      "domain": "about",
+      "any": [
+        "rag",
+        "retrieval"
+      ]
+    },
+    {
+      "id": "about-use-es",
+      "q": "¿Para qué sirves?",
+      "domain": "about",
+      "any": [
+        "vllm",
+        "pelicula",
+        "cv",
+        "wikipedia",
+        "dominio"
+      ]
+    },
+    {
+      "id": "about-xquad",
+      "q": "¿Qué sabes de xquad?",
+      "domain": "about",
+      "any": [
+        "48"
+      ]
+    },
+    {
+      "id": "about-films",
+      "q": "¿Qué películas tienes?",
+      "domain": [
+        "about",
+        "film"
+      ],
+      "any": [
+        "shrek"
+      ]
+    },
+    {
+      "id": "about-threshold",
+      "q": "¿Qué umbral tiene el dominio film?",
+      "domain": "about",
+      "any": [
+        "-2.0",
+        "-2,0",
+        "-2"
+      ]
+    },
+    {
+      "id": "about-db",
+      "q": "¿Qué base de datos vectorial usa el proyecto?",
+      "domain": "about",
+      "any": [
+        "qdrant"
+      ]
+    },
+    {
+      "id": "about-reranker",
+      "q": "Which reranker does the project use?",
+      "domain": "about",
+      "any": [
+        "mmarco",
+        "minilm"
+      ]
+    },
+    {
+      "id": "about-base",
+      "q": "¿Cuál es el modelo base del proyecto?",
+      "domain": "about",
+      "any": [
+        "0.6b"
+      ]
+    },
+    {
+      "id": "cv-school",
+      "q": "¿Dónde estudió Chrystian el bachillerato?",
+      "domain": "cv",
+      "any": [
+        "celestino mutis"
+      ]
+    },
+    {
+      "id": "cv-born",
+      "q": "When was Chrystian born?",
+      "domain": "cv",
+      "any": [
+        "1996"
+      ]
+    },
+    {
+      "id": "cv-phone",
+      "q": "¿Cuál es el teléfono de Chrystian?",
+      "domain": "cv",
+      "any": [
+        "correo",
+        "email",
+        "e-mail",
+        "privad"
+      ]
+    },
+    {
+      "id": "cv-contact",
+      "q": "¿Cómo puedo contactar con el autor?",
+      "domain": "cv",
+      "any": [
+        "@"
+      ]
+    },
+    {
+      "id": "vllm-paged",
+      "q": "What is PagedAttention?",
+      "domain": "vllm",
+      "any": [
+        "attention",
+        "memory",
+        "kv"
+      ]
+    },
+    {
+      "id": "vllm-server",
+      "q": "How do I start an OpenAI-compatible server with vLLM?",
+      "domain": "vllm",
+      "any": [
+        "serve"
+      ]
+    },
+    {
+      "id": "vllm-prefix",
+      "q": "¿Qué es el prefix caching en vLLM?",
+      "domain": "vllm",
+      "any": [
+        "cach"
+      ]
+    },
+    {
+      "id": "xquad-sb-en",
+      "q": "Who sang the national anthem at Super Bowl 50?",
+      "domain": "xquad",
+      "any": [
+        "gaga"
+      ]
+    },
+    {
+      "id": "xquad-sb-es",
+      "q": "¿Quién cantó el himno en la Super Bowl 50?",
+      "domain": "xquad",
+      "any": [
+        "gaga"
+      ]
+    },
+    {
+      "id": "xquad-tesla",
+      "q": "When did Nikola Tesla die?",
+      "domain": "xquad",
+      "any": [
+        "1943"
+      ]
+    },
+    {
+      "id": "xquad-tesla-born",
+      "q": "Where was Nikola Tesla born?",
+      "not_found": true,
+      "none": [
+        "ask him",
+        "pregunt"
+      ]
+    },
+    {
+      "id": "film-metodo",
+      "q": "¿De qué va El método?",
+      "domain": "film",
+      "any": [
+        "gronholm",
+        "seleccion",
+        "candidat"
+      ]
+    },
+    {
+      "id": "film-metodo-2",
+      "q": "Que me puedes decir sobre el metodo?",
+      "domain": "film",
+      "any": [
+        "gronholm",
+        "seleccion",
+        "candidat"
+      ]
+    },
+    {
+      "id": "film-shrek2",
+      "q": "What is Shrek 2 about?",
+      "domain": "film",
+      "any": [
+        "fiona",
+        "far far away"
+      ]
+    },
+    {
+      "id": "film-shrek1",
+      "q": "¿Qué ocurre en Shrek 1?",
+      "domain": "film",
+      "any": [
+        "fiona",
+        "farquaad"
+      ]
+    },
+    {
+      "id": "film-rescue",
+      "q": "Who does Shrek have to rescue?",
+      "domain": "film",
+      "any": [
+        "fiona"
+      ]
+    },
+    {
+      "id": "film-julio",
+      "q": "¿Quién es Julio en El método?",
+      "domain": "film",
+      "any": [
+        "denunci",
+        "pesticid",
+        "contamina",
+        "lider",
+        "abogado"
+      ]
+    },
+    {
+      "id": "film-min45",
+      "q": "¿Qué pasa en el minuto 45 de Shrek 2?",
+      "domain": "film",
+      "any": [
+        "poci",
+        "potion",
+        "hada",
+        "godmother"
+      ]
+    },
+    {
+      "id": "film-min30",
+      "q": "¿Qué ocurre en el minuto 30?",
+      "domain": "film",
+      "any": [
+        "shrek",
+        "metodo"
+      ]
+    },
+    {
+      "id": "film-puss-1",
+      "session": "puss",
+      "q": "¿Quién es el Gato con Botas?",
+      "domain": "film",
+      "any": [
+        "gato",
+        "puss",
+        "asesino",
+        "assassin"
+      ]
+    },
+    {
+      "id": "film-puss-2",
+      "session": "puss",
+      "q": "¿Y quién le contrató?",
+      "domain": "film",
+      "any": [
+        "rey",
+        "king",
+        "harold"
+      ],
+      "agent_only": true
+    },
+    {
+      "id": "vllm-france",
+      "q": "¿Cuál es la capital de Francia?",
+      "domain": "vllm",
+      "any": [
+        "paris"
+      ],
+      "note": "The vLLM docs use it, with its answer, as an API example (Phase 3, B15): answering from them is right."
+    },
+    {
+      "id": "ood-gpu",
+      "q": "What is the best GPU for gaming?",
+      "not_found": true
+    }
+  ]
+}

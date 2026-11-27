@@ -1,0 +1,37 @@
+{
+  "label": "188-qwen3-1.7b-context-mixed",
+  "k": 5,
+  "sets": "conversations",
+  "timestamp": "2026-11-27T00:26:48",
+  "commit": "9c4f021",
+  "dirty": true,
+  "profile": "llm-qwen3-1.7b",
+  "generator": "Qwen/Qwen3-1.7B",
+  "fallback_answer": "mixed",
+  "answer_with": "context",
+  "device": "cuda",
+  "results": {
+    "agent": {
+      "conversations/first": {
+        "questions": 12,
+        "contains_answer": 0.9167,
+        "f1": 0.2241,
+        "not_found": 0.0,
+        "seconds_per_answer": 3.03,
+        "tool_call_rate": 1.0,
+        "steps": 2.0,
+        "safety_net_rate": 0.3333
+      },
+      "conversations/follow-up": {
+        "questions": 18,
+        "contains_answer": 0.7222,
+        "f1": 0.1295,
+        "not_found": 0.0556,
+        "seconds_per_answer": 4.39,
+        "tool_call_rate": 0.6111,
+        "steps": 1.94,
+        "safety_net_rate": 0.6111
+      }
+    }
+  }
+}

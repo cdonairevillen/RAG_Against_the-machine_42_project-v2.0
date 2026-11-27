@@ -1,0 +1,37 @@
+{
+  "label": "187-granite-micro-base",
+  "k": 5,
+  "sets": "conversations",
+  "timestamp": "2026-11-27T00:12:56",
+  "commit": "9c4f021",
+  "dirty": true,
+  "profile": "llm-granite-micro",
+  "generator": "ibm-granite/granite-4.0-micro",
+  "fallback_answer": "mixed",
+  "answer_with": "rewrite",
+  "device": "cuda",
+  "results": {
+    "agent": {
+      "conversations/first": {
+        "questions": 12,
+        "contains_answer": 0.9167,
+        "f1": 0.2378,
+        "not_found": 0.0,
+        "seconds_per_answer": 4.26,
+        "tool_call_rate": 1.0,
+        "steps": 2.0,
+        "safety_net_rate": 0.0833
+      },
+      "conversations/follow-up": {
+        "questions": 18,
+        "contains_answer": 0.9444,
+        "f1": 0.1674,
+        "not_found": 0.0,
+        "seconds_per_answer": 5.74,
+        "tool_call_rate": 0.9444,
+        "steps": 2.11,
+        "safety_net_rate": 0.2778
+      }
+    }
+  }
+}

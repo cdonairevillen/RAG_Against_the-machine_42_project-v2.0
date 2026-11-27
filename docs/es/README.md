@@ -4,14 +4,15 @@
 
 # RAG against the Machine v2.0
 
-Un sistema de **generación aumentada por recuperación** (RAG) multidominio, con un agente, un servidor MCP y una interfaz web. Responde a preguntas, con citas, a partir de cuatro bases de conocimiento:
+Un sistema de **generación aumentada por recuperación** (RAG) multidominio, con un agente, un servidor MCP y una interfaz web. Responde a preguntas, con citas, a partir de cinco bases de conocimiento:
 
 | Dominio | Qué contiene | Tamaño |
 |---|---|---|
 | `vllm` | La documentación y el código fuente de vLLM 0.10.1 (el corpus del benchmark de 42) | 37 381 chunks |
 | `xquad` | Cultura general: 48 artículos de Wikipedia de XQuAD, en inglés y en español | 1 217 chunks |
 | `cv` | El CV del autor, su perfil de LinkedIn y su biografía (en inglés y en español) | 162 chunks |
-| `about` | El propio proyecto: el README, la documentación de `docs/` (en inglés y en español) y el código de `src/` | ~3 000 chunks |
+| `about` | El propio proyecto: el README, el informe de benchmarks (en inglés y en español) y el código de `src/` | 1 277 chunks |
+| `film` | Tres películas, por tiempo: *Shrek*, *Shrek 2* y *El método* (diálogo, escenas, resúmenes y fichas de personajes) | 961 chunks |
 
 El modelo de lenguaje base es **Qwen3-0.6B**, el del proyecto original de 42, para que los resultados sigan siendo comparables con otros RAG de 42. Los modelos más grandes son perfiles opcionales: Qwen3-1.7B y Qwen3-4B, de la misma familia, e IBM Granite 4.0 Micro, de otra.
 
@@ -23,7 +24,21 @@ El proyecto se rehízo fase a fase, y cada cambio se midió antes de quedarse. L
 
 ## Contenido
 
-[Resultados](#resultados) · [Cómo funciona](#cómo-funciona) · [Interfaz web](#interfaz-web) · [Cómo ejecutarlo](#cómo-ejecutarlo) · [Despliegue](#despliegue) · [Estructura del proyecto](#estructura-del-proyecto) · [Documentación](#documentación) · [Créditos](#créditos) · [Licencia](#licencia)
+[Qué puede responder](#qué-puede-responder-y-hasta-dónde-llega) · [Resultados](#resultados) · [Cómo funciona](#cómo-funciona) · [Decisiones clave](#decisiones-clave) · [Interfaz web](#interfaz-web) · [Cómo ejecutarlo](#cómo-ejecutarlo) · [Despliegue](#despliegue) · [Estructura del proyecto](#estructura-del-proyecto) · [Documentación](#documentación) · [Créditos](#créditos) · [Licencia](#licencia)
+
+---
+
+## Qué puede responder y hasta dónde llega
+
+Lo que sabe este asistente, dominio a dominio, y dónde acaba su conocimiento. Cada respuesta sale de las fuentes que cita; cuando no contienen la respuesta, lo dice en lugar de inventarla.
+
+- **`vllm`**: la documentación y el código fuente de **vLLM 0.10.1, y solo esa versión**: cómo servir y configurar LLMs, sus APIs, los modelos y el hardware que admite, y su funcionamiento interno. Nada de versiones posteriores ni de otros motores de inferencia.
+- **`xquad`**: cultura general, pero **no toda la Wikipedia**: solo los 48 artículos del dataset XQuAD (unos 240 párrafos, los mismos en inglés y en español). Los artículos: Crisis del petróleo de 1973, Selva amazónica, American Broadcasting Company, Programa Apolo, Peste negra, Cloroplasto, Desobediencia civil, Teoría de la complejidad computacional, Construcción, Ctenóforos, Doctor Who, Desigualdad económica, Derecho de la Unión Europea, Fuerza, Guerra franco-india, Fresno (California), Gengis Kan, Geología, Universidad de Harvard, Hugonotes, Sistema inmunitario, Imperialismo, Grupo Intergubernamental de Expertos sobre el Cambio Climático, Islamismo, Jacksonville (Florida), Kenia, Martín Lutero, Newcastle upon Tyne, Nikola Tesla, Normandos, Oxígeno, Conmutación de paquetes, Farmacia, Número primo, Escuela privada, Rin, Parlamento escocés, Sky (Reino Unido), Sur de California, Máquina de vapor, Super Bowl 50, Docente, Iglesia Metodista Unida, Universidad de Chicago, Victoria (Australia), Museo Victoria y Alberto, Varsovia, Dinastía Yuan.
+- **`cv`**: el autor, Chrystian Donaire Villén: estudios, trabajos, proyectos, habilidades, aficiones y cómo contactar con él (por correo; el teléfono es privado). Nada que no esté en sus propios documentos.
+- **`about`**: este proyecto: qué es, cómo funciona, sus modelos, benchmarks y decisiones de diseño, y su código fuente (este README, el informe de benchmarks y `src/`).
+- **`film`**: tres películas, con búsqueda por tiempo: *Shrek* (2001) y *Shrek 2* (2004), en inglés, y *El método* (2005), en español. De cada una, lo que dicen los personajes, lo que se ve en pantalla, resúmenes de escenas y fichas de personajes. Ninguna otra película.
+
+**¿No sabes qué preguntar?** Usa las preguntas de ejemplo sobre la barra del chat, o pregúntame por alguno de los dominios.
 
 ---
 
@@ -117,6 +132,34 @@ Phi-4-mini fue una opción de otra familia hasta la Fase 7; se retiró porque su
   - **Redes de seguridad:** si la reescritura no encuentra nada, busca la pregunta original; si el dominio que eligió el modelo no tiene nada, repite la búsqueda dentro del filtro del usuario, nunca fuera de él. Un plan B determinista cubre a los modelos que no llaman a la herramienta.
   - La respuesta final usa el mismo generador y las mismas reglas de dominio que el flujo directo.
 - **Servidor MCP** (`make mcp`): el RAG expuesto como herramientas `list_domains`, `search` y `answer`, por stdio o por HTTP (streamable HTTP), para cualquier cliente MCP.
+
+---
+
+## Decisiones clave
+
+Cada decisión de abajo se midió antes de adoptarla. Las cifras completas están en [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md).
+
+- **Qwen3-0.6B sigue siendo el modelo base.** Es el modelo del enunciado de 42, así que el recall y las respuestas se pueden comparar con otros RAG de 42. Los modelos más grandes son perfiles opcionales de `rag.toml`; nunca sustituyen a la base en los benchmarks.
+- **Qdrant en servidor (Docker) como almacenamiento.** Comparado con ~59 000 fragmentos:
+
+  | Opción | Resultado |
+  |---|---|
+  | Qdrant en modo local | ~9 minutos para escribir los fragmentos |
+  | **Qdrant en servidor** | **1,9 s**, consultas filtradas en 18 ms |
+  | Postgres + pgvector | Cerca (consultas en 13 ms), pero necesita un índice vectorial aparte |
+  | SQLite | No tiene vectores |
+  | LanceDB | Bloqueado en Windows |
+
+  Qdrant guarda los fragmentos, sus metadatos y los dos tipos de vector en los mismos puntos. Postgres queda como opción si aparece una necesidad relacional.
+- **`bge-m3` para los embeddings.** Empata con `multilingual-e5-small` y `Qwen3-Embedding-0.6B` en la R@5 del benchmark de 42 (docs 0.92, code 0.79), gana en R@1, R@3 y R@10, y es multilingüe.
+  - **Coste:** unas 2 horas para indexar en CPU. El perfil `cpu-light` (`e5-small`, ~13 minutos) cubre las máquinas sin GPU.
+  - **Descartado:** Qwen3-Embedding, con ~19 horas para indexar en CPU y 0,8 s por consulta.
+- **Búsqueda híbrida con RRF.** BM25, con un tokenizador que separa `snake_case` y `CamelCase`, encuentra los identificadores exactos; los vectores densos encuentran paráfrasis y otros idiomas. Reciprocal Rank Fusion combina las dos listas sin ajustar pesos.
+- **Un reranker multilingüe pequeño:** `mmarco-mMiniLMv2-L12` (97 ms por consulta; R@5 de code 0.80).
+  - `bge-reranker-v2-m3` es mejor en code (R@5 0.86), pero tarda ~23 s por consulta en CPU, así que queda como el perfil opcional `gpu-quality`.
+  - El reranker multilingüe de Jina se descartó por su licencia no comercial.
+- **Un umbral de relevancia por dominio.** El cross-encoder puntúa cada corpus en su propia escala, así que el umbral de cada dominio se calibra con sus propias preguntas antes de ponerlo en marcha. Un umbral global único rechazaba la mayoría de las preguntas válidas de los dominios nuevos. Los umbrales en uso (`relevance_threshold` en `rag.toml`, un logit del cross-encoder): `vllm` 0.0, `xquad` −2.0, `cv` −3.0, `about` −1.25 y `film` −2.0. Una pregunta que nombra una película por su título va a `film` sin pasar por su umbral.
+- **El agente es opcional en la web.** En la CLI va por defecto, como en los RAG de producción. Con modelos pequeños, su memoria de la conversación puede mezclar temas anteriores, así que la web empieza en modo directo.
 
 ---
 

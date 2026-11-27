@@ -1,4 +1,5 @@
 import os
+import traceback
 from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel
@@ -8,6 +9,7 @@ from src.config import CONFIG_FILE, RagConfig, load_config
 from src.rag.pipeline import RagPipeline
 from src.rag.retriever import Retriever
 from src.rag.router import DomainRouter
+from src.llm import create_generator
 from src.rag.generator import Generator
 from src.rag.embeddings import vector_name
 from src.rag.ingestion.chunk import Chunk
@@ -121,7 +123,7 @@ class CLI:
         """
         if self.generator is None:
             try:
-                self.generator = Generator(self.config.generation)
+                self.generator = create_generator(self.config.generation)
             except Exception as exc:
                 print(f"Error loading model: {exc}")
                 raise
@@ -810,7 +812,9 @@ class CLI:
             print(f"Error during gate_scores: {exc}")
 
     def agent_bench(self, label: str = "run", k: int = 5,
-                    sets: str = "all") -> None:
+                    sets: str = "all", fallback_answer: str = "mixed",
+                    answer_with: Optional[str] = None,
+                    modes: str = "agent,direct") -> None:
         """Agent vs direct access on conversations and single questions.
 
         Results go to bench/results/agent/. The LLM (and so the agent)
@@ -820,14 +824,25 @@ class CLI:
             label: Short name for this run.
             k: Sources per search / answer.
             sets: "conversations", "single" or "all".
+            fallback_answer: What the agent answers after its fallback:
+                "mixed" or "original" (plan B, 8f).
+            answer_with: What it answers after its own searches:
+                "rewrite", "original" or "context" (default: the
+                profile's agent_answer_with).
+            modes: "agent,direct" or only one of them.
         """
         from src.evaluation.agent_bench import run_agent_bench
 
         try:
             run_agent_bench(label=label, k=k, sets=sets,
-                            config=self.config)
+                            config=self.config,
+                            fallback_answer=fallback_answer,
+                            answer_with=answer_with, modes=modes)
         except Exception as exc:
             print(f"Error during agent_bench: {exc}")
+            # The whole trace: a benchmark that fails after hours must
+            # say where.
+            traceback.print_exc()
 
     def bundle_export(self, out_dir: str = "deploy/bundle") -> None:
         """Snapshot every indexed domain (Qdrant + BM25) into a bundle.

@@ -10,7 +10,7 @@ from tqdm import tqdm
 from src.evaluation.bench import SUITES, git_revision
 from src.config import RagConfig, get_config
 from src.evaluation.evaluator import Evaluator
-from src.rag.generator import Generator
+from src.llm import create_generator
 from src.rag.language import ARTICLES, detect_language, words
 from src.models import MinimalSource
 from src.rag.pipeline import RagPipeline
@@ -241,7 +241,7 @@ def run_gen_bench(label: str, k: int = 5, limit: Optional[int] = None,
     config = config or get_config()
     retriever = Retriever.from_store(domain, config=config)
     retriever.load_reranker()
-    generator = Generator(config.generation)
+    generator = create_generator(config.generation)
     pipeline = RagPipeline(retriever, generator)
 
     details: list[dict[str, Any]] = []

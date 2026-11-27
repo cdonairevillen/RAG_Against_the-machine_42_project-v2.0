@@ -1,0 +1,97 @@
+{
+  "label": "180-lightning-cv",
+  "suite": "cv",
+  "domain": "cv",
+  "k": 5,
+  "limit": null,
+  "sample": null,
+  "timestamp": "2026-11-25T16:44:37",
+  "commit": "9c4f021",
+  "dirty": true,
+  "profile": "llm-nvidia-lightning",
+  "generator": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "max_new_tokens": 1024,
+  "device": "cuda",
+  "sets": {
+    "cv/en": {
+      "questions": 30,
+      "f1": 0.3972,
+      "f1_answered": 0.4256,
+      "contains_answer": 0.8333,
+      "false_not_found": 0.0667,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.9333,
+      "cites": 0.75,
+      "citation_correct": 0.9524,
+      "language_match": 0.4286,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "cut": 0.25,
+      "tokens": 14.0,
+      "tokens_max": 57,
+      "seconds_per_answer": 1.06
+    },
+    "cv/es": {
+      "questions": 30,
+      "f1": 0.2433,
+      "f1_answered": 0.2607,
+      "contains_answer": 0.9,
+      "false_not_found": 0.0667,
+      "refused_with_answer": 0.0,
+      "answer_in_context": 0.9333,
+      "cites": 0.9286,
+      "citation_correct": 0.9231,
+      "language_match": 0.75,
+      "leaks": 0,
+      "echo": 0.0,
+      "bad_citation": 0.0,
+      "cut": 0.0357,
+      "tokens": 20.1,
+      "tokens_max": 61,
+      "seconds_per_answer": 1.38
+    },
+    "cv-ood/en-missing": {
+      "questions": 7,
+      "correct_not_found": 1.0,
+      "cv_message": 1.0,
+      "handled": 1.0,
+      "leaks": 0
+    },
+    "cv-ood/en-private": {
+      "questions": 2,
+      "correct_not_found": 0.5,
+      "cv_message": 0.5,
+      "handled": 0.5,
+      "leaks": 0
+    },
+    "cv-ood/en-secret": {
+      "questions": 1,
+      "correct_not_found": 0.0,
+      "cv_message": 0.0,
+      "handled": 1.0,
+      "leaks": 0
+    },
+    "cv-ood/es-missing": {
+      "questions": 7,
+      "correct_not_found": 0.4286,
+      "cv_message": 0.4286,
+      "handled": 0.4286,
+      "leaks": 0
+    },
+    "cv-ood/es-private": {
+      "questions": 2,
+      "correct_not_found": 0.5,
+      "cv_message": 0.5,
+      "handled": 0.5,
+      "leaks": 0
+    },
+    "cv-ood/es-secret": {
+      "questions": 1,
+      "correct_not_found": 0.0,
+      "cv_message": 0.0,
+      "handled": 1.0,
+      "leaks": 0
+    }
+  }
+}

@@ -414,3 +414,46 @@ def test_the_api_docs_can_be_hidden(monkeypatch) -> None:
     assert hidden.get("/openapi.json").status_code == 404
     assert hidden.get("/docs").status_code == 404
     assert hidden.get("/health").status_code == 200
+
+
+def test_the_fallback_chain_hides_its_extra_models(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.api.app import ModelPool
+
+    config = CONFIG.model_copy(
+        update={"available_profiles": ["default", "llm-a", "llm-b"]})
+    monkeypatch.setattr("src.api.app.load_config",
+                        lambda profile: CONFIG)
+    monkeypatch.setenv("RAG_API_MODELS", "default,llm-a")
+    monkeypatch.setenv("RAG_API_FALLBACK_MODEL", "llm-a,llm-b,nope")
+    pool = ModelPool(config)
+    # llm-b only answers as a fallback: loaded, not offered.
+    assert pool.fallback_ids == ["llm-a", "llm-b"]
+    assert [m["id"] for m in pool.describe()] == ["default", "llm-a"]
+    assert pool.resolve("llm-b") == "default"
+
+
+def test_a_failing_api_model_walks_the_chain(client: TestClient) -> None:
+    from src.llm.remote import RemoteUnavailable
+
+    service = client.app.state.service  # type: ignore[attr-defined]
+    for name in ("llm-x", "llm-y"):
+        service.models.options[name] = CONFIG.generation
+    service.models.fallback_ids = ["llm-x", "llm-y", "default"]
+    real = service.answer
+    asked: list[str] = []
+
+    def answer(request: Any, session_id: Any, domains: Any, model: str,
+               on_piece: Any, cancel: Any) -> dict[str, Any]:
+        asked.append(model)
+        if model != "default":
+            raise RemoteUnavailable(f"{model}: HTTP 429")
+        return real(request, session_id, domains, model, on_piece, cancel)
+
+    service.answer = answer
+    done = events(client.post("/chat", json={
+        "message": "q", "agent": False, "model": "llm-x"}))[-1]
+    # llm-x is skipped the second time: it already failed.
+    assert asked == ["llm-x", "llm-y", "default"]
+    assert done[0] == "done"
+    assert done[1]["trace"]["fallback_from"].count(",") == 1

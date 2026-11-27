@@ -1030,3 +1030,110 @@ La "citation ok" del `gen-bench` cae a ~0.1, pero es un efecto de la métrica: c
 **Coste conocido:** "Quien es burro" vuelve a "no se encuentra" (era la línea quitada). Pendiente de la traducción de la pregunta.
 
 **Reversible:** sí (variantes `160` y `164` arriba).
+
+## DEC-57 — LLM externo: una segunda implementación al lado de la local, sin tocar la local
+
+**Contexto (2026-11-25, Fase 10a):** el generador local da por hecho que el modelo está en memoria (tokenizador, plantilla, `generate`, tokens de parada). Una API recibe los mensajes y aplica su propia plantilla.
+
+| Opción | Pros | Contras |
+|---|---|---|
+| **A. `RemoteGenerator` aparte (`src/llm/remote.py`) con la misma interfaz, y una fábrica `create_generator`** ✅ | El `Generator` local no cambia ni una línea: respuestas idénticas comprobadas (`170-local-check`, 44 de 44) | El agente necesita un punto de entrada propio para el remoto (`tool_step`) |
+| B. Mover el código local a una clase base y heredar | Más "limpio" sobre el papel | Mueve el código que mide 42 y todos los benchmarks: más riesgo para la garantía de respuestas idénticas |
+
+**Reversible:** sí. Sin el perfil remoto, todo funciona como antes.
+
+## DEC-58 — Si el modelo externo falla, responde el Qwen3-1.7B (solo en la web)
+
+**Decidido por ti (2026-11-25).** La caída solo ocurre si la API no ha escrito nada todavía. Si falla a mitad de respuesta, se queda lo que llegó. En los benchmarks no hay caída (`RAG_API_FALLBACK_MODEL` vacío), para que un fallo de la API se vea en las cifras y no lo tape el 1.7B.
+
+**Reversible:** sí: `API_FALLBACK_MODEL=` desactiva la caída y muestra el error.
+
+## DEC-59 — Resúmenes y fichas de cada película en el idioma de su diálogo
+
+**Decidido por ti (2026-11-25):** español para *El método*. Lo aplico como regla general y no como opción por película: el idioma se detecta en las líneas de diálogo (`film_language`). Las cabeceras que leen los parsers (`SUMMARY:`, `## Character:`, `First named…`) siguen en inglés. Para Shrek el prompt sale idéntico (inglés), así que su caché sigue valiendo.
+
+**Reversible:** sí.
+
+## DEC-60 — "About" solo con el código, el README y el informe de benchmarks (opción B)
+
+**Decidido por ti (2026-11-25)**, tras medirlo (`FASE_10.md` §10c): R@5 de "about" de 0.33 a 0.50 (EN) y de 0.44 a 0.72 (ES), la generación dentro del ruido, 42 sin cambios. Con una sección "Key decisions" en el README para no perder el "porqué".
+
+**Reversible:** sí: quitar las líneas nuevas de `exclude_paths` y reindexar.
+
+## DEC-61 — Identificador de película sin tildes
+
+**Contexto:** `film_id("El método (2005)")` daba `el-m-todo-2005`. Ahora se normaliza a ASCII antes (`el-metodo-2005`). Los identificadores de Shrek no cambian.
+
+**Reversible:** sí.
+
+# Noche del 2026-11-26/27 (sesión autónoma, autorizada por ti)
+
+Encargo: pasar la batería de preguntas básicas (`make demo-check`) con todos los modelos, hacer el plan B del agente (8f), abrir el túnel y los retoques necesarios. Las decisiones van aquí; el detalle y las cifras, en `FASE_10.md` §10h.
+
+## DEC-62 — Cuatro preguntas de la batería estaban mal planteadas: se corrigen las preguntas, no el RAG
+
+La batería mide si el sistema responde bien; una pregunta mal planteada mide otra cosa. Corregidas:
+
+| Pregunta | Problema | Cambio |
+|---|---|---|
+| `xquad-sb-en` / `-es` ("¿Quién ganó la Super Bowl 50?") | El corpus de XQuAD **no dice quién ganó** (solo da pistas: Manning, los Broncos en las rondas previas). "No se encuentra" era la respuesta honesta; ayer pasó porque Gemini 3.1 lo dedujo | "¿Quién cantó el himno en la Super Bowl 50?" → Lady Gaga, que sí está en los dos idiomas |
+| `about-what-*` ("¿Qué eres?") | Se esperaba "rag"; "Retrieval-Augmented Generation" es igual de correcto | Vale también "retrieval" |
+| `about-films` ("¿Qué películas tienes?") | Responder desde `film` con la lista de películas es correcto | `domain` admite una lista: `about` o `film` |
+| `film-puss-2` ("¿Y quién le contrató?") | Es un seguimiento: sin agente no hay memoria, así que en modo directo siempre falla | `agent_only`: se salta con `--direct` |
+
+**Reversible:** sí (`bench/datasets/demo/questions.json`, `scripts/demo_check.py`).
+
+## DEC-63 — El agente responde a la pregunta del usuario, no a su reescritura (opción `context`, por modelo)
+
+**Causa encontrada con la batería:** con el agente, Lightning contestaba "no lo sé" a las cuatro preguntas del CV. Las fuentes llegaban bien, pero el generador recibía la **reescritura** del agente, que suele ser una lista de palabras clave ("Chrystian Donaire Villén birth date"). Con eso, el modelo dice que no lo encuentra, repite las palabras clave como respuesta ("Chrystian Erasmus internship [1][3]") o contesta en el idioma equivocado. La misma consulta en modo directo, como pregunta, se responde bien.
+
+| Opción | Qué responde el generador |
+|---|---|
+| `rewrite` (la de siempre) | La primera consulta del agente que encontró fuentes |
+| `original` | La pregunta del usuario, tal cual |
+| **`context`** ✅ (Lightning, Gemini y Granite) | La pregunta del usuario; en una conversación, seguida de la reescritura entre paréntesis ("¿Y dónde? (Chrystian birth date)"), que dice a qué se refiere "él" o "eso" |
+
+**Medido** (`agent-bench`, conversaciones; primera pregunta / seguimiento, cada seguimiento vale 0.055):
+
+| Modelo | `rewrite` | `context` | `original` |
+|---|---|---|---|
+| Lightning (`186`) | 0.75 / 0.83 | 0.92 / 0.89 | 1.00 / 0.89 |
+| Bolt (`186`) | 1.00 / 0.94 | **1.00 / 1.00** | 1.00 / 0.89 |
+| Gemini 3.5 Flash-Lite (`186`) | 0.92 / 0.94 | **1.00 / 0.94** | — (cuota) |
+| Qwen3-0.6B (`187`/`188`) | 1.00 / 0.72 | 1.00 / 0.72 | 1.00 / 0.67 |
+| Qwen3-1.7B (`187`/`188`) | 0.92 / 0.78 | 0.92 / 0.72 | 0.92 / 0.67 |
+| Granite 4.0 Micro (`187`/`188`) | 0.92 / 0.94 | 0.92 / **1.00** | 0.92 / 0.83 |
+
+**Preguntas sueltas** (CV, XQuAD y 42, `189`): Granite queda igual (contiene la respuesta ±1 pregunta, F1 ±0.015). Con Lightning, `context` sube el F1 del CV (0.17 → 0.37 EN) y de XQuAD (0.43 → 0.59 EN), porque deja de repetir las palabras clave como respuesta. En el código de vLLM baja (0.42 → 0.35), pero las respuestas siguen siendo correctas: son más cortas ("4096 [1]"), el estilo telegrama de Lightning (10a), y el F1 castiga lo corto frente a una referencia larga.
+
+**Batería de preguntas básicas** (32 preguntas, con el agente): Gemini 25 → **29**, Lightning 25 → **29**, Bolt 27 → 25. Bolt empeora en "¿Qué eres?" / "¿Para qué sirves?": con la pregunta literal, aplica la regla 7 de "about" al pie de la letra y responde solo "I am this project's assistant [7]". Con la reescritura ("What is RAG against the Machine v2.0?") daba la descripción completa.
+
+**Probada y descartada, `both`:** la reescritura entre paréntesis también en la primera pregunta. En las conversaciones no mejora a `context` (Lightning 1.00 / 0.83, Bolt 1.00 / 0.94, `191`), y Bolt añade notas sobre la regla ("Nota: … se usa la regla 7"). Se queda en el código como opción.
+
+**Elegido:** un ajuste por modelo, `agent_answer_with` en el perfil de `rag.toml` (por defecto `rewrite`, el comportamiento de siempre). `context` en Lightning, los tres perfiles de Gemini (los dos que no son 3.5 Flash-Lite, por ser de la misma familia; sin medir) y Granite. `rewrite` en Bolt (por la batería), el 0.6B (la base de las comparativas) y el 1.7B (con ellos no mejora). `original` pierde el sujeto de los seguimientos ("that studio") y no se usa.
+
+**Pendiente:** la regla 7 de "about" se escribió para el modo directo con modelos pequeños. Reescribirla para que no la copien literalmente exige medir el `gen-bench` de "about" con todos los modelos, así que la dejo para ti.
+
+**Reversible:** sí: quitar `agent_answer_with` de los perfiles.
+
+## DEC-64 — Plan B del agente (8f): medido y descartado
+
+**Plan B:** cuando el modelo no hace ninguna llamada válida, buscar con la mezcla (consulta anterior + pregunta nueva) y responder **solo** a la pregunta original (`fallback_answer = "original"`). Medido en las conversaciones (seguimientos): 0.6B 0.72 → 0.72, 1.7B 0.78 → 0.72, Granite 0.94 → 0.89 (`187`). Con la nube casi no hay fallback (tool calls 0.94–1.00), así que no le afecta.
+
+**Por qué empeora:** responder a "¿En qué ciudad está ese estudio?" sin la mezcla pierde **qué** estudio; el 1.7B contesta con otro (Madrid en lugar de Bristol). Responder a la mezcla, que era el problema que motivó el plan B en la Fase 6, hoy sale mejor en los tres modelos.
+
+**Elegido:** no se adopta. La opción queda en el código (`fallback_answer`, `make agent-bench FALLBACK_ANSWER=original`) por si cambia con otros modelos.
+
+**Reversible:** sí.
+
+## DEC-65 — No se hace tolerante el `agent-bench` a un reindexado en marcha
+
+Pendiente de 10e: un proceso largo falla con `list index out of range` si se reindexa mientras corre. Saltarse las posiciones fuera de rango ocultaría el problema sin arreglarlo: las posiciones que sí caen dentro apuntarían a fragmentos distintos y darían resultados equivocados sin avisar. La regla sigue siendo no reindexar con un benchmark corriendo (la web se reinicia tras cada reindexado).
+
+**Reversible:** no aplica (no hay cambio).
+
+## DEC-66 — Los fallos del modo directo por enrutado se quedan como límite
+
+En modo directo, con los modelos locales, "¿Qué películas tienes?" va al CV (−2.61 frente a −2.73 de `film`) y "¿Qué base de datos vectorial usa el proyecto?" no pasa el umbral de ningún dominio (vLLM −2.2 con umbral 0.0; "about" −2.67 con −1.25). Con el agente salen bien. Arreglarlo con frases fijas es lo que se quitó en DEC-33, y ordenar por la distancia de cada dominio a su umbral no cambia ninguno de los dos casos (comprobado con las puntuaciones). Queda como límite documentado del enrutado por puntuación.
+
+**Reversible:** no aplica (no hay cambio).

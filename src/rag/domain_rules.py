@@ -99,6 +99,10 @@ class DomainRules:
         source = self.sources.get(domain or "")
         if source is None or not source.not_found_message:
             return None
+        if source.not_found_when and not any(
+                re.search(p, question, re.IGNORECASE)
+                for p in source.not_found_when):
+            return None
         messages = source.not_found_message
         language = detect_language(question)
         return messages.get(language) or messages.get("en") \

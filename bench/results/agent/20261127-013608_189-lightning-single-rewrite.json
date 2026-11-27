@@ -1,0 +1,77 @@
+{
+  "label": "189-lightning-single-rewrite",
+  "k": 5,
+  "sets": "single",
+  "timestamp": "2026-11-27T01:36:08",
+  "commit": "9c4f021",
+  "dirty": true,
+  "profile": "llm-nvidia-lightning",
+  "generator": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "fallback_answer": "mixed",
+  "answer_with": "rewrite",
+  "device": "cuda",
+  "results": {
+    "agent": {
+      "cv/en": {
+        "questions": 30,
+        "contains_answer": 0.8,
+        "f1": 0.1709,
+        "not_found": 0.0667,
+        "seconds_per_answer": 5.6,
+        "tool_call_rate": 0.9667,
+        "steps": 2.47,
+        "safety_net_rate": 0.1
+      },
+      "cv/es": {
+        "questions": 30,
+        "contains_answer": 0.8667,
+        "f1": 0.1299,
+        "not_found": 0.0,
+        "seconds_per_answer": 5.55,
+        "tool_call_rate": 1.0,
+        "steps": 2.63,
+        "safety_net_rate": 0.1
+      },
+      "xquad/en": {
+        "questions": 50,
+        "contains_answer": 0.84,
+        "f1": 0.4337,
+        "not_found": 0.08,
+        "seconds_per_answer": 5.23,
+        "tool_call_rate": 0.74,
+        "steps": 2.48,
+        "safety_net_rate": 0.16
+      },
+      "xquad/es": {
+        "questions": 50,
+        "contains_answer": 0.82,
+        "f1": 0.3065,
+        "not_found": 0.02,
+        "seconds_per_answer": 5.97,
+        "tool_call_rate": 0.96,
+        "steps": 2.9,
+        "safety_net_rate": 0.42
+      },
+      "public/docs": {
+        "questions": 25,
+        "contains_answer": 0.0,
+        "f1": 0.4898,
+        "not_found": 0.0,
+        "seconds_per_answer": 5.59,
+        "tool_call_rate": 0.92,
+        "steps": 2.6,
+        "safety_net_rate": 0.0
+      },
+      "public/code": {
+        "questions": 25,
+        "contains_answer": 0.08,
+        "f1": 0.4192,
+        "not_found": 0.04,
+        "seconds_per_answer": 4.35,
+        "tool_call_rate": 0.44,
+        "steps": 1.84,
+        "safety_net_rate": 0.04
+      }
+    }
+  }
+}

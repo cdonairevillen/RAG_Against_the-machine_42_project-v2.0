@@ -1,0 +1,37 @@
+{
+  "label": "186-lightning-context",
+  "k": 5,
+  "sets": "conversations",
+  "timestamp": "2026-11-26T23:19:36",
+  "commit": "9c4f021",
+  "dirty": true,
+  "profile": "llm-nvidia-lightning",
+  "generator": "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "fallback_answer": "mixed",
+  "answer_with": "context",
+  "device": "cuda",
+  "results": {
+    "agent": {
+      "conversations/first": {
+        "questions": 12,
+        "contains_answer": 0.9167,
+        "f1": 0.3154,
+        "not_found": 0.0,
+        "seconds_per_answer": 7.51,
+        "tool_call_rate": 1.0,
+        "steps": 2.83,
+        "safety_net_rate": 0.0
+      },
+      "conversations/follow-up": {
+        "questions": 18,
+        "contains_answer": 0.8889,
+        "f1": 0.4388,
+        "not_found": 0.0556,
+        "seconds_per_answer": 7.85,
+        "tool_call_rate": 0.9444,
+        "steps": 2.78,
+        "safety_net_rate": 0.0
+      }
+    }
+  }
+}

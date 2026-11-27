@@ -1,0 +1,77 @@
+{
+  "label": "189-granite-single-context",
+  "k": 5,
+  "sets": "single",
+  "timestamp": "2026-11-27T01:16:02",
+  "commit": "9c4f021",
+  "dirty": true,
+  "profile": "llm-granite-micro",
+  "generator": "ibm-granite/granite-4.0-micro",
+  "fallback_answer": "mixed",
+  "answer_with": "context",
+  "device": "cuda",
+  "results": {
+    "agent": {
+      "cv/en": {
+        "questions": 30,
+        "contains_answer": 0.9333,
+        "f1": 0.1839,
+        "not_found": 0.0333,
+        "seconds_per_answer": 4.17,
+        "tool_call_rate": 0.9667,
+        "steps": 2.13,
+        "safety_net_rate": 0.2667
+      },
+      "cv/es": {
+        "questions": 30,
+        "contains_answer": 0.9,
+        "f1": 0.1528,
+        "not_found": 0.0333,
+        "seconds_per_answer": 4.73,
+        "tool_call_rate": 0.9667,
+        "steps": 2.03,
+        "safety_net_rate": 0.2667
+      },
+      "xquad/en": {
+        "questions": 50,
+        "contains_answer": 0.76,
+        "f1": 0.2578,
+        "not_found": 0.06,
+        "seconds_per_answer": 5.64,
+        "tool_call_rate": 0.94,
+        "steps": 2.34,
+        "safety_net_rate": 0.52
+      },
+      "xquad/es": {
+        "questions": 50,
+        "contains_answer": 0.76,
+        "f1": 0.2323,
+        "not_found": 0.04,
+        "seconds_per_answer": 6.78,
+        "tool_call_rate": 0.96,
+        "steps": 2.06,
+        "safety_net_rate": 0.48
+      },
+      "public/docs": {
+        "questions": 25,
+        "contains_answer": 0.0,
+        "f1": 0.5182,
+        "not_found": 0.0,
+        "seconds_per_answer": 9.63,
+        "tool_call_rate": 1.0,
+        "steps": 2.36,
+        "safety_net_rate": 0.0
+      },
+      "public/code": {
+        "questions": 25,
+        "contains_answer": 0.0,
+        "f1": 0.5223,
+        "not_found": 0.0,
+        "seconds_per_answer": 8.79,
+        "tool_call_rate": 1.0,
+        "steps": 2.52,
+        "safety_net_rate": 0.08
+      }
+    }
+  }
+}

@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   chat, clipUrl, getConfig, getHealth, getMetrics, getSource, resetChat,
-  type Config, type Metrics, type RecallSet, type Retrieval, type Source,
+  type Config, type Metrics, type Mode, type RecallSet, type Retrieval, type Source,
 } from "./api";
 import { EXAMPLES } from "./examples";
 
 const GITHUB = "https://github.com/cdonairevillen/RAG_Against_the-machine_42_project-v2.0";
 
 const BLURB =
-  "A multi-domain RAG over the vLLM docs and code, general knowledge from Wikipedia (English and Spanish) and the author's profile, and the project explaining itself (\"about\", always on). The filters choose where it searches.";
+  "A multi-domain RAG over the vLLM 0.10.1 docs and code, 48 Wikipedia articles (English and Spanish), the author's profile, three films (Shrek, Shrek 2 and El método) and the project explaining itself (\"about\", always on). The filters choose where it searches. Not sure what to ask? Use the example questions above the chat bar, or ask me about one of the domains.";
 
 // Short notes for the model menu (docs/BENCHMARK_REPORT.md §5 and §8).
 const MODEL_NOTES: Record<string, string> = {
@@ -16,7 +16,15 @@ const MODEL_NOTES: Record<string, string> = {
   "llm-qwen3-1.7b": "Better answers · a bit slower",
   "llm-qwen3-4b": "Best answers · slowest · direct RAG only",
   "llm-granite-micro": "IBM Granite · best answers · slowest",
+  "llm-nvidia-lightning": "NVIDIA Nemotron · 30B (3B active) · fast",
+  "llm-nvidia-bolt": "NVIDIA Nemotron · compact · fastest",
 };
+
+// The two modes (Phase 10): the same retrieval, a different writer.
+const MODES: { id: Mode; icon: string; label: string; note: string }[] = [
+  { id: "local", icon: "⚡", label: "Local", note: "Small open models on the author's GPU" },
+  { id: "cloud", icon: "☁", label: "Cloud", note: "A large model through an API, with the agent" },
+];
 
 function depthLabel(depth: number): string {
   return `${depth} sources`;
@@ -38,7 +46,8 @@ interface Turn {
 }
 
 function traceLine(trace: Record<string, unknown>): string {
-  const line = traceBody(trace);
+  let line = traceBody(trace);
+  if (trace.fallback_from) line += ` · ${trace.fallback_from} unavailable`;
   if (trace.cut) return `${line} · cut at the length limit`;
   return line;
 }
@@ -273,6 +282,7 @@ export default function App() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>("local");
   const [useAgent, setUseAgent] = useState(false);
   const [domains, setDomains] = useState<string[]>([]);
   const [model, setModel] = useState("default");
@@ -295,8 +305,10 @@ export default function App() {
           if (h.loaded) {
             getConfig().then((c) => {
               setConfig(c);
-              setUseAgent(c.agent_default);
-              setModel(c.model_default ?? "default");
+              const start: Mode = c.mode_default === "cloud" && c.model_default_cloud ? "cloud" : "local";
+              setMode(start);
+              setUseAgent(start === "cloud" ? (c.agent_default_cloud ?? false) : false);
+              setModel(start === "cloud" ? c.model_default_cloud! : (c.model_default ?? "default"));
               setDepth(c.depth_default ?? 5);
               setDomains(c.domains.map((d) => d.name));
             });
@@ -315,6 +327,12 @@ export default function App() {
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [turns]);
+
+  // The mode's look (index.css): on <html>, so the whole window
+  // changes, with a transition rather than a new screen.
+  useEffect(() => {
+    document.documentElement.dataset.mode = mode;
+  }, [mode]);
 
   // The input grows with its text, up to a limit (then it scrolls).
   useEffect(() => {
@@ -382,8 +400,19 @@ export default function App() {
     setDomains((d) => (d.includes(name) ? d.filter((x) => x !== name) : [...d, name]));
   };
 
-  const models = config?.models ?? [{ id: "default", label: config?.model ?? "Qwen3-0.6B", model: "", loaded: true }];
-  const modelInfo = (id: string) => models.find((m) => m.id === id);
+  const allModels = config?.models ?? [{ id: "default", label: config?.model ?? "Qwen3-0.6B", model: "", loaded: true }];
+  const hasCloud = allModels.some((m) => m.remote);
+  const models = allModels.filter((m) => (mode === "cloud") === !!m.remote);
+  const modelInfo = (id: string) => allModels.find((m) => m.id === id);
+  // Switching modes keeps the conversation: only the writer changes. The
+  // agent switch exists only in the cloud mode (with the small local
+  // models the agent mixes topics: Phase 7).
+  const switchMode = (next: Mode) => {
+    if (next === mode || busy) return;
+    setMode(next);
+    setUseAgent(next === "cloud" ? (config?.agent_default_cloud ?? false) : false);
+    setModel(next === "cloud" ? (config?.model_default_cloud ?? "") : (config?.model_default ?? "default"));
+  };
   const agentAllowed = (id: string) => modelInfo(id)?.agent !== false;
   // Turning the agent on with a direct-only model selected (Qwen3-4B)
   // switches to the web's default model.
@@ -393,10 +422,32 @@ export default function App() {
   };
 
   return (
-    <div className="page">
+    <div className={`page mode-${mode}`}>
       <header>
-        <div className="rag-title">⚡ RAG against the Machine</div>
-        <div className="rag-subtitle">Multi-domain RAG · {modelInfo(model)?.label ?? "Qwen3-0.6B"} · {useAgent ? "agent" : "direct"}</div>
+        <div>
+          <div className="rag-title">{mode === "cloud" ? "☁" : "⚡"} RAG against the Machine</div>
+          <div className="rag-subtitle">
+            Multi-domain RAG · {mode} · {modelInfo(model)?.label ?? "Qwen3-0.6B"} · {useAgent ? "agent" : "direct"}
+          </div>
+        </div>
+        {hasCloud && (
+          <div className="mode-switch" role="tablist" aria-label="Mode">
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                role="tab"
+                aria-selected={mode === m.id}
+                className={`mode-option ${mode === m.id ? "on" : ""}`}
+                title={m.note}
+                disabled={busy}
+                onClick={() => switchMode(m.id)}
+              >
+                {m.icon} {m.label}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       <div className="columns">
@@ -416,20 +467,13 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <div className="agent-toggle">
+            {mode === "cloud" && <div className="agent-toggle">
               <label className="switch" title="The agent remembers the conversation and rewrites follow-up questions">
                 <span className="switch-label">{useAgent ? "With agent (memory)" : "Direct RAG"}</span>
                 <input type="checkbox" checked={useAgent} onChange={(e) => toggleAgent(e.target.checked)} />
                 <span className="switch-track"><span className="switch-thumb" /></span>
               </label>
-              {/* Floats under the switch, so turning it on moves nothing. */}
-              {useAgent && (
-                <div className="wip-note">
-                  Work in progress: the agent's conversation memory is still being improved, and it may mix in earlier
-                  topics.
-                </div>
-              )}
-            </div>
+            </div>}
           </div>
 
           {apiError && !loaded && <div className="notice">{apiError}</div>}
@@ -535,7 +579,7 @@ export default function App() {
           <div className="section-label">System</div>
           <div className="metric-card">
             <div className="status-line">
-              <span className="status-dot" style={{ background: loaded ? "#2ecc71" : "#333" }} />
+              <span className="status-dot" style={{ background: loaded ? "var(--ok)" : "var(--off)" }} />
               {loaded ? "Models loaded" : "Loading…"}
             </div>
             {config?.domains.map((d) => (

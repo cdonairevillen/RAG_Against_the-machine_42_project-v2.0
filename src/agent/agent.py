@@ -50,6 +50,10 @@ AGENT_PROMPT = (
 STEP_TOKENS = 128
 # Characters of each source shown back to the planner.
 RESULT_PREVIEW = 300
+# What the generator answers after the fallback (see Agent.__init__).
+FALLBACK_ANSWERS = ("mixed", "original")
+# What the generator answers after the model's own searches.
+ANSWER_WITH = ("rewrite", "original", "context", "both")
 
 
 @dataclass
@@ -100,8 +104,32 @@ class Agent:
     """
 
     def __init__(self, tools: RagTools, max_steps: int = 3,
-                 k: int = 5, generator: Optional[Generator] = None) -> None:
+                 k: int = 5, generator: Optional[Generator] = None,
+                 fallback_answer: str = "mixed",
+                 answer_with: Optional[str] = None) -> None:
         self.tools = tools
+        # Which question the generator answers when the model searched
+        # (no fallback). "rewrite": the model's first query that found
+        # sources, as before (often keywords: "X birth date"); "original":
+        # the user's question; "context": the user's question, followed
+        # by the rewrite in brackets when there is a conversation (it
+        # names what "he" or "it" refers to); "both": the user's question
+        # plus the rewrite in brackets whenever they differ, first
+        # questions too ("¿Qué eres? (What is this project?)"). None: the
+        # model's own
+        # setting (rag.toml agent_answer_with, read at every question:
+        # the web swaps the model within a session).
+        if answer_with is not None and answer_with not in ANSWER_WITH:
+            raise ValueError(f"answer_with must be one of {ANSWER_WITH}")
+        self.answer_with = answer_with
+        # Plan B (8f): after the deterministic fallback, which question the
+        # generator answers. "mixed": the fallback query (last query +
+        # new question), as before; "original": the question as asked,
+        # with the sources found by the mixed query.
+        if fallback_answer not in FALLBACK_ANSWERS:
+            raise ValueError(f"fallback_answer must be one of "
+                             f"{FALLBACK_ANSWERS}")
+        self.fallback_answer = fallback_answer
         # The LLM that plans and answers (default: the tools' one). The
         # web's model selector swaps it between questions; the session's
         # memory is kept.
@@ -145,14 +173,20 @@ class Agent:
             {"role": "system", "content": self.system_prompt()},
             {"role": "user", "content": content},
         ]
-        tokenizer = self.generator.tokenizer
+        # An API model (src/llm/remote.py) plans with the API's native tool
+        # calls; a local one renders its own template (toolcalls.py).
+        tool_step = getattr(self.generator, "tool_step", None)
         searches: list[tuple[str, dict[str, Any]]] = []
         raw: list[str] = []
         retries: list[str] = []
         for _ in range(self.max_steps):
-            output = self.generator.complete(
-                render(tokenizer, messages, [SEARCH_TOOL]), STEP_TOKENS
-            )
+            if tool_step is not None:
+                output = tool_step(messages, [SEARCH_TOOL], STEP_TOKENS)
+            else:
+                output = self.generator.complete(
+                    render(self.generator.tokenizer, messages,
+                           [SEARCH_TOOL]), STEP_TOKENS
+                )
             raw.append(output)
             calls = [c for c in parse_tool_calls(output)
                      if c["name"] == "search"
@@ -204,6 +238,26 @@ class Agent:
         searches.append((query, self.search(query, user_domains)))
         return searches, raw, True, retries
 
+    def question_to_answer(self, question: str, query: str,
+                           fallback: bool, history: bool) -> str:
+        """The question the generator answers (answer_with and
+        fallback_answer, see __init__)."""
+        if fallback:
+            # Plan B: search with the mix, answer only what was asked.
+            if self.fallback_answer == "original":
+                return question
+            return query
+        mode = self.answer_with or getattr(
+            self.generator, "agent_answer_with", "rewrite")
+        if mode == "original":
+            return question
+        if mode in ("context", "both"):
+            if query.strip() == question.strip() or (
+                    mode == "context" and not history):
+                return question
+            return f"{question} ({query})"
+        return query
+
     @staticmethod
     def describe(result: dict[str, Any]) -> str:
         """A search result as the planner reads it (short)."""
@@ -249,6 +303,8 @@ class Agent:
             ))
 
         query, first = found[0]
+        query = self.question_to_answer(question, query, fallback,
+                                        bool(self.session.turns))
         domain = first["domain"]
         retriever = self.tools.router.retrievers.get(domain)
         limit = (retriever.answer_k if retriever else None) or self.k

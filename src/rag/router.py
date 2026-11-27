@@ -257,6 +257,41 @@ class DomainRouter:
         ranked = self.route(query, k, selected)
         return ranked[0][2]
 
+    def moment(self, query: str, selected: Sequence[str]
+               ) -> Optional[list[MinimalSource]]:
+        """Sources of a question about a moment of a film ("¿qué pasa en
+        el minuto 30 de Shrek 2?"), or None for any other question.
+
+        The film's scene summary and transcript sections that cover the
+        moment, found by time rather than by similarity (a header like
+        "## 00:30:00 - 00:30:30" looks nothing like "minute 30"). Only
+        the films the question names; all of them when it names none.
+        """
+        from src.rag.sources.film import chunks_at, named_titles, time_of
+
+        for domain in selected:
+            retriever = self.retrievers[domain]
+            root = getattr(retriever, "title_root", None)
+            if not root:
+                continue
+            titles = named_titles(query, root)
+            seconds = time_of(query, bool(titles))
+            if seconds is None:
+                return None
+            chunks = chunks_at(retriever.parent_chunks, seconds, titles)
+            if not chunks:
+                return None
+            sources = [MinimalSource(
+                file_path=c.file_path,
+                first_character_index=c.first_character_index,
+                last_character_index=c.last_character_index)
+                for c in chunks]
+            self.last_route = [(domain, float("nan"))]
+            self.last_ranked = [(domain, float("nan"), sources)]
+            self.last_named = domain
+            return sources
+        return None
+
     def search_for_generation(self, query: str, k: int = 10,
                               domains: Optional[str | Sequence[str]] = None
                               ) -> list[MinimalSource]:
@@ -272,6 +307,9 @@ class DomainRouter:
         if not query or not query.strip() or k <= 0:
             return []
         selected = self.selected(domains)
+        timed = self.moment(query, selected)
+        if timed is not None:
+            return timed
         if len(selected) == 1:
             retriever = self.retrievers[selected[0]]
             self.last_route = [(selected[0], float("nan"))]

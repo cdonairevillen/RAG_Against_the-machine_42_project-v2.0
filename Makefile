@@ -99,9 +99,23 @@ web-stop:
 # 8, FASE_8.md 8a): similar answers, and it fits in 12 GB next to the
 # retrieval with the agent on. API_DIRECT_ONLY lists models offered
 # without the agent only (the 4B, if added back: llm-qwen3-4b).
-API_MODELS ?= default,llm-qwen3-1.7b,llm-granite-micro
+API_MODELS ?= default,llm-qwen3-1.7b,llm-granite-micro,llm-qwen3-4b,llm-nvidia-lightning,llm-nvidia-bolt,llm-gemini-lite
 API_DEFAULT_MODEL ?= llm-qwen3-1.7b
-API_DIRECT_ONLY ?=
+API_DIRECT_ONLY ?= llm-qwen3-4b
+# Two modes in the web (Phase 10): local models (red) and API models
+# (llm-nvidia-*, llm-gemini-*; blue, the only ones with the agent switch). The web
+# starts in API_DEFAULT_MODE (cloud when an API model is offered).
+API_DEFAULT_MODE ?= cloud
+API_DEFAULT_CLOUD_MODEL ?= llm-gemini-lite
+# The agent starts on in cloud mode (it can be turned off there); local
+# mode has no agent switch.
+API_AGENT_CLOUD ?= 1
+# The models that answer, in order, when an API model fails: rate
+# limit, used-up daily quota, outage or timeout (Phase 10). A model
+# already tried is skipped; those not in API_MODELS only answer as a
+# fallback. Ends with a local model, so the web always answers. Empty:
+# the error is shown.
+API_FALLBACK_MODEL ?= llm-gemini-lite,llm-gemini-lite-31,llm-qwen3-1.7b
 # Answer length cap in the web (rag.toml keeps 150 so gen-bench stays
 # comparable). A safety net only: generation loops stop by themselves
 # (src/rag/loops.py), and the longest legit answer measured was 464
@@ -122,7 +136,7 @@ API_DOCS ?= 1
 API_ORIGINS ?= *
 api: db-up
 	RAG_API_DOMAINS=$(API_DOMAINS) RAG_API_SHOW=$(API_SHOW) RAG_API_MODELS=$(API_MODELS) RAG_API_MAX_TOKENS=$(API_MAX_TOKENS) \
-		RAG_API_DEFAULT_MODEL=$(API_DEFAULT_MODEL) RAG_API_DIRECT_ONLY=$(API_DIRECT_ONLY) 		RAG_API_MAX_QUEUE=$(API_MAX_QUEUE) RAG_ALLOWED_ORIGINS='$(API_ORIGINS)' RAG_API_DOCS=$(API_DOCS) \
+		RAG_API_DEFAULT_MODEL=$(API_DEFAULT_MODEL) RAG_API_DIRECT_ONLY=$(API_DIRECT_ONLY) RAG_API_FALLBACK_MODEL=$(API_FALLBACK_MODEL) RAG_API_DEFAULT_MODE=$(API_DEFAULT_MODE) RAG_API_DEFAULT_CLOUD_MODEL=$(API_DEFAULT_CLOUD_MODEL) RAG_API_AGENT_CLOUD=$(API_AGENT_CLOUD) 		RAG_API_MAX_QUEUE=$(API_MAX_QUEUE) RAG_ALLOWED_ORIGINS='$(API_ORIGINS)' RAG_API_DOCS=$(API_DOCS) \
 		$(ENV) $(UV) run --project . $(PY) -m src.api
 
 # The web public from this PC through a tunnel (Phase 8d, deploy/local/).
@@ -251,7 +265,14 @@ mcp: db-up
 	$(RUN) mcp --transport $(MCP_TRANSPORT) --port $(MCP_PORT)
 
 agent-bench: db-up
-	$(RUN) agent_bench --label $(LABEL) $(if $(SETS),--sets $(SETS))
+	$(RUN) agent_bench --label $(LABEL) $(if $(SETS),--sets $(SETS)) $(if $(FALLBACK_ANSWER),--fallback_answer $(FALLBACK_ANSWER)) $(if $(ANSWER_WITH),--answer_with $(ANSWER_WITH)) $(if $(MODES),--modes $(MODES))
+
+# Presentation check (Phase 10): the demo questions against the running
+# web API (bench/datasets/demo/questions.json), with the agent. Uses the
+# free API quota: ~2-4 requests per question.
+DEMO_URL ?= http://127.0.0.1:8000
+demo-check:
+	DEMO_URL=$(DEMO_URL) uv run --project . python scripts/demo_check.py $(DEMO_ARGS)
 
 route-bench: db-up
 	$(RUN) route_bench --label $(LABEL)
@@ -292,6 +313,6 @@ meme:
 	$(ENV) $(UV) run --project . $(PY) -m streamlit run src/web.py &
 	@echo "Web running at http://localhost:8501"
 
-.PHONY: install data film film-enrich data-vllm data-xquad db-up db-down db-reset run web web-stop index search-docs search-code \
+.PHONY: demo-check install data film film-enrich data-vllm data-xquad db-up db-down db-reset run web web-stop index search-docs search-code \
         eval-docs eval-code bench route-bench agent-bench gen-bench judge mcp test lint clean meme \
         api api-public api-public-stop api-public-restart web-dev web-build bundle space-build space-run

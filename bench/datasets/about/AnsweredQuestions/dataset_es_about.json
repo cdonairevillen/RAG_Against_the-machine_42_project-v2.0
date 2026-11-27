@@ -18,8 +18,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 1025,
-          "last_character_index": 1101
+          "first_character_index": 1160,
+          "last_character_index": 1236
         }
       ],
       "answer": "Qwen3-0.6B"
@@ -30,8 +30,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 5547,
-          "last_character_index": 5710
+          "first_character_index": 8140,
+          "last_character_index": 8303
         }
       ],
       "answer": "bge-m3"
@@ -42,8 +42,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 5743,
-          "last_character_index": 5848
+          "first_character_index": 8336,
+          "last_character_index": 8441
         }
       ],
       "answer": "mmarco-mMiniLMv2-L12-H384-v1"
@@ -54,8 +54,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 5112,
-          "last_character_index": 5209
+          "first_character_index": 7705,
+          "last_character_index": 7802
         }
       ],
       "answer": "Qdrant"
@@ -66,8 +66,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 6133,
-          "last_character_index": 6264
+          "first_character_index": 8726,
+          "last_character_index": 8857
         }
       ],
       "answer": "cross-encoder"
@@ -78,8 +78,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 2417,
-          "last_character_index": 2466
+          "first_character_index": 5010,
+          "last_character_index": 5059
         }
       ],
       "answer": "0.17"
@@ -90,8 +90,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 8251,
-          "last_character_index": 8330
+          "first_character_index": 11488,
+          "last_character_index": 11567
         }
       ],
       "answer": "sesión"
@@ -102,8 +102,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 4765,
-          "last_character_index": 4826
+          "first_character_index": 7358,
+          "last_character_index": 7419
         }
       ],
       "answer": "ast"
@@ -114,8 +114,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 8995,
-          "last_character_index": 9064
+          "first_character_index": 12232,
+          "last_character_index": 12301
         }
       ],
       "answer": "list_domains"
@@ -126,8 +126,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 12454,
-          "last_character_index": 12529
+          "first_character_index": 19005,
+          "last_character_index": 19080
         }
       ],
       "answer": "Oracle"
@@ -138,8 +138,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 15929,
-          "last_character_index": 16028
+          "first_character_index": 22521,
+          "last_character_index": 22620
         }
       ],
       "answer": "MIT"
@@ -150,8 +150,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 1993,
-          "last_character_index": 2100
+          "first_character_index": 4586,
+          "last_character_index": 4693
         }
       ],
       "answer": "5%"
@@ -161,9 +161,9 @@
       "question": "¿Qué bases de datos se compararon antes de elegir Qdrant?",
       "sources": [
         {
-          "file_path": "docs/es/ROADMAP.md",
-          "first_character_index": 42652,
-          "last_character_index": 42740
+          "file_path": "docs/es/README.md",
+          "first_character_index": 13060,
+          "last_character_index": 13154
         }
       ],
       "answer": "pgvector"
@@ -174,8 +174,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 5915,
-          "last_character_index": 6033
+          "first_character_index": 8508,
+          "last_character_index": 8626
         }
       ],
       "answer": "empeor"
@@ -198,8 +198,8 @@
       "sources": [
         {
           "file_path": "src/rag/generator.py",
-          "first_character_index": 15989,
-          "last_character_index": 16044
+          "first_character_index": 17140,
+          "last_character_index": 17195
         }
       ],
       "answer": "cancel"
@@ -210,8 +210,8 @@
       "sources": [
         {
           "file_path": "docs/es/README.md",
-          "first_character_index": 8604,
-          "last_character_index": 8667
+          "first_character_index": 11841,
+          "last_character_index": 11904
         }
       ],
       "answer": "pregunta original"

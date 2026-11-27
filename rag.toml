@@ -153,6 +153,15 @@ child_size = 400
 
 # Granite 4.0 Micro only (FASE_8.md 8a): it answered the Hotmail question
 # with the Gmail, presented as the Hotmail. The Qwen prompts stay as is.
+# Its "ask him yourself" answer only when the question is about the author
+# (Phase 10): "where was Nikola Tesla born?" also lands here (the birth
+# details look alike) and gets the generic "not found".
+not_found_when = [
+    '\b(chrystian|donaire|vill[eé]n)\b',
+    '\b(el|al|del|the|tu|your) (autor|author|creador|creator)\b',
+    '\b([eé]l|he|him|his)\b',
+]
+
 [sources.cv.model_rules]
 "ibm-granite/granite-4.0-micro" = """
 12. cdonairevillen@gmail.com is a Gmail address. If asked for his Hotmail, Outlook or any other e-mail, his phone, WhatsApp or home address, never answer with that Gmail as if it were the requested one: say that it is private, then give the Gmail as his public contact.
@@ -181,9 +190,19 @@ exclude_dirs = [
 # RESPUESTAS_ARCHIVADAS.md keeps the test questions and wrong answers
 # verbatim: indexed, the search returned them instead of the answers
 # (DEC-39, FASE_7.md 7b.9).
+# Option B (Phase 10, 2026-11-25): only the code, the README and the
+# benchmark report. The work log (roadmap, decisions, changelogs) repeats
+# the author's name and the CV, took CV questions and diluted the README
+# as it grew (about R@5 0.56 -> 0.33 between runs 79 and 171). Deploy
+# guides and the video script (video/, git-ignored) stay out too.
 exclude_paths = [
     "deploy/stage", "deploy/bundle", "deploy/space/README.md",
     "docs/es/RESPUESTAS_ARCHIVADAS.md",
+    "docs/ROADMAP.md", "docs/es/ROADMAP.md",
+    "docs/decisions.md", "docs/es/decisions.md",
+    "docs/changelog", "docs/es/changelog",
+    "docs/es/DETECTOR_BUCLES.md",
+    "deploy/README.md", "deploy/local/README.md", "video",
 ]
 # The working docs exist in Spanish (docs/es/) and English (docs/). The
 # filter below gives English questions only the English copy (Spanish
@@ -253,7 +272,7 @@ default_chunker = "markdown_headers_packed"
 # src/rag/sources/film.py). Git-ignored. Hidden from the web unless the
 # API starts with API_SHOW=film (only on the demo days).
 [sources.film]
-description = "Films, by time: what the characters say (subtitles) and what is seen on screen (scene descriptions)."
+description = "Three films, by time: Shrek (2001) and Shrek 2 (2004), in English, and El método (2005), a Spanish film about a job interview. What the characters say, what is seen on screen, scene summaries and character profiles."
 root = "data/film"
 include = [".md"]
 exclude_dirs = [".work"]
@@ -274,6 +293,11 @@ chronological_context = true
 # accepts 79% / 71%. Spanish out-of-domain questions score high on every
 # domain: route-bench checks which domain wins them.
 relevance_threshold = -2.0
+# A question that names an ingested film by its title goes to this domain
+# and skips the gate (Phase 10): titles from the files in `root`; one that
+# starts with an article ("El método") only counts at the end of the
+# question or after "película"/"film" (src/rag/sources/film.py).
+route_names_from_titles = true
 
 # The character profiles (<Title>.characters.md, film_enrich.py): one
 # chunk each, so a profile is never packed with anything else (and cited
@@ -281,6 +305,8 @@ relevance_threshold = -2.0
 # keep the default, packed together. DEC-55, DEC-56.
 [sources.film.chunkers]
 ".characters.md" = "markdown_sections"
+# The film's synopsis (Phase 10): one chunk.
+".synopsis.md" = "markdown_sections"
 
 # Optional profiles: extra models as explicit options on top of the
 # stable base above (which is what the official benchmark uses and gives
@@ -323,3 +349,64 @@ device = "cpu"
 # languages. Being evaluated: FASE_8.md 8a.
 [profiles.llm-granite-micro.generation]
 model = "ibm-granite/granite-4.0-micro"
+# The agent answers the user's question (plus its rewrite in a
+# conversation), not the rewrite alone: follow-ups 0.94 -> 1.00, single
+# questions equal (DEC-63). The 0.6B and the 1.7B keep "rewrite".
+agent_answer_with = "context"
+
+# External models (Phase 10, 10a): an OpenAI-compatible API instead of a
+# local model (src/llm/remote.py). Same retrieval, prompt and clean-up;
+# the key stays in .env (NVIDIA_API_KEY). Free tier of build.nvidia.com,
+# ~40 requests/min (docs/es/LLM_EXTERNO.md). Reasoning off: with it on,
+# Lightning spent every token thinking. Token limits as the base, so
+# gen-bench compares with the local models. Lightning and Gemini: the
+# agent answers the user's question, not its keyword rewrite (DEC-63).
+[profiles.llm-nvidia-lightning.generation]
+model = "nvidia/nemotron-3.5-lightning-30b-a3b"
+provider = "openai"
+base_url = "https://integrate.api.nvidia.com/v1"
+api_key_env = "NVIDIA_API_KEY"
+extra_body = { chat_template_kwargs = { enable_thinking = false } }
+agent_answer_with = "context"
+
+# Bolt keeps "rewrite": with the user's own "what are you?" it answers
+# only "I am this project's assistant [7]" (about's rule 7), worse in
+# the basic-questions check (DEC-63).
+[profiles.llm-nvidia-bolt.generation]
+model = "nvidia/nemotron-3.5-bolt-e4b"
+provider = "openai"
+base_url = "https://integrate.api.nvidia.com/v1"
+api_key_env = "NVIDIA_API_KEY"
+extra_body = { chat_template_kwargs = { enable_thinking = false } }
+
+# Google AI Studio (Gemini API), free tier, through its OpenAI-compatible
+# endpoint; key in .env (GEMINI_API_KEY). Reasoning off ("none" for
+# Flash; Flash-Lite only accepts "minimal"). Gemini 4 has no free quota.
+[profiles.llm-gemini-flash.generation]
+model = "gemini-3.5-flash"
+provider = "openai"
+base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+api_key_env = "GEMINI_API_KEY"
+extra_body = { reasoning_effort = "none" }
+agent_answer_with = "context"
+
+[profiles.llm-gemini-lite.generation]
+model = "gemini-3.5-flash-lite"
+provider = "openai"
+base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+api_key_env = "GEMINI_API_KEY"
+extra_body = { reasoning_effort = "minimal" }
+agent_answer_with = "context"
+
+# Its own daily quota (Google counts per model): the fallback when 3.5
+# Flash-Lite runs out. Slower (8-45 s when tested, often busy).
+[profiles.llm-gemini-lite-31.generation]
+model = "gemini-3.1-flash-lite"
+provider = "openai"
+base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+api_key_env = "GEMINI_API_KEY"
+extra_body = { reasoning_effort = "minimal" }
+agent_answer_with = "context"
+# A short wait: as a fallback, the local model should not be far behind.
+timeout = 30.0
+retries = 2

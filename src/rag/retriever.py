@@ -166,6 +166,10 @@ class Retriever:
         self.route_hints: list[re.Pattern[str]] = []
         # Patterns that name it beyond doubt (rag.toml route_names).
         self.route_names: list[re.Pattern[str]] = []
+        # Films (rag.toml route_names_from_titles): the folder of the
+        # films, so the router can answer "what happens at minute 30?"
+        # from the sections that cover that moment (Phase 10).
+        self.title_root: Optional[str] = None
         # (pattern, search query) pairs (rag.toml route_queries).
         self.route_queries: list[tuple[re.Pattern[str], str]] = []
         # [English, Spanish] path prefixes of translated files (rag.toml
@@ -352,9 +356,13 @@ class Retriever:
             re.compile(hint, re.IGNORECASE)
             for hint in (source.route_hints if source else [])
         ]
+        names = list(source.route_names) if source else []
+        if source and source.route_names_from_titles:
+            from src.rag.sources.film import title_patterns
+            names += title_patterns(source.root)
+            retriever.title_root = source.root
         retriever.route_names = [
-            re.compile(name, re.IGNORECASE)
-            for name in (source.route_names if source else [])
+            re.compile(name, re.IGNORECASE) for name in names
         ]
         retriever.route_queries = [
             (re.compile(pattern, re.IGNORECASE), search)

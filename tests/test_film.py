@@ -98,10 +98,18 @@ def test_enrichment_windows_names_and_render() -> None:
     secs = [(a, b, t + " Shrek!") for a, b, t in secs]
     replies = iter(["SUMMARY: A.\nCHARACTERS: Shrek", "SUMMARY: B.\n"
                     "CHARACTERS: Shrek", "SUMMARY: C.\nCHARACTERS: none",
-                    "Shrek is an ogre."])
+                    "Shrek is an ogre.",
+                    "**SYNOPSIS:** An ogre and his story."])
     result = enrich_film("T (2000)", secs, lambda s, u, n: next(replies))
-    scenes, people_text = render(result)
+    scenes, people_text, synopsis = render(result)
     assert "## 00:00:00 - 00:03:00 (scene summary)" in scenes
+    # One synopsis for the whole film, without times (no clip); a second
+    # run with the same scenes reuses it.
+    assert synopsis.startswith("## Synopsis of the whole film: T (2000)\n\n"
+                               "An ogre and his story.")
+    assert clip_of(synopsis) is None
+    again = enrich_film("T (2000)", secs, lambda s, u, n: "unused", result)
+    assert again["synopsis"] == "An ogre and his story."
     assert "## Character: Shrek" in people_text
     assert "First mentioned in the scene 00:00:00 - 00:03:00." \
         in people_text
@@ -188,7 +196,7 @@ def test_summaries_file_title_clip_and_chunks() -> None:
                 "name": "Fiona", "aliases": ["fiona"], "windows": [0],
                 "first": 0, "first_listed": 0, "first_section": None,
                 "profile": "A princess."}}}
-    scenes, people = render(data)
+    scenes, people, _ = render(data)
     assert "## Character:" not in scenes and "scene summary" not in people
     # The profile plays the first section that names him, not a window.
     assert clip_of(people.split("## Character: Fiona")[0]) == (30.0, 60.0)
@@ -209,3 +217,53 @@ def test_summaries_file_title_clip_and_chunks() -> None:
     assert source.chunker_for("a/X.characters.md") == "markdown_sections"
     assert source.chunker_for("a/X.summaries.md") == "markdown_headers_packed"
     assert source.chunker_for("a/X.md") == "markdown_headers_packed"
+
+
+def test_titles_name_the_film_domain(tmp_path) -> None:
+    import re
+
+    from src.rag.sources.film import title_patterns
+
+    for name in ("Shrek 2 (2004).md", "El método (2005).md",
+                 "El método (2005).summaries.md"):
+        (tmp_path / name).write_text("x", encoding="utf-8")
+    patterns = [re.compile(p, re.I) for p in title_patterns(str(tmp_path))]
+
+    def names(question: str) -> bool:
+        return any(p.search(question) for p in patterns)
+
+    assert names("What happens in Shrek 2?")
+    assert names("¿Qué sabes de El metodo?")
+    assert names("Háblame de la película El método y sus personajes")
+    # "el método" as an everyday phrase (vLLM code questions).
+    assert not names("¿Qué devuelve el método generate de LLM?")
+    assert not names("¿Cuál es el método de selección?")
+
+
+def test_a_moment_of_a_film(tmp_path) -> None:
+    from src.rag.ingestion.chunk import Chunk
+    from src.rag.sources.film import chunks_at, named_titles, time_of
+
+    for name in ("Shrek (2001).md", "Shrek 2 (2004).md"):
+        (tmp_path / name).write_text("x", encoding="utf-8")
+    assert named_titles("¿Qué pasa en Shrek 2?", str(tmp_path)) == [
+        "Shrek 2 (2004)"]
+    assert time_of("¿Qué ocurre en el minuto 30?", False) == 1800.0
+    assert time_of("What happens at 1:05:00?", False) == 3900.0
+    # Looser forms only when a film is named.
+    assert time_of("a timeout of 30 minutes", False) is None
+    assert time_of("¿Qué pasa a la 1h20 de Shrek?", True) == 4800.0
+    assert time_of("¿Y a la media hora de Shrek?", True) == 1800.0
+
+    def chunk(path: str, start: str, end: str) -> Chunk:
+        return Chunk(f"## {start} - {end}\n\nx", path, 0, 10, "doc")
+
+    parents = [chunk("data/film/Shrek (2001).md", "00:29:30", "00:31:00"),
+               chunk("data/film/Shrek (2001).summaries.md", "00:28:00",
+                     "00:31:00"),
+               chunk("data/film/Shrek 2 (2004).md", "00:00:00", "00:01:00")]
+    found = chunks_at(parents, 1800.0)
+    # The scene summary first, then the transcript; Shrek 2 not there.
+    assert [c.file_path for c in found] == [
+        "data/film/Shrek (2001).summaries.md", "data/film/Shrek (2001).md"]
+    assert chunks_at(parents, 1800.0, ["Shrek 2 (2004)"]) == []

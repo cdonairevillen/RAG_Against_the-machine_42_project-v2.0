@@ -9,6 +9,7 @@ import math
 from typing import Any, Optional, Sequence
 
 from src.config import RagConfig, get_config
+from src.llm import create_generator
 from src.rag.domain_rules import DomainRules
 from src.rag.generator import Generator
 from src.rag.pipeline import RagPipeline
@@ -50,7 +51,7 @@ class RagTools:
         """The answer flow, loading the generator on first use."""
         if self.pipeline is None:
             if self.generator is None:
-                self.generator = Generator(self.config.generation)
+                self.generator = create_generator(self.config.generation)
             self.pipeline = RagPipeline(self.router, self.generator,
                                         self.rules)
         return self.pipeline

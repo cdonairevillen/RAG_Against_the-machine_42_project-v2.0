@@ -145,10 +145,10 @@
       "en": "Which databases were compared before choosing Qdrant?",
       "es": "¿Qué bases de datos se compararon antes de elegir Qdrant?",
       "answer": "pgvector",
-      "file": "docs/ROADMAP.md",
-      "evidence": "decided after measuring local Qdrant, Qdrant server, Postgres + pgvector, SQLite and LanceDB",
-      "file_es": "docs/es/ROADMAP.md",
-      "evidence_es": "decidido tras medir Qdrant local, Qdrant servidor, Postgres + pgvector, SQLite y LanceDB"
+      "file": "README.md",
+      "evidence": "| Postgres + pgvector | Close (13 ms queries), but needs a separate vector index |",
+      "file_es": "docs/es/README.md",
+      "evidence_es": "| Postgres + pgvector | Cerca (consultas en 13 ms), pero necesita un índice vectorial aparte |"
     },
     {
       "id": "about-15",

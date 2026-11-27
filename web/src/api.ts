@@ -22,7 +22,11 @@ export interface ModelOption {
   loaded: boolean;
   // False: offered only without the agent (Qwen3-4B: GPU memory).
   agent?: boolean;
+  // An API model (Phase 10): shown in the cloud mode.
+  remote?: boolean;
 }
+
+export type Mode = "local" | "cloud";
 
 export interface Config {
   model: string;
@@ -33,6 +37,11 @@ export interface Config {
   models: ModelOption[];
   // The model the web starts with (the base stays Qwen3-0.6B).
   model_default?: string;
+  // Cloud mode (API models): its first model, whether the web starts in
+  // it, and whether its agent switch starts on.
+  model_default_cloud?: string;
+  mode_default?: Mode;
+  agent_default_cloud?: boolean;
   depths: number[];
   depth_default: number;
   agent_default: boolean;

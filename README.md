@@ -2,14 +2,15 @@
 
 # RAG against the Machine v2.0
 
-A multi-domain **Retrieval-Augmented Generation** system with an agent, an MCP server and a web interface. It answers questions with citations from four knowledge bases:
+A multi-domain **Retrieval-Augmented Generation** system with an agent, an MCP server and a web interface. It answers questions with citations from five knowledge bases:
 
 | Domain | What it holds | Size |
 |---|---|---|
 | `vllm` | The vLLM 0.10.1 documentation and source code (the 42 benchmark corpus) | 37,381 chunks |
 | `xquad` | General knowledge: 48 Wikipedia articles from XQuAD, in English and Spanish | 1,217 chunks |
 | `cv` | The author's CV, LinkedIn profile and biography (English and Spanish) | 162 chunks |
-| `about` | This project itself: this README, the documentation in `docs/` (English and Spanish) and the source code in `src/` | ~3,000 chunks |
+| `about` | This project itself: this README, the benchmark report (English and Spanish) and the source code in `src/` | 1,277 chunks |
+| `film` | Three films, by time: *Shrek*, *Shrek 2* and *El método* (dialogue, scenes, summaries and character profiles) | 961 chunks |
 
 The base language model is **Qwen3-0.6B**, the model of the original 42 project, so the results stay comparable with other 42 RAGs. Larger models are optional profiles: Qwen3-1.7B and Qwen3-4B from the same family, and IBM Granite 4.0 Micro from another one.
 
@@ -21,7 +22,21 @@ The project was rebuilt phase by phase, and every change was measured before it 
 
 ## Contents
 
-[Results](#results) · [How it works](#how-it-works) · [Web interface](#web-interface) · [Running it](#running-it) · [Deployment](#deployment) · [Project layout](#project-layout) · [Documentation](#documentation) · [Credits](#credits) · [License](#license)
+[What it can answer](#what-it-can-answer-and-its-limits) · [Results](#results) · [How it works](#how-it-works) · [Key decisions](#key-decisions) · [Web interface](#web-interface) · [Running it](#running-it) · [Deployment](#deployment) · [Project layout](#project-layout) · [Documentation](#documentation) · [Credits](#credits) · [License](#license)
+
+---
+
+## What it can answer, and its limits
+
+What this assistant knows, domain by domain, and where its knowledge ends. Every answer comes from the sources it cites; when they do not hold the answer, it says so instead of guessing.
+
+- **`vllm`**: the documentation and source code of **vLLM 0.10.1 only**: serving and configuring LLMs, its APIs, supported models and hardware, and its internals. Nothing about later versions or other inference engines.
+- **`xquad`**: general knowledge, but **not the whole of Wikipedia**: only the 48 articles of the XQuAD dataset (about 240 paragraphs, the same ones in English and Spanish). The articles: 1973 oil crisis, Amazon rainforest, American Broadcasting Company, Apollo program, Black Death, Chloroplast, Civil disobedience, Computational complexity theory, Construction, Ctenophora, Doctor Who, Economic inequality, European Union law, Force, French and Indian War, Fresno (California), Genghis Khan, Geology, Harvard University, Huguenot, Immune system, Imperialism, Intergovernmental Panel on Climate Change, Islamism, Jacksonville (Florida), Kenya, Martin Luther, Newcastle upon Tyne, Nikola Tesla, Normans, Oxygen, Packet switching, Pharmacy, Prime number, Private school, Rhine, Scottish Parliament, Sky (United Kingdom), Southern California, Steam engine, Super Bowl 50, Teacher, United Methodist Church, University of Chicago, Victoria (Australia), Victoria and Albert Museum, Warsaw, Yuan dynasty.
+- **`cv`**: the author, Chrystian Donaire Villén: education, jobs, projects, skills, hobbies and how to contact him (by e-mail; the phone number is private). Nothing beyond his own documents.
+- **`about`**: this project: what it is, how it works, its models, benchmarks and design decisions, and its source code (this README, the benchmark report and `src/`).
+- **`film`**: three films, searched by time: *Shrek* (2001) and *Shrek 2* (2004), in English, and *El método* (2005), in Spanish. For each one, what the characters say, what is seen on screen, scene summaries and character profiles. No other films.
+
+**Not sure what to ask?** Use the example questions above the chat bar, or ask me about one of the domains.
 
 ---
 
@@ -114,6 +129,34 @@ Phi-4-mini was an option from another family until Phase 7; it was dropped becau
   - **Safety nets:** if the rewrite finds nothing, it searches the original question; if the model's domain choice finds nothing, it retries within the user's filter, never outside it. A deterministic fallback covers models that do not call the tool.
   - The final answer uses the same generator and domain rules as the direct path.
 - **MCP server** (`make mcp`): the RAG exposed as `list_domains`, `search` and `answer` tools, over stdio or streamable HTTP, for any MCP client.
+
+---
+
+## Key decisions
+
+Every choice below was measured before it was adopted. The full numbers are in [`docs/BENCHMARK_REPORT.md`](docs/BENCHMARK_REPORT.md).
+
+- **Qwen3-0.6B stays the base model.** It is the model of the 42 subject, so the recall and answer numbers can be compared with other 42 RAGs. Larger models are optional profiles in `rag.toml`; they never replace the base in the benchmarks.
+- **Qdrant as a server (Docker) for storage.** Compared on ~59,000 chunks:
+
+  | Option | Result |
+  |---|---|
+  | Qdrant in local mode | ~9 minutes to write the chunks |
+  | **Qdrant as a server** | **1.9 s**, filtered queries in 18 ms |
+  | Postgres + pgvector | Close (13 ms queries), but needs a separate vector index |
+  | SQLite | Has no vectors |
+  | LanceDB | Blocked on Windows |
+
+  Qdrant keeps chunks, metadata and both vector types in the same points. Postgres remains an option if a relational need appears.
+- **`bge-m3` for embeddings.** It ties with `multilingual-e5-small` and `Qwen3-Embedding-0.6B` on R@5 of the 42 benchmark (docs 0.92, code 0.79), leads on R@1, R@3 and R@10, and is multilingual.
+  - **Cost:** about 2 hours to index on a CPU. The `cpu-light` profile (`e5-small`, ~13 minutes) covers machines without a GPU.
+  - **Discarded:** Qwen3-Embedding, at ~19 hours to index on a CPU and 0.8 s per query.
+- **Hybrid retrieval with RRF.** BM25, with a tokenizer that splits `snake_case` and `CamelCase`, finds exact identifiers; dense vectors find paraphrases and other languages. Reciprocal Rank Fusion combines the two without tuning weights.
+- **A small multilingual reranker:** `mmarco-mMiniLMv2-L12` (97 ms per query; code R@5 0.80).
+  - `bge-reranker-v2-m3` does better on code (R@5 0.86) but takes ~23 s per query on a CPU, so it stays as the optional `gpu-quality` profile.
+  - Jina's multilingual reranker was discarded for its non-commercial license.
+- **One relevance threshold per domain.** The cross-encoder scores each corpus on its own scale, so each domain's threshold is calibrated on its own questions before it goes live. A single global threshold rejected most valid questions in the newer domains. The thresholds in use (`relevance_threshold` in `rag.toml`, a cross-encoder logit): `vllm` 0.0, `xquad` −2.0, `cv` −3.0, `about` −1.25 and `film` −2.0. A question that names a film by its title goes to `film` without its threshold.
+- **The agent is optional in the web.** In the CLI it is the default, as in production RAG systems. With small models, its conversation memory can mix in earlier topics, so the web starts in direct mode.
 
 ---
 

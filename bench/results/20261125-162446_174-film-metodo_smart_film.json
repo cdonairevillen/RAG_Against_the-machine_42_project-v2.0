@@ -1,0 +1,73 @@
+{
+  "label": "174-film-metodo",
+  "mode": "smart",
+  "suite": "film",
+  "k": 10,
+  "timestamp": "2026-11-25T16:24:39",
+  "commit": "9c4f021",
+  "dirty": true,
+  "domain": "film",
+  "profile": "default",
+  "chunking": {
+    "code_chunk_size": 2000,
+    "doc_chunk_size": 2000,
+    "code_child_size": 600,
+    "doc_child_size": 600
+  },
+  "chunkers": {
+    ".characters.md": "markdown_sections"
+  },
+  "retrieval": {
+    "classifier_margin": 0.5,
+    "code_signal_weight": 0.5,
+    "doc_signal_weight": 0.5,
+    "skip_rerank_score": Infinity,
+    "bm25_score_floor": 5.5,
+    "reranker_model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    "rerank_fusion": "rrf",
+    "rrf_k": 60,
+    "doc_signal_languages": [
+      "en",
+      "es"
+    ],
+    "relevance_threshold": 0.0,
+    "rerank_doc_branch": false,
+    "bm25_in_doc_branch": true,
+    "code_aware_tokens": "code"
+  },
+  "device": "cuda",
+  "datasets": {
+    "en": {
+      "recall_at_k": {
+        "1": 0.1935,
+        "3": 0.2903,
+        "5": 0.4516,
+        "10": 0.5806
+      },
+      "seconds": 3.69,
+      "questions": 31,
+      "recall_any_at_k": {
+        "1": 0.5484,
+        "3": 0.7419,
+        "5": 0.9032,
+        "10": 0.9355
+      }
+    },
+    "es": {
+      "recall_at_k": {
+        "1": 0.2258,
+        "3": 0.3548,
+        "5": 0.3871,
+        "10": 0.5806
+      },
+      "seconds": 3.45,
+      "questions": 31,
+      "recall_any_at_k": {
+        "1": 0.5484,
+        "3": 0.7742,
+        "5": 0.8387,
+        "10": 0.9355
+      }
+    }
+  }
+}

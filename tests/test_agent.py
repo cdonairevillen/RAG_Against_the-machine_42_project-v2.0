@@ -134,6 +134,50 @@ def test_fallback_keeps_the_subject_of_the_last_model_query() -> None:
     assert "Conversation so far:" in generator.prompts[-1]
 
 
+def test_plan_b_answers_the_original_question_after_fallback() -> None:
+    plans = [model_call("Where was Chrystian born?"), "DONE",
+             "He was born in 1996."]   # answers without searching
+    for mode, expected in (("mixed", "Where was Chrystian born? "
+                                     "And in which year?"),
+                           ("original", "And in which year?")):
+        generator = FakeGenerator(list(plans))
+        tools = FakeTools(generator)
+        agent = Agent(tools, fallback_answer=mode)  # type: ignore[arg-type]
+        agent.ask("Where was he born?")
+        second = agent.ask("And in which year?")
+        # Same search either way; only the question answered changes.
+        assert second.fallback
+        assert tools.queries[-1] == ("Where was Chrystian born? "
+                                     "And in which year?")
+        assert generator.answered[-1] == expected
+
+
+def test_answer_with_picks_the_question_the_generator_answers() -> None:
+    rewrite = "Chrystian birth date"
+    for mode, first, follow in (
+            ("rewrite", rewrite, rewrite),
+            ("original", "When was he born?", "And where?"),
+            ("context", "When was he born?",
+             "And where? (Chrystian birth date)"),
+            ("both", "When was he born? (Chrystian birth date)",
+             "And where? (Chrystian birth date)")):
+        generator = FakeGenerator([model_call(rewrite), "DONE",
+                                   model_call(rewrite), "DONE"])
+        tools = FakeTools(generator)
+        agent = Agent(tools, answer_with=mode)  # type: ignore[arg-type]
+        agent.ask("When was he born?")
+        agent.ask("And where?")
+        assert generator.answered == [first, follow], mode
+
+
+def test_answer_with_defaults_to_the_models_setting() -> None:
+    generator = FakeGenerator([model_call("Chrystian birth date"), "DONE"])
+    generator.agent_answer_with = "original"  # type: ignore[attr-defined]
+    Agent(FakeTools(generator)).ask(  # type: ignore[arg-type]
+        "When was he born?")
+    assert generator.answered == ["When was he born?"]
+
+
 class PickyTools(FakeTools):
     """Finds sources only for some queries and domains."""
 

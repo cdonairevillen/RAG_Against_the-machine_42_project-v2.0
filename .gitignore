@@ -14,6 +14,9 @@ data/
 bench/datasets/film/
 
 
+# Presentation video: script, raw footage and edits (local only)
+video/
+
 # Local config / secrets
 .streamlit/
 .env

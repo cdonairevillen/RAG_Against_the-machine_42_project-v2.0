@@ -38,6 +38,7 @@ the web can play the clip of a source (/film/<id>/video, DEC-44).
 import json
 import os
 import re
+import unicodedata
 from dataclasses import asdict, dataclass
 from typing import Any, Iterator, Optional
 
@@ -119,7 +120,8 @@ def frame_name(seconds: float) -> str:
 # profile is never packed, cited or played with anything else.
 SUMMARIES_SUFFIX = ".summaries.md"
 CHARACTERS_SUFFIX = ".characters.md"
-GENERATED_SUFFIXES = (SUMMARIES_SUFFIX, CHARACTERS_SUFFIX)
+SYNOPSIS_SUFFIX = ".synopsis.md"
+GENERATED_SUFFIXES = (SUMMARIES_SUFFIX, CHARACTERS_SUFFIX, SYNOPSIS_SUFFIX)
 # A character profile has no header time: its clip is the first section
 # of the film that names the character (film_enrich.render()).
 FIRST_NAMED = re.compile(
@@ -132,15 +134,74 @@ SECTION_HEADER = re.compile(
     r"(?: \(scene summary\))?\s*$", re.M)
 
 
+ARTICLES = {"el", "la", "los", "las", "the", "a", "an"}
+TITLE_YEAR = re.compile(r"\s*\(\d{4}\)$")
+
+
+def title_patterns(root: str) -> list[str]:
+    """All the title expressions of `root` (title_pattern_map)."""
+    return [p for ps in title_pattern_map(root).values() for p in ps]
+
+
+def title_pattern_map(root: str) -> dict[str, list[str]]:
+    """Expressions that name a film of `root` by its title (the router's
+    route_names, Phase 10). A title that is a proper name ("Shrek 2")
+    names it anywhere. One that starts with an article ("El método") is
+    also an everyday phrase ("¿qué devuelve el método generate?"), so it
+    only counts when the question ends it there ("¿qué sabes de El
+    método?") or calls it a film ("la película El método")."""
+    found: dict[str, list[str]] = {}
+    if not os.path.isdir(root):
+        return found
+    for name in sorted(os.listdir(root)):
+        if not name.endswith(".md") or name.endswith(GENERATED_SUFFIXES):
+            continue
+        title = TITLE_YEAR.sub("", name[:-3]).strip()
+        words = plain(title).split()
+        if not words:
+            continue
+        body = r"\s+".join(loose(word) for word in words)
+        # Keyed by the file's title with its year, as title_of() gives it.
+        patterns = found.setdefault(name[:-3], [])
+        if words[0].lower() in ARTICLES and len(words) > 1:
+            patterns.append(r"\b(pel[ií]cula|film|movie)\s+(de\s+)?"
+                            r"[\"'“«*]?" + body + r"\b")
+            patterns.append(r"\b" + body + r"\b(?=\s*(\(\d{4}\))?"
+                            r"\s*[?.!,;:\"'”»*]*\s*$)")
+        else:
+            patterns.append(r"\b" + body + r"\b")
+    return found
+
+
+def plain(text: str) -> str:
+    """Text without accents: "método" -> "metodo"."""
+    return unicodedata.normalize("NFKD", text).encode(
+        "ascii", "ignore").decode()
+
+
+LOOSE_LETTERS = {"a": "[aá]", "e": "[eé]", "i": "[ií]", "o": "[oó]",
+                 "u": "[uúü]", "n": "[nñ]"}
+
+
+def loose(word: str) -> str:
+    """A word as a pattern with optional accents ("metodo" also matches
+    "método")."""
+    return "".join(LOOSE_LETTERS.get(c.lower(), re.escape(c))
+                   for c in word)
+
+
 def film_id(title: str) -> str:
     """URL-safe id of a film ("Shrek 2 (2004)" -> "shrek-2-2004"): the
-    web asks for a video by this id, never by its path."""
-    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    web asks for a video by this id, never by its path. Accents are
+    dropped ("Él (2005)" -> "el-2005")."""
+    plain = unicodedata.normalize("NFKD", title).encode(
+        "ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", plain.lower()).strip("-")
 
 
 def title_of(file_path: str) -> str:
     """Film title of a chunk's file (data/film/<Title>.md, or one of its
-    generated files, <Title>.summaries.md / <Title>.characters.md)."""
+    generated files: <Title>.summaries.md, .characters.md, .synopsis.md)."""
     name = os.path.basename(file_path)
     for suffix in GENERATED_SUFFIXES:
         if name.endswith(suffix):
@@ -163,6 +224,86 @@ def clip_of(text: str) -> Optional[tuple[float, float]]:
     start = int(first[0]) * 3600 + int(first[1]) * 60 + int(first[2])
     end = int(last[3]) * 3600 + int(last[4]) * 60 + int(last[5])
     return float(start), float(max(end, start))
+
+
+def named_titles(question: str, root: str) -> list[str]:
+    """Titles of the films of `root` that the question names
+    (title_patterns), in file order."""
+    found = [title for title, patterns in title_pattern_map(root).items()
+             if any(re.search(p, question, re.IGNORECASE)
+                    for p in patterns)]
+    # "Shrek 2" also contains "Shrek": the longer title wins.
+    names = {t: plain(TITLE_YEAR.sub("", t)).lower() for t in found}
+    return [t for t in found
+            if not any(u != t and names[u].startswith(names[t] + " ")
+                       for u in found)]
+
+
+# A moment of the film in a question (Phase 10): "¿qué pasa en el
+# minuto 30?", "at 1:05:00", "a la media hora de Shrek". The plain forms
+# ("minuto 30", "minute 30", H:MM:SS) always count; looser ones ("30
+# min", "1h20", "media hora", M:SS) only when the question names a film,
+# since other domains use them too ("a timeout of 30 minutes").
+CLOCK = re.compile(r"\b(\d{1,2}):(\d{2}):(\d{2})\b")
+MINUTE_WORD = re.compile(
+    r"\b(?:minuto|minute|min\.?)\s+(\d{1,3})(?::(\d{2}))?\b", re.IGNORECASE)
+HOURS = re.compile(
+    r"\b(\d)\s*(?:h|horas?|hours?)(?![a-z])\s*(?:y\s+|and\s+)?(?:(\d{1,2})\s*"
+    r"(?:m|min|mins|minutos?|minutes?)?\b)?", re.IGNORECASE)
+MINUTES = re.compile(r"\b(\d{1,3})\s*(?:min|mins|minutos?|minutes?)\b",
+                     re.IGNORECASE)
+SHORT_CLOCK = re.compile(r"\b(\d{1,3}):(\d{2})\b")
+HALF_HOUR = re.compile(r"\b(media hora|half an hour)\b", re.IGNORECASE)
+
+
+def time_of(question: str, film_named: bool) -> Optional[float]:
+    """Second of the film a question asks about, or None."""
+    found = CLOCK.search(question)
+    if found:
+        h, m, s = (int(x) for x in found.groups())
+        return float(h * 3600 + m * 60 + s)
+    found = MINUTE_WORD.search(question)
+    if found:
+        return float(int(found.group(1)) * 60 + int(found.group(2) or 0))
+    if not film_named:
+        return None
+    found = HOURS.search(question)
+    if found:
+        return float(int(found.group(1)) * 3600
+                     + int(found.group(2) or 0) * 60)
+    found = MINUTES.search(question)
+    if found:
+        return float(int(found.group(1)) * 60)
+    found = SHORT_CLOCK.search(question)
+    if found:
+        return float(int(found.group(1)) * 60 + int(found.group(2)))
+    if HALF_HOUR.search(question):
+        return 1800.0
+    return None
+
+
+def chunks_at(parents: list[Any], seconds: float,
+              titles: Optional[list[str]] = None) -> list[Any]:
+    """The parent chunks of each film (or only `titles`) that cover a
+    moment: its scene summary first, then the transcript around it
+    (dialogue and what is on screen). Films shorter than the moment are
+    left out."""
+    by_film: dict[str, dict[str, Any]] = {}
+    for chunk in parents:
+        span = clip_of(chunk.text)
+        if span is None or not span[0] <= seconds < max(span[1],
+                                                        span[0] + 1):
+            continue
+        title = title_of(chunk.file_path)
+        if titles and title not in titles:
+            continue
+        kind = "summary" if chunk.file_path.endswith(SUMMARIES_SUFFIX) \
+            else ("transcript" if not is_summary(chunk.file_path)
+                  else "")
+        if kind and kind not in by_film.setdefault(title, {}):
+            by_film[title][kind] = chunk
+    return [film[kind] for _, film in sorted(by_film.items())
+            for kind in ("summary", "transcript") if kind in film]
 
 
 def videos(films_dir: str = FILMS_DIR) -> dict[str, str]:
@@ -657,6 +798,8 @@ def write_summaries(output_dir: str, title: str, work: str,
         if path is None:
             return False
         data = load_json(path)
+    # Caches written before the synopsis header named the film.
+    data.setdefault("title", title)
     for suffix, text in zip(GENERATED_SUFFIXES, film_enrich.render(data)):
         with open(summaries_path(output_dir, title, suffix), "w",
                   encoding="utf-8", newline="\n") as fh:
